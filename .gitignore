@@ -1,8 +1,14 @@
-# Miscellaneous
+# --------------------------
+# Archivos generales
+# --------------------------
 *.class
 *.log
 *.pyc
 *.swp
+*.tmp
+*.bak
+*.orig
+*.rej
 .DS_Store
 .atom/
 .build/
@@ -12,34 +18,89 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# --------------------------
+# IDEs / Editores
+# --------------------------
 *.iml
 *.ipr
 *.iws
 .idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# --------------------------
+# Flutter / Dart
+# --------------------------
 .dart_tool/
-.flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Compilation Files
 /build/
-/coverage/
+coverage/
+test/**/coverage/
 
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
+# --------------------------
+# Android
+# --------------------------
+/android/.gradle/
+android/.gradle/
+/android/local.properties
+/android/**/gradle-wrapper.jar
+/android/**/GeneratedPluginRegistrant.java
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Keystores (private keys)
+*.jks
+*.keystore
+*.gradle/
+gradle-app.setting
+gradlew
+gradlew.bat
+
+# --------------------------
+# iOS / Xcode
+# --------------------------
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Compilation Files
+*.xcworkspace
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+*.xcuserdatad
+ios/Runner.xcarchive/
+
+# --------------------------
+# Web
+# --------------------------
+lib/generated_plugin_registrant.dart
+
+# --------------------------
+# Obfuscation / Symbolication
+# --------------------------
+app.*.symbols
+app.*.map.json
+
+# --------------------------
+# Other
+# --------------------------
+*.lock
+pubspec.lock
+.env
