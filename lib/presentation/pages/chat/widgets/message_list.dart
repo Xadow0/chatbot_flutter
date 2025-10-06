@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../../data/models/message_model.dart';
 
 class MessageList extends StatelessWidget {
@@ -52,6 +53,16 @@ class _MessageBubble extends StatelessWidget {
 
   const _MessageBubble({required this.message});
 
+  String _cleanMarkdownText(String text) {
+    // Eliminar múltiples saltos de línea consecutivos (más de uno)
+    String cleaned = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    
+    // Limpiar espacios en blanco al inicio y final
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUser = message.type == MessageType.user;
@@ -63,7 +74,7 @@ class _MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
+          maxWidth: MediaQuery.of(context).size.width * 0.85,
         ),
         decoration: BoxDecoration(
           color: isUser
@@ -73,22 +84,93 @@ class _MessageBubble extends StatelessWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              message.displayPrefix,
-              style: const TextStyle(fontSize: 16),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                message.displayPrefix,
+                style: const TextStyle(fontSize: 16),
+              ),
             ),
             const SizedBox(width: 8),
             Flexible(
-              child: Text(
-                message.content,
-                style: TextStyle(
-                  color: isUser
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurface,
-                  fontSize: 15,
-                ),
-              ),
+              child: isUser
+                  ? Text(
+                      message.content,
+                      style: TextStyle(
+                        color: colorScheme.onPrimary,
+                        fontSize: 15,
+                      ),
+                    )
+                  : MarkdownBody(
+                      data: _cleanMarkdownText(message.content),
+                      selectable: true,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 15,
+                          height: 1.4,
+                        ),
+                        h1: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          height: 1.3,
+                        ),
+                        h2: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          height: 1.3,
+                        ),
+                        h3: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          height: 1.3,
+                        ),
+                        strong: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        em: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        code: TextStyle(
+                          backgroundColor: colorScheme.surfaceContainer,
+                          color: colorScheme.primary,
+                          fontFamily: 'monospace',
+                          fontSize: 14,
+                        ),
+                        codeblockDecoration: BoxDecoration(
+                          color: colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        codeblockPadding: const EdgeInsets.all(12),
+                        listBullet: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 15,
+                        ),
+                        listIndent: 20,
+                        blockSpacing: 8.0,
+                        blockquoteDecoration: BoxDecoration(
+                          color: colorScheme.surfaceContainer.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border(
+                            left: BorderSide(
+                              color: colorScheme.primary,
+                              width: 3,
+                            ),
+                          ),
+                        ),
+                        blockquotePadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
