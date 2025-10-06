@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 class MessageInput extends StatefulWidget {
   final Function(String) onSendMessage;
+  final bool isBlocked;
 
   const MessageInput({
     super.key,
     required this.onSendMessage,
+    this.isBlocked = false,
   });
 
   @override
@@ -16,8 +18,7 @@ class _MessageInputState extends State<MessageInput> {
   final TextEditingController _controller = TextEditingController();
 
   void _handleSend() {
-    if (_controller.text.trim().isEmpty) return;
-    
+    if (_controller.text.trim().isEmpty || widget.isBlocked) return;
     widget.onSendMessage(_controller.text.trim());
     _controller.clear();
   }
@@ -47,8 +48,11 @@ class _MessageInputState extends State<MessageInput> {
           Expanded(
             child: TextField(
               controller: _controller,
-              decoration: const InputDecoration(
-                hintText: 'Escribe un mensaje...',
+              enabled: !widget.isBlocked,
+              decoration: InputDecoration(
+                hintText: widget.isBlocked
+                    ? 'Procesando respuesta...'
+                    : 'Escribe un mensaje...',
               ),
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _handleSend(),
@@ -57,7 +61,7 @@ class _MessageInputState extends State<MessageInput> {
           const SizedBox(width: 8),
           IconButton.filled(
             icon: const Icon(Icons.send),
-            onPressed: _handleSend,
+            onPressed: widget.isBlocked ? null : _handleSend,
             tooltip: 'Enviar',
           ),
         ],

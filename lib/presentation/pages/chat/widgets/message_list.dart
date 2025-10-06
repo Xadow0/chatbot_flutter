@@ -3,10 +3,12 @@ import '../../../../data/models/message_model.dart';
 
 class MessageList extends StatelessWidget {
   final List<Message> messages;
+  final bool isProcessing;
 
   const MessageList({
     super.key,
     required this.messages,
+    this.isProcessing = false,
   });
 
   @override

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'config/routes.dart';
 import 'core/theme/app_theme.dart';
 
-void main() {
+
+Future<void> main() async {
+  // Cargar variables de entorno
+  await dotenv.load(fileName: ".env");
+  
   runApp(const MyApp());
 }
 
@@ -17,7 +22,7 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       initialRoute: AppRoutes.chat,
-      routes: AppRoutes.routes,
+      routes: AppRoutes.routes
     );
   }
 }

@@ -1,43 +1,54 @@
 import 'package:flutter/foundation.dart';
 import '../../data/models/message_model.dart';
 import '../../data/models/quick_response_model.dart';
+import '../../data/services/gemini_service.dart';
+import '../../data/repositories/chat_repository.dart';
+import '../../domain/usecases/command_processor.dart';
+import '../../domain/usecases/send_message_usecase.dart';
 
 class ChatProvider extends ChangeNotifier {
   final List<Message> _messages = [];
   List<QuickResponse> _quickResponses = QuickResponseProvider.defaultResponses;
+  bool _isProcessing = false;
+
+  late final SendMessageUseCase _sendMessageUseCase;
+
+  ChatProvider() {
+    final geminiService = GeminiService();
+    final commandProcessor = CommandProcessor(geminiService);
+    final localRepository = LocalChatRepository();
+
+    _sendMessageUseCase = SendMessageUseCase(
+      commandProcessor: commandProcessor,
+      chatRepository: localRepository,
+    );
+  }
 
   List<Message> get messages => List.unmodifiable(_messages);
   List<QuickResponse> get quickResponses => _quickResponses;
+  bool get isProcessing => _isProcessing;
 
-  void sendMessage(String content) {
-    if (content.trim().isEmpty) return;
+  Future<void> sendMessage(String content) async {
+    if (content.trim().isEmpty || _isProcessing) return;
 
-    // Añadir mensaje del usuario
     final userMessage = Message.user(content);
     _messages.add(userMessage);
-
-    // Simular respuesta del bot
-    _simulateBotResponse(content);
-
-    // Actualizar respuestas rápidas según contexto
-    _updateQuickResponses();
-
+    _isProcessing = true;
     notifyListeners();
-  }
 
-  void _simulateBotResponse(String userMessage) {
-    // Simular un pequeño delay
-    Future.delayed(const Duration(milliseconds: 500), () {
-      final botMessage = Message.bot(
-        '¡Hola! Recibí tu mensaje: $userMessage',
-      );
-      _messages.add(botMessage);
+    try {
+      final botResponse = await _sendMessageUseCase.execute(content);
+      _messages.add(botResponse);
+    } catch (e) {
+      _messages.add(Message.bot('❌ Error inesperado: ${e.toString()}'));
+    } finally {
+      _isProcessing = false;
+      _updateQuickResponses();
       notifyListeners();
-    });
+    }
   }
 
   void _updateQuickResponses() {
-    // TODO: Implementar lógica dinámica
     _quickResponses = QuickResponseProvider.getContextualResponses(_messages);
   }
 
