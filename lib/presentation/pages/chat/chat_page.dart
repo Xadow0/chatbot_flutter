@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/chat_provider.dart';
@@ -7,19 +8,39 @@ import 'widgets/message_input.dart';
 import 'widgets/quick_responses.dart';
 
 class ChatPage extends StatelessWidget {
-  const ChatPage({super.key});
+  final File? preloadedConversationFile;
+
+  const ChatPage({super.key, this.preloadedConversationFile});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => ChatProvider(),
-      child: const _ChatBody(),
+      child: _ChatBody(preloadedConversationFile: preloadedConversationFile),
     );
   }
 }
 
-class _ChatBody extends StatelessWidget {
-  const _ChatBody();
+class _ChatBody extends StatefulWidget {
+  final File? preloadedConversationFile;
+  const _ChatBody({this.preloadedConversationFile});
+
+  @override
+  State<_ChatBody> createState() => _ChatBodyState();
+}
+
+class _ChatBodyState extends State<_ChatBody> {
+  @override
+  void initState() {
+    super.initState();
+    // Si hay una conversación preexistente, cargarla al iniciar
+    if (widget.preloadedConversationFile != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final chatProvider = context.read<ChatProvider>();
+        await chatProvider.loadConversation(widget.preloadedConversationFile!);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,3 +88,4 @@ class _ChatBody extends StatelessWidget {
     );
   }
 }
+

@@ -34,7 +34,6 @@ class CustomDrawer extends StatelessWidget {
               ],
             ),
           ),
-
           ListTile(
             leading: const Icon(Icons.home_outlined),
             title: const Text('Menú de inicio'),
@@ -43,11 +42,18 @@ class CustomDrawer extends StatelessWidget {
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.startMenu,
-                (route) => false, // elimina el stack de navegación
+                (route) => false,
               );
             },
           ),
-
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('Historial'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, AppRoutes.history);
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.chat),
             title: const Text('Chat'),
@@ -64,9 +70,7 @@ class CustomDrawer extends StatelessWidget {
               Navigator.pushNamed(context, AppRoutes.settings);
             },
           ),
-
           const Divider(),
-
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('Acerca de'),
@@ -92,3 +96,5 @@ class CustomDrawer extends StatelessWidget {
     );
   }
 }
+
+

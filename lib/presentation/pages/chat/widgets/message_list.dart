@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown_widget/markdown_widget.dart';
 import '../../../../data/models/message_model.dart';
 
 class MessageList extends StatelessWidget {
@@ -103,72 +103,84 @@ class _MessageBubble extends StatelessWidget {
                         fontSize: 15,
                       ),
                     )
-                  : MarkdownBody(
+                  : MarkdownWidget(
                       data: _cleanMarkdownText(message.content),
+                      shrinkWrap: true,
                       selectable: true,
-                      styleSheet: MarkdownStyleSheet(
-                        p: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 15,
-                          height: 1.4,
-                        ),
-                        h1: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          height: 1.3,
-                        ),
-                        h2: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          height: 1.3,
-                        ),
-                        h3: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          height: 1.3,
-                        ),
-                        strong: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        em: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        code: TextStyle(
-                          backgroundColor: colorScheme.surfaceContainer,
-                          color: colorScheme.primary,
-                          fontFamily: 'monospace',
-                          fontSize: 14,
-                        ),
-                        codeblockDecoration: BoxDecoration(
-                          color: colorScheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        codeblockPadding: const EdgeInsets.all(12),
-                        listBullet: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 15,
-                        ),
-                        listIndent: 20,
-                        blockSpacing: 8.0,
-                        blockquoteDecoration: BoxDecoration(
-                          color: colorScheme.surfaceContainer.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border(
-                            left: BorderSide(
-                              color: colorScheme.primary,
-                              width: 3,
+                      config: MarkdownConfig(
+                        configs: [
+                          PConfig(
+                            textStyle: TextStyle(
+                              color: colorScheme.onSurface,
+                              fontSize: 15,
+                              height: 1.4,
                             ),
                           ),
-                        ),
-                        blockquotePadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                          H1Config(
+                            style: TextStyle(
+                              color: colorScheme.onSurface,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              height: 1.3,
+                            ),
+                          ),
+                          H2Config(
+                            style: TextStyle(
+                              color: colorScheme.onSurface,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              height: 1.3,
+                            ),
+                          ),
+                          H3Config(
+                            style: TextStyle(
+                              color: colorScheme.onSurface,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              height: 1.3,
+                            ),
+                          ),
+                          CodeConfig(
+                            style: TextStyle(
+                              backgroundColor: colorScheme.surfaceContainer,
+                              color: colorScheme.primary,
+                              fontFamily: 'monospace',
+                              fontSize: 14,
+                            ),
+                          ),
+                          PreConfig(
+                            textStyle: TextStyle(
+                              color: colorScheme.onSurface,
+                              fontFamily: 'monospace',
+                              fontSize: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.all(12),
+                          ),
+                          ListConfig(
+                            marker: (bool isOrdered, int depth, int index) {
+                              if (isOrdered) {
+                                return Text(
+                                  '${index + 1}. ',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurface,
+                                    fontSize: 15,
+                                  ),
+                                );
+                              }
+                              return Text(
+                                '• ',
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontSize: 15,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
             ),

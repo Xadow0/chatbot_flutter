@@ -57,6 +57,17 @@ class StartMenuPage extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 20),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.history),
+                label: const Text('Historial'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                onPressed: () {
+                  Navigator.pushNamed(context, AppRoutes.history);
+                },
+              ),
+              const SizedBox(height: 20),
               OutlinedButton.icon(
                 icon: const Icon(Icons.settings),
                 label: const Text('Ajustes'),
@@ -70,11 +81,8 @@ class StartMenuPage extends StatelessWidget {
               const SizedBox(height: 20),
               TextButton(
                 onPressed: () {
-                  // Aún sin funcionalidad
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Créditos próximamente'),
-                    ),
+                    const SnackBar(content: Text('Créditos próximamente')),
                   );
                 },
                 child: const Text('Créditos'),
@@ -86,3 +94,5 @@ class StartMenuPage extends StatelessWidget {
     );
   }
 }
+
+

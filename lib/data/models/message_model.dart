@@ -32,6 +32,25 @@ class Message {
   }
 
   String get displayPrefix => type == MessageType.user ? '👤' : '🤖';
-  
   String get displayName => type == MessageType.user ? 'Usuario' : 'Bot';
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'content': content,
+        'type': type.name,
+        'timestamp': timestamp.toIso8601String(),
+      };
+
+  factory Message.fromJson(Map<String, dynamic> json) {
+    return Message(
+      id: json['id'],
+      content: json['content'],
+      type: MessageType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => MessageType.bot,
+      ),
+      timestamp: DateTime.parse(json['timestamp']),
+    );
+  }
 }
+

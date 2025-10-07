@@ -11,7 +11,7 @@ class QuickResponse {
 class QuickResponseProvider {
   // Respuestas por defecto
   static const List<QuickResponse> defaultResponses = [
-    QuickResponse(text: 'Sí'),
+    QuickResponse(text: '/tryprompt'),
     QuickResponse(text: 'Hola'),
     QuickResponse(text: 'Siguiente'),
   ];

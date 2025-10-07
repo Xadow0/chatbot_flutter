@@ -51,8 +51,8 @@ class CommandProcessor {
   Future<CommandResult> processMessage(String message) async {
     final normalizedMessage = message.trim().toLowerCase();
 
-    // Detectar comando "probar prompt"
-    if (normalizedMessage.startsWith('probar prompt')) {
+    // Detectar comando "/tryprompt"
+    if (normalizedMessage.startsWith('/tryprompt')) {
       return await _processProbarPrompt(message);
     }
 
@@ -60,16 +60,16 @@ class CommandProcessor {
     return CommandResult.notCommand();
   }
 
-  /// Procesa el comando "probar prompt"
+  /// Procesa el comando "/tryprompt"
   Future<CommandResult> _processProbarPrompt(String message) async {
     try {
       // Extraer el contenido después del comando
-      final content = _extractContentAfterCommand(message, 'probar prompt');
+      final content = _extractContentAfterCommand(message, '/tryprompt');
       
       if (content.isEmpty) {
         return CommandResult.error(
           CommandType.probarPrompt,
-          'Por favor, escribe algo después de "probar prompt".\nEjemplo: probar prompt ¿Qué es Flutter?',
+          'Por favor, escribe algo después de "/tryprompt".\nEjemplo: /tryprompt ¿Qué es Flutter?',
         );
       }
 

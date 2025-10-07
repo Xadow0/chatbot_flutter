@@ -1,14 +1,21 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 import 'config/routes.dart';
 import 'core/theme/app_theme.dart';
-
+import 'presentation/providers/chat_provider.dart';
 
 Future<void> main() async {
-  // Cargar variables de entorno
   await dotenv.load(fileName: ".env");
-  
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -22,7 +29,7 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       initialRoute: AppRoutes.startMenu,
-      routes: AppRoutes.routes
+      routes: AppRoutes.routes,
     );
   }
 }
