@@ -34,6 +34,20 @@ class CustomDrawer extends StatelessWidget {
               ],
             ),
           ),
+
+          ListTile(
+            leading: const Icon(Icons.home_outlined),
+            title: const Text('Menú de inicio'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.startMenu,
+                (route) => false, // elimina el stack de navegación
+              );
+            },
+          ),
+
           ListTile(
             leading: const Icon(Icons.chat),
             title: const Text('Chat'),
@@ -50,7 +64,9 @@ class CustomDrawer extends StatelessWidget {
               Navigator.pushNamed(context, AppRoutes.settings);
             },
           ),
+
           const Divider(),
+
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('Acerca de'),
