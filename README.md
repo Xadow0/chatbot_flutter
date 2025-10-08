@@ -27,11 +27,13 @@ El objetivo **no es crear prompts perfectos**, sino **ayudar a comprender cómo 
 
 ## 🚀 Ejecución del Proyecto
 
+Ejecutar los comandos en la terminal Dart de VSCode en la raíz del programa ("/chatbot_flutter").
+
 ### 📱 En Android (emulado o dispositivo real)
 
 1. Abre el proyecto en **VSCode** o **Android Studio**.  
 2. Inicia un dispositivo virtual (por ejemplo, *Google Pixel 7*).  
-3. Ejecuta los siguientes comandos en la terminal:
+3. Ejecuta los siguientes comandos en la terminal Dart:
 
 ```bash
 $ flutter devices      # Verifica que el dispositivo está conectado
@@ -41,12 +43,13 @@ $ flutter run          # Ejecuta la app en el emulador o dispositivo
 ### 💻 En Windows (emulado o dispositivo real)
 
 1. Asegúrate de tener Flutter configurado para escritorio:
-2. 
+   
  ```bash
 $ flutter config --enable-windows-desktop
 ```
+
 3. Ejecuta la aplicación:
-4. 
+   
 ```bash
 $ flutter run -d windows               # Modo debug
 $ flutter run --release -d windows     # Modo release
