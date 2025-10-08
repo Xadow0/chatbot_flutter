@@ -100,22 +100,29 @@ class CommandProcessor {
   /// Construye el prompt mejorado para Gemini
   String _buildEnhancedPrompt(String userContent) {
     return '''
-Haz de un entrenador de prompts. Identifica en el siguiente mensaje del usuario, cual es el objetivo que quiere cumplir. Una vez tengas claro el
-objetivo, indícaselo al inicio de la respuesta. 
-Luego, analiza el resto del prompt y evalúa su eficiencia en una valoración del 1 al 100, donde el 1 es muy deficiente y 100 es perfecto. Para esta
-valoración se deberá tener en cuenta cuanto de grande y complicado es el objetivo a cumplir, y como de bien estructurado y expresado esta el prompt para lograr ese objetivo.
-Cuanto más complicado y grande sea el objetivo, será más necesario: un contexto completo, instrucciones claras y por pasos, ejemplos, y un formato de respuesta adecuado.
+      Actúa como un evaluador y mejorador de prompts sobre el prompt que adjunto como "Mensaje del usuario".
 
-Señala los posibles errores o carencias del prompt, y explica como mejorarlo.
+      Instrucciones
+      1.  **Identifica el objetivo principal** que este prompt busca que tú (la IA) cumplas. Indícalo claramente al inicio de tu respuesta.
+      2.  **Evalúa la eficiencia de este prompt** con una valoración del 1 al 100 (donde 1 es muy deficiente y 100 es perfecto). Para esta valoración, considera los siguientes aspectos:   
+      2.1.   **Tamaño y complejidad del objetivo:** ¿Es el objetivo que el prompt propone grande y complicado para la IA?   
+      2.2.   **Estructura y expresión del prompt:** ¿Está este prompt bien estructurado y expresado para lograr su objetivo de manera efectiva?    
+      2.3.   **Necesidades de un prompt complejo:** Si el objetivo es grande y/o complicado, ¿incluye este prompt un contexto completo, instrucciones claras y por pasos, ejemplos relevantes y un formato de respuesta adecuado para la IA?
+      3.  **Señala los posibles errores o carencias** de este prompt y explica detalladamente cómo cada uno podría mejorarse.
+      4.  **Reescribe el prompt mejorado**, incorporando todas las mejoras que hayas señalado. Asegúrate de que el prompt resultante sea claro, completo y específico.
+      Señala los posibles errores o carencias del prompt, y explica como mejorarlo.
 
-Finalmente, reescribe el prompt mejorado, teniendo en cuenta las mejoras que has señalado. Asegúrate de que el prompt mejorado es claro, completo y específico.
+      Reestricciones:
+      *   Tu respuesta no debe superar los 4000 tokens.
+      *   Céntrate en la explicación de las mejoras y en la generación del prompt mejorado, sin dar rodeos o información superflua en el formato de la explicación.
 
-Mensaje del usuario:
-$userContent
+      Mensaje del usuario:
+      $userContent
 
-Tu respuesta:
-''';
-  }
+
+      Fin del mensaje del usuario.
+      ''';
+    }
 }
 
 // Comandos adicionales que puedes implementar en el futuro:
