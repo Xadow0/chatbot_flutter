@@ -46,13 +46,3 @@ El objetivo **no es crear prompts perfectos**, sino **ayudar a comprender cómo 
 
 💾 **Gestión del Historial de Conversaciones**
   - Cada conversación se guarda como un fichero .json en "Application/Documents/conversations/".
-
-🗂️ **Formato del archivo** (json)
-{
-  "id": "12345",
-  "startedAt": "2025-10-01T10:00:00Z",
-  "messages": [
-    { "id": "1", "sender": "user", "text": "Hola", "timestamp": "..." },
-    { "id": "2", "sender": "ia", "text": "¡Hola! ¿En qué puedo ayudarte?", "timestamp": "..." }
-  ]
-}
