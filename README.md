@@ -1,6 +1,6 @@
 # 🧠 TRAINING.IA
 
-> Aplicación/juego interactivo para aprender y comprender el funcionamiento de las **Inteligencias Artificiales Generativas** desde un nivel básico, usando tecnologías abiertas y gratuitas.
+> Aplicación/juego interactivo para aprender y comprender el funcionamiento de las **Inteligencias Artificiales Generativas**, usando tecnologías abiertas y gratuitas.
 
 ---
 
