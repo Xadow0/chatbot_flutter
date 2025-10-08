@@ -100,15 +100,15 @@ class CommandProcessor {
   /// Construye el prompt mejorado para Gemini
   String _buildEnhancedPrompt(String userContent) {
     return '''
-      Actúa como un evaluador y mejorador de prompts sobre el prompt que adjunto como "Mensaje del usuario".
+      Actúa como un evaluador y mejorador de prompts sobre el prompt que adjunto como "Mensaje del usuario". El objetivo final y principal que debes tener en cuenta es mejorar el prompt, por lo que eso debe ser lo que sí o sí aparezca en la respuesta siempre.
 
       Instrucciones
       1.  **Identifica el objetivo principal** que este prompt busca que tú (la IA) cumplas. Indícalo claramente al inicio de tu respuesta.
-      2.  **Evalúa la eficiencia de este prompt** con una valoración del 1 al 100 (donde 1 es muy deficiente y 100 es perfecto). Para esta valoración, considera los siguientes aspectos:   
+      2.  **Evalúa la eficiencia de este prompt** con una valoración del 1 al 100 (donde 1 es muy deficiente y 100 es perfecto). Para esta valoración, respondiendo a los siguientes aspectos de forma clara y concisa, sin dar demasiado detalle:   
       2.1.   **Tamaño y complejidad del objetivo:** ¿Es el objetivo que el prompt propone grande y complicado para la IA?   
       2.2.   **Estructura y expresión del prompt:** ¿Está este prompt bien estructurado y expresado para lograr su objetivo de manera efectiva?    
       2.3.   **Necesidades de un prompt complejo:** Si el objetivo es grande y/o complicado, ¿incluye este prompt un contexto completo, instrucciones claras y por pasos, ejemplos relevantes y un formato de respuesta adecuado para la IA?
-      3.  **Señala los posibles errores o carencias** de este prompt y explica detalladamente cómo cada uno podría mejorarse.
+      3.  **Señala los posibles errores o carencias** de este prompt y explica por encima cómo cada uno podría mejorarse.
       4.  **Reescribe el prompt mejorado**, incorporando todas las mejoras que hayas señalado. Asegúrate de que el prompt resultante sea claro, completo y específico.
       Señala los posibles errores o carencias del prompt, y explica como mejorarlo.
 
