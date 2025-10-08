@@ -25,24 +25,43 @@ El objetivo **no es crear prompts perfectos**, sino **ayudar a comprender cómo 
 
 ---
 
-## Ejecución del Proyecto
-📱 **En Android (emulado o dispositivo real)**
-  1. Abre el proyecto en VSCode o Android Studio.
-  2. Inicia un dispositivo virtual (por ejemplo, Google Pixel 7).
-  3. Ejecuta los siguientes comandos:
-      $ flutter devices      # Verifica que el dispositivo está conectado
-      $ flutter run          # Ejecuta la app
+## 🚀 Ejecución del Proyecto
 
-💻 **En Windows**
-  1. Asegúrate de tener Flutter configurado para escritorio:
-    $ flutter config --enable-windows-desktop
-  2. Ejecuta la aplicación:
-    $ flutter run -d windows               # Modo debug
-    $ flutter run --release -d windows     # Modo release
+### 📱 En Android (emulado o dispositivo real)
 
-  Para compilar el ejecutable final (.exe):
-    $ flutter build windows --release
+1. Abre el proyecto en **VSCode** o **Android Studio**.  
+2. Inicia un dispositivo virtual (por ejemplo, *Google Pixel 7*).  
+3. Ejecuta los siguientes comandos en la terminal:
 
+```bash
+$ flutter devices      # Verifica que el dispositivo está conectado
+$ flutter run          # Ejecuta la app en el emulador o dispositivo
+```
 
-💾 **Gestión del Historial de Conversaciones**
-  - Cada conversación se guarda como un fichero .json en "Application/Documents/conversations/".
+### 💻 En Windows (emulado o dispositivo real)
+
+1. Asegúrate de tener Flutter configurado para escritorio:
+2. 
+ ```bash
+$ flutter config --enable-windows-desktop
+```
+3. Ejecuta la aplicación:
+4. 
+```bash
+$ flutter run -d windows               # Modo debug
+$ flutter run --release -d windows     # Modo release
+```
+
+### Para compilar el ejecutable final (.exe):
+
+```bash
+$ flutter build windows --release
+```
+
+### 💾 Gestión del Historial de Conversaciones
+
+Cada conversación se guarda automáticamente como un fichero .json en la siguiente ruta:
+
+```bash
+Application/Documents/conversations/
+```
