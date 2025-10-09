@@ -43,17 +43,13 @@ class StartMenuPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                icon: const Icon(Icons.history_edu_outlined),
-                label: const Text('Chat de Historia'),
+                icon: const Icon(Icons.school_outlined),
+                label: const Text('Aprendizaje'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
                 ),
                 onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppRoutes.chat,
-                    arguments: {'mode': 'story'},
-                  );
+                  Navigator.pushNamed(context, AppRoutes.learning);
                 },
               ),
               const SizedBox(height: 20),
