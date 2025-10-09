@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:rive/rive.dart';
 
 class LearningPage extends StatefulWidget {
   const LearningPage({super.key});
@@ -12,9 +11,8 @@ class _LearningPageState extends State<LearningPage> with TickerProviderStateMix
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   
-  // Controladores para Rive
-  SMITrigger? _trigger;
-  StateMachineController? _stateMachineController;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
   
   // Estado para controlar la visibilidad
   bool _showAnimation = false;
@@ -31,35 +29,25 @@ class _LearningPageState extends State<LearningPage> with TickerProviderStateMix
       curve: Curves.easeIn,
     );
     _fadeController.forward();
+    
+    // Controlador para animación de pulso
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(
+        parent: _pulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
-    _stateMachineController?.dispose();
+    _pulseController.dispose();
     super.dispose();
-  }
-
-  void _onRiveInit(Artboard artboard) {
-    final controller = StateMachineController.fromArtboard(
-      artboard,
-      'State Machine 1', // Nombre por defecto, ajusta si es necesario
-    );
-    
-    if (controller != null) {
-      artboard.addController(controller);
-      _stateMachineController = controller;
-      
-      // Busca el trigger en la state machine
-      _trigger = controller.findInput<bool>('Trigger') as SMITrigger?;
-      
-      // Si no encuentra 'Trigger', intenta con otros nombres comunes
-      _trigger ??= controller.findInput<bool>('trigger') as SMITrigger?;
-      _trigger ??= controller.inputs.firstWhere(
-        (input) => input is SMITrigger,
-        orElse: () => controller.inputs.first,
-      ) as SMITrigger?;
-    }
   }
 
   void _onStartPressed() {
@@ -68,9 +56,9 @@ class _LearningPageState extends State<LearningPage> with TickerProviderStateMix
       _showAnimation = true;
     });
     
-    // Dispara la animación Rive después de un breve delay para asegurar que se renderiza
+    // Inicia la animación de pulso
     Future.delayed(const Duration(milliseconds: 100), () {
-      _trigger?.fire();
+      _pulseController.repeat(reverse: true);
     });
     
     ScaffoldMessenger.of(context).showSnackBar(
@@ -82,7 +70,7 @@ class _LearningPageState extends State<LearningPage> with TickerProviderStateMix
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
         child: Stack(
           children: [
@@ -117,16 +105,37 @@ class _LearningPageState extends State<LearningPage> with TickerProviderStateMix
               ),
             ),
             
-            // Animación Rive en el centro (solo visible cuando _showAnimation es true)
+            // Animación simple con Flutter (reemplaza la animación Rive)
             if (_showAnimation)
               Center(
-                child: SizedBox(
-                  width: 300,
-                  height: 300,
-                  child: RiveAnimation.asset(
-                    'assets/animations/radio_button.riv',
-                    fit: BoxFit.contain,
-                    onInit: _onRiveInit,
+                child: ScaleTransition(
+                  scale: _pulseAnimation,
+                  child: Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.colorScheme.primary,
+                          theme.colorScheme.secondary,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withOpacity(0.5),
+                          blurRadius: 30,
+                          spreadRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.psychology,
+                      size: 100,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
