@@ -36,15 +36,16 @@ class ChatProvider extends ChangeNotifier {
 
   /// Añade el mensaje de bienvenida inicial
   void _addWelcomeMessage() {
-    final welcomeMessage = '''¡Bienvenido al chat! 👋
+    final welcomeMessage = '''
+      ¡Bienvenido al chat! 👋
 
-      Aquí puedes conversar conmigo y utilizar los siguientes comandos:
+Aquí puedes conversar conmigo y utilizar los siguientes comandos:    
 
-      **Comandos disponibles:**
+**Comandos disponibles:**
 
-      • **/tryprompt** [escribe aquí tu prompt] -- Este comando te permite ejecutar un análisis y mejora de tu prompt, generando como resultado un prompt mejorado en caso de que sea posible.
+    • **/tryprompt** [escribe aquí tu prompt] -- Este comando te permite ejecutar un análisis y mejora de tu prompt, generando como resultado un prompt mejorado en caso de que sea posible.
 
-      ¡Empieza escribiendo tu mensaje!''';
+¡Empieza escribiendo tu mensaje!''';
 
     _messages.add(Message.bot(welcomeMessage));
     notifyListeners();
