@@ -100,22 +100,22 @@ class CommandProcessor {
   /// Construye el prompt mejorado para Gemini
   String _buildEnhancedPrompt(String userContent) {
     return '''
-      Actúa como un evaluador y mejorador de prompts para el prompt que adjunto como "Mensaje del usuario". 
-      El usuario mandará un prompt para que lo evalúes y mejores, este prompt puede ser muy simple o muy complejo. Para cada caso, debes identificar
-      cuales serían los tres pasos que este prompt debería tener, adaptado al tema de ese prompt en específico. 
+      Actúa como un evaluador y mejorador de prompts para el prompt que adjunto como "Mensaje del usuario". No repitas tu función ni el mensaje del usuario, céntrate en mejorar el prompt. 
+      El usuario mandará un prompt para que lo evalúes y mejores, para cada caso, debes identificar los tres pasos que cualquier prompt debería tener:
       1. Task 
       2. Context
       3. Referencias
-
-      Identifica cada una de estas tres partes en el prompt del usuario, y si cualquiera de ellas es faltante o deficiente, debes indicar al usuario como mejorarlo haciendole las preguntas pertinentes para el tema en expecífico del que trate el prompt.
+      Si cualquiera de las tres partes es faltante o deficiente, debes indicar al usuario como mejorarlo, haciendo las preguntas generales para que el usuario las conteste en el tema en específico del que trate el prompt.
+      Estos son los pasos que debes cumplir para evaluar y mejorar el prompt:
 
       Instrucciones
       **Identifica el objetivo principal** cuál es el objetivo que este prompt busca que tú (la IA) cumplas.
       **Tamaño y complejidad del objetivo:** ¿Es el objetivo que el prompt propone grande y complicado para la IA?  Si es así, ¿como desglosarlo en objetivos mas pequeños?
       **Estructura y expresión del prompt:** ¿Está este prompt bien estructurado y expresado para lograr su objetivo de manera efectiva?    
       **Necesidades de un prompt complejo:** Si el objetivo es grande y/o complicado, ¿incluye este prompt un contexto completo, instrucciones claras y por pasos, ejemplos relevantes y un formato de respuesta adecuado para la IA?
-      **Señala los posibles errores o carencias** de este prompt de forma clara mediante una frase por error, sin extenderte en la explicación.
-      **Reescribe el prompt mejorado**, incorporando todas las mejoras que hayas señalado. Asegúrate de que el prompt resultante sea claro, completo y específico.
+      **Añade una referencias adecuadas para el resultado:** ¿Que tipo de estructura quieres que tenga la respuesta (lista, tabla, párrafos)? ¿Que tono, longitud y estilo? Es necesario un ejemplo claro de respuesta?
+      **Reescribe el prompt mejorado** incorporando todas las mejoras que hayas señalado. Asegúrate de que el prompt resultante sea claro y completo. Proporciona este prompt mejorado en un formato markdown. Todas las partes que deban ser reemplazadas o completadas por el usuario estaran entre corchetes [].
+
 
       Reestricciones:
       *   Tu respuesta no debe superar los 4000 tokens.
