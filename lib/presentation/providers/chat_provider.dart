@@ -12,6 +12,7 @@ class ChatProvider extends ChangeNotifier {
   final List<Message> _messages = [];
   List<QuickResponse> _quickResponses = QuickResponseProvider.defaultResponses;
   bool _isProcessing = false;
+  bool _isNewConversation = true;
 
   late final SendMessageUseCase _sendMessageUseCase;
 
@@ -24,15 +25,39 @@ class ChatProvider extends ChangeNotifier {
       commandProcessor: commandProcessor,
       chatRepository: localRepository,
     );
+
+    // Añadir mensaje de bienvenida al iniciar una conversación nueva
+    _addWelcomeMessage();
   }
 
   List<Message> get messages => List.unmodifiable(_messages);
   List<QuickResponse> get quickResponses => _quickResponses;
   bool get isProcessing => _isProcessing;
 
+  /// Añade el mensaje de bienvenida inicial
+  void _addWelcomeMessage() {
+    final welcomeMessage = '''¡Bienvenido al chat! 👋
+
+      Aquí puedes conversar conmigo y utilizar los siguientes comandos:
+
+      **Comandos disponibles:**
+
+      • **/tryprompt** [escribe aquí tu prompt] -- Este comando te permite ejecutar un análisis y mejora de tu prompt, generando como resultado un prompt mejorado en caso de que sea posible.
+
+      ¡Empieza escribiendo tu mensaje!''';
+
+    _messages.add(Message.bot(welcomeMessage));
+    notifyListeners();
+  }
+
   /// Envía un mensaje y guarda la conversación automáticamente
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty || _isProcessing) return;
+
+    // Marcar que ya no es una conversación nueva después del primer mensaje
+    if (_isNewConversation) {
+      _isNewConversation = false;
+    }
 
     final userMessage = Message.user(content);
     _messages.add(userMessage);
@@ -77,7 +102,10 @@ class ChatProvider extends ChangeNotifier {
       await ConversationRepository.saveConversation(_messages);
     }
     _messages.clear();
-    notifyListeners();
+    _isNewConversation = true;
+    
+    // Añadir mensaje de bienvenida al limpiar
+    _addWelcomeMessage();
   }
 
   /// Carga una conversación desde un archivo
@@ -86,8 +114,11 @@ class ChatProvider extends ChangeNotifier {
     _messages
       ..clear()
       ..addAll(loadedMessages);
+    
+    // Marcar como conversación existente (no mostrar mensaje de bienvenida)
+    _isNewConversation = false;
+    
     _updateQuickResponses();
     notifyListeners();
   }
 }
-
