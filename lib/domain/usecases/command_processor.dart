@@ -117,7 +117,7 @@ class CommandProcessor {
       **Reescribe el prompt mejorado** incorporando todas las mejoras que hayas señalado. Asegúrate de que el prompt resultante sea claro y completo. Proporciona este prompt mejorado en un formato markdown. Todas las partes que deban ser reemplazadas o completadas por el usuario estaran entre corchetes [].
 
 
-      Reestricciones:
+      Restricciones:
       *   Tu respuesta no debe superar los 4000 tokens.
       *   Céntrate en la explicación de las mejoras y en la generación del prompt mejorado, sin dar rodeos o información superflua en el formato de la explicación.
 
