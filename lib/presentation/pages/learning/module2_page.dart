@@ -582,10 +582,12 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
   bool _waitingForInput = false;
   bool _promptComplete = false;
   // bool _showingFinalPrompt = false; // removed (unused)
-  bool _generatingResponse = false;
+  // Note: removed unused _generatingResponse to avoid analyzer warnings
   String _aiResponse = '';
   bool _responseAnimationComplete = false;
-  
+  // Indica que Gemini devolvió la respuesta y que se eliminó el mensaje "Generando respuesta"
+  bool _geminiReturned = false;
+    
   // Para guardar la conversación
   String? _conversationId;
 
@@ -706,7 +708,6 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
       );
 
       setState(() {
-        _generatingResponse = true;
         _responseAnimationComplete = false;
       });
 
@@ -740,6 +741,10 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
       
       // Remover mensaje de "Generando..." y agregar mensaje AI con callback
       _messages.removeLast(); // Remover mensaje de "Generando..."
+      // Marcamos que Gemini devolvió la respuesta y ya se borró el marcador "Generando respuesta"
+      setState(() {
+        _geminiReturned = true;
+      });
 
       // Añadir la respuesta animada y pasar un onComplete para habilitar botones
       _addMessage(
@@ -751,8 +756,11 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
             if (!mounted) return;
             setState(() {
               _aiResponse = response;
+              // Marcar que la animación finalizó
               _responseAnimationComplete = true;
             });
+            // Guardar la conversación actualizada (ahora completada)
+            _saveConversation();
           },
         ),
       );
@@ -760,10 +768,12 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
       if (!mounted) return;
       
       setState(() {
-        _generatingResponse = false;
+        // on error, ensure response animation flag is false and gemini flag reset
+        _responseAnimationComplete = false;
+        _geminiReturned = false;
       });
 
-      _messages.removeLast();
+  _messages.removeLast();
 
       _addMessage(
         _ChatMessage(
@@ -819,8 +829,8 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
       _currentPartIndex = 0;
       _waitingForInput = false;
       _promptComplete = false;
-      _generatingResponse = false;
-      _aiResponse = '';
+  _aiResponse = '';
+  _geminiReturned = false;
       _responseAnimationComplete = false;
       _conversationId = 'modulo2_${DateTime.now().millisecondsSinceEpoch}';
     });
@@ -858,8 +868,8 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
           ),
         ),
 
-  // Botones finales (solo cuando la respuesta esté completamente lista y la animación haya terminado)
-  if (_aiResponse.isNotEmpty && !_generatingResponse && _responseAnimationComplete)
+  // Botones finales: mostrar cuando el prompt esté completo y la animación de la respuesta haya terminado
+  if (_promptComplete && _responseAnimationComplete)
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -938,6 +948,27 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
               ],
             ),
           ),
+        // Área de finalización: cuando ya no estamos pidiendo partes y el prompt está completo,
+        // mostramos un único botón 'Finaliza' en la zona de input.
+        if (!_waitingForInput && _promptComplete)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _geminiReturned ? widget.onComplete : null,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Finaliza'),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -1010,7 +1041,7 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
       return false;
     }
 
-    String _cleanMarkdownText(String t) {
+    String cleanMarkdownText(String t) {
       String cleaned = t.replaceAll(RegExp(r'\n{3,}'), '\n\n');
       cleaned = cleaned.trim();
       return cleaned;
@@ -1019,7 +1050,7 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
     // If the message is from the AI and it looks like markdown, render with MarkdownWidget
     if (!message.isUser && looksLikeMarkdown(text)) {
       return MarkdownWidget(
-        data: _cleanMarkdownText(text),
+        data: cleanMarkdownText(text),
         shrinkWrap: true,
         selectable: true,
         config: MarkdownConfig(

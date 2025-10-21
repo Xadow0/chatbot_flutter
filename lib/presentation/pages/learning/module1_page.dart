@@ -337,7 +337,7 @@ class _ExplanationPageState extends State<_ExplanationPage> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ],
           
           const Spacer(),
@@ -387,7 +387,7 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
   ];
 
   List<_CapabilityQuestion> _selectedQuestions = [];
-  Map<int, bool?> _userAnswers = {};
+  final Map<int, bool?> _userAnswers = {};
   bool _canProceed = false;
 
   @override
@@ -617,7 +617,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
     'en', 'cada', 'momento'
   ];
   
-  List<String> _generatedWords = [];
+  final List<String> _generatedWords = [];
   String _currentWord = '';
   List<String> _candidateWords = [];
   int _wordIndex = 0;
