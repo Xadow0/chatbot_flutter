@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'module3_intro_page.dart';
 import 'module3_iteration_page.dart';
+import 'module3_conclusion_page.dart';
 
 class Module3Page extends StatefulWidget {
   const Module3Page({super.key});
@@ -74,14 +75,16 @@ class _Module3PageState extends State<Module3Page> {
       case 1:
         return Module3IterationPage(
           // run the full iteration sequence in one chat interface
-          iterationSequence: [IterationType.reformular, IterationType.aclarar, IterationType.ejemplificar, IterationType.acotar],
-          onNext: _completeModule,
+          iterationSequence: [
+            IterationType.reformular,
+            IterationType.aclarar,
+            IterationType.ejemplificar,
+            IterationType.acotar
+          ],
+          onNext: _nextPage, // Cambiado: ahora va a la página de conclusión
         );
       case 2:
-      case 3:
-      case 4:
-        // these pages are handled inside the single Module3IterationPage now
-        return const SizedBox.shrink();
+        return Module3ConclusionPage(onFinish: _completeModule);
       default:
         return const SizedBox();
     }

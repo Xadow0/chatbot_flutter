@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../../../data/services/gemini_service.dart';
+import 'package:markdown_widget/markdown_widget.dart';
 
 enum IterationType { reformular, aclarar, ejemplificar, acotar }
 
@@ -360,7 +361,17 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(gradient: LinearGradient(colors: [theme.colorScheme.primary, theme.colorScheme.secondary]), borderRadius: BorderRadius.circular(20)),
-          child: message.isAnimated ? _AnimatedText(text: message.text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), onComplete: () => message.animationCompleter?.complete()) : Text(message.text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+          child: message.isAnimated
+              ? _AnimatedText(
+                  text: message.text,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  onComplete: () {
+                    // mark animation complete and signal awaiting code
+                    message.animationCompleter?.complete();
+                    if (mounted) setState(() => message.isAnimated = false);
+                  },
+                )
+              : Text(message.text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         ),
       ),
     );
@@ -379,11 +390,65 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: message.isUser ? theme.colorScheme.primaryContainer : theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
-              child: message.isAnimated ? _AnimatedText(text: message.text, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5), onComplete: () => message.animationCompleter?.complete()) : SelectableText(message.text, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+              child: _buildMessageContent(theme, message),
             ),
           ),
           if (message.isUser) ...[const SizedBox(width: 8), CircleAvatar(backgroundColor: theme.colorScheme.primaryContainer, radius: 16, child: Icon(Icons.person, size: 18, color: theme.colorScheme.onPrimaryContainer))],
         ],
+      ),
+    );
+  }
+
+  // Decide how to render the message content: animated plain text, selectable plain text,
+  // or a Markdown widget if the text looks like markdown/code (for Gemini responses).
+  Widget _buildMessageContent(ThemeData theme, _ChatMessage message) {
+    final text = message.text;
+
+    bool looksLikeMarkdown(String t) {
+      if (t.contains('```')) return true;
+      if (t.contains('\n- ') || t.contains('\n* ') || t.contains('\n1. ')) return true;
+      if (RegExp(r'^#{1,6}\s', multiLine: true).hasMatch(t)) return true;
+      if (t.contains('**') || t.contains('__') || t.contains('`')) return true;
+      return false;
+    }
+
+    String cleanMarkdownText(String t) {
+      String cleaned = t.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+      cleaned = cleaned.trim();
+      return cleaned;
+    }
+
+    // If the message is from the AI and it looks like markdown, render with MarkdownWidget
+    if (!message.isUser && looksLikeMarkdown(text)) {
+      // If this message was animating, stop animation and persist it as static markdown
+      if (message.isAnimated) {
+        message.animationCompleter?.complete();
+        message.isAnimated = false;
+      }
+      return MarkdownWidget(
+        data: cleanMarkdownText(text),
+        shrinkWrap: true,
+        selectable: true,
+        config: MarkdownConfig(),
+      );
+    }
+
+    if (message.isAnimated) {
+      return _AnimatedText(
+        text: text,
+        style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+        onComplete: () {
+          // mark animation complete so it won't re-animate when scrolled
+          message.animationCompleter?.complete();
+          if (mounted) setState(() => message.isAnimated = false);
+        },
+      );
+    }
+
+    return SelectableText(
+      text,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        height: 1.5,
       ),
     );
   }
@@ -392,7 +457,7 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
 class _ChatMessage {
   final String text;
   final bool isUser;
-  final bool isAnimated;
+  bool isAnimated; // mutable so we can mark it completed
   final bool isTitle;
 
   Completer<void>? animationCompleter;
@@ -453,6 +518,9 @@ class _AnimatedTextState extends State<_AnimatedText> {
 
   @override
   Widget build(BuildContext context) {
-    return Text(_displayedText, style: widget.style ?? Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5));
+    return SelectableText(
+      _displayedText,
+      style: widget.style ?? Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
+    );
   }
 }

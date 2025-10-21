@@ -150,7 +150,6 @@ class _ExplanationPageState extends State<_ExplanationPage> {
       'a partir de los patrones y relaciones que aprendió durante su entrenamiento con grandes cantidades de datos. '
       'En lugar de recordar hechos, predice lo que viene a continuación según el contexto del mensaje que recibe.';
   
-  bool _textComplete = false;
   bool _showQuiz = false;
   int? _selectedAnswer;
   bool _answeredCorrectly = false;
@@ -173,9 +172,7 @@ class _ExplanationPageState extends State<_ExplanationPage> {
         charIndex++;
       } else {
         timer.cancel();
-        setState(() {
-          _textComplete = true;
-        });
+        // Texto completado; mostrar quiz después de un pequeño retraso.
         Future.delayed(const Duration(seconds: 1), () {
           setState(() {
             _showQuiz = true;
