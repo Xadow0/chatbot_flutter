@@ -7,6 +7,7 @@ import '../../data/services/gemini_service.dart';
 import '../../data/services/ollama_service.dart';
 import '../../data/services/openai_service.dart';
 import '../../data/services/ai_service_selector.dart';
+import '../../data/services/preferences_service.dart';
 import '../../data/repositories/chat_repository.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../domain/usecases/command_processor.dart';
@@ -20,6 +21,7 @@ class ChatProvider extends ChangeNotifier {
 
   late final SendMessageUseCase _sendMessageUseCase;
   late final AIServiceSelector _aiSelector;
+  late final PreferencesService _preferencesService;
   
   // Estado específico para la selección de modelos
   bool _showModelSelector = false;
@@ -31,6 +33,9 @@ class ChatProvider extends ChangeNotifier {
     final geminiService = GeminiService();
     final ollamaService = OllamaService();
     final openaiService = OpenAIService();
+    
+    // Inicializar servicio de preferencias
+    _preferencesService = PreferencesService();
     
     // Inicializar selector de IA
     _aiSelector = AIServiceSelector(
@@ -48,7 +53,7 @@ class ChatProvider extends ChangeNotifier {
       chatRepository: localRepository,
     );
 
-    // Inicializar modelos disponibles
+    // Inicializar modelos disponibles y restaurar preferencias
     _initializeModels();
     
     // Añadir mensaje de bienvenida al iniciar una conversación nueva
@@ -75,7 +80,7 @@ class ChatProvider extends ChangeNotifier {
   // Stream de conexión
   Stream<ConnectionInfo> get connectionStream => _aiSelector.connectionStream;
 
-  /// Inicializar modelos disponibles
+  /// Inicializar modelos disponibles y restaurar preferencias
   Future<void> _initializeModels() async {
     try {
       debugPrint('🎬 [ChatProvider] Inicializando modelos...');
@@ -87,14 +92,107 @@ class ChatProvider extends ChangeNotifier {
         _availableModels = _aiSelector.availableModels;
         if (_availableModels.isNotEmpty) {
           _currentModel = _availableModels.first.name;
-          debugPrint('   ✅ Modelo inicial: $_currentModel');
         }
-      } else {
-        debugPrint('   ⚠️ Ollama no disponible, usando Gemini por defecto');
       }
+      
+      // Restaurar preferencias del usuario
+      await _restoreUserPreferences();
+      
       notifyListeners();
     } catch (e) {
       debugPrint('❌ [ChatProvider] Error inicializando modelos: $e');
+    }
+  }
+  
+  /// Restaurar las preferencias del usuario
+  Future<void> _restoreUserPreferences() async {
+    try {
+      debugPrint('🔄 [ChatProvider] Restaurando preferencias...');
+      
+      // Obtener último proveedor usado
+      final lastProvider = await _preferencesService.getLastProvider();
+      
+      if (lastProvider != null) {
+        // Verificar disponibilidad del proveedor antes de restaurarlo
+        bool canRestore = false;
+        
+        switch (lastProvider) {
+          case AIProvider.gemini:
+            // Gemini siempre disponible
+            canRestore = true;
+            break;
+            
+          case AIProvider.ollama:
+            // Verificar si Ollama está disponible
+            canRestore = _aiSelector.ollamaAvailable;
+            if (!canRestore) {
+              debugPrint('   ⚠️ Ollama no disponible, usando Gemini por defecto');
+            }
+            break;
+            
+          case AIProvider.openai:
+            // Verificar si OpenAI está configurado
+            canRestore = _aiSelector.openaiAvailable;
+            if (!canRestore) {
+              debugPrint('   ⚠️ OpenAI no disponible, usando Gemini por defecto');
+            }
+            break;
+        }
+        
+        if (canRestore) {
+          _currentProvider = lastProvider;
+          await _aiSelector.setProvider(lastProvider);
+          debugPrint('   ✅ Restaurado proveedor: $lastProvider');
+          
+          // Restaurar modelo específico según el proveedor
+          await _restoreProviderModel(lastProvider);
+        } else {
+          // Si no se puede restaurar, usar Gemini por defecto
+          _currentProvider = AIProvider.gemini;
+          await _aiSelector.setProvider(AIProvider.gemini);
+          debugPrint('   ℹ️ Usando Gemini por defecto');
+        }
+      } else {
+        debugPrint('   ℹ️ No hay preferencias previas, usando Gemini');
+      }
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error restaurando preferencias: $e');
+      // En caso de error, usar Gemini por defecto
+      _currentProvider = AIProvider.gemini;
+    }
+  }
+  
+  /// Restaurar el modelo específico del proveedor
+  Future<void> _restoreProviderModel(AIProvider provider) async {
+    try {
+      switch (provider) {
+        case AIProvider.ollama:
+          final lastModel = await _preferencesService.getLastOllamaModel();
+          if (lastModel != null && _availableModels.any((m) => m.name == lastModel)) {
+            _currentModel = lastModel;
+            await _aiSelector.setOllamaModel(lastModel);
+            debugPrint('   ✅ Restaurado modelo Ollama: $lastModel');
+          } else {
+            debugPrint('   ℹ️ Modelo Ollama no disponible, usando: $_currentModel');
+          }
+          break;
+          
+        case AIProvider.openai:
+          final lastModel = await _preferencesService.getLastOpenAIModel();
+          if (lastModel != null && _aiSelector.availableOpenAIModels.contains(lastModel)) {
+            _aiSelector.setOpenAIModel(lastModel);
+            debugPrint('   ✅ Restaurado modelo OpenAI: $lastModel');
+          } else {
+            debugPrint('   ℹ️ Usando modelo OpenAI por defecto');
+          }
+          break;
+          
+        case AIProvider.gemini:
+          // Gemini usa un solo modelo, no hay que restaurar nada
+          break;
+      }
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error restaurando modelo: $e');
     }
   }
 
@@ -117,8 +215,13 @@ class ChatProvider extends ChangeNotifier {
     try {
       debugPrint('🔄 [ChatProvider] Cambiando proveedor a: $provider');
       
+      // Verificar disponibilidad según el proveedor
       if (provider == AIProvider.ollama && !_aiSelector.ollamaAvailable) {
         throw Exception('Ollama no está disponible');
+      }
+      
+      if (provider == AIProvider.openai && !_aiSelector.openaiAvailable) {
+        throw Exception('OpenAI no está disponible. Configura OPENAI_API_KEY en .env');
       }
       
       await _aiSelector.setProvider(provider);
@@ -129,7 +232,10 @@ class ChatProvider extends ChangeNotifier {
         await _aiSelector.setOllamaModel(_currentModel);
       }
       
-      debugPrint('   ✅ Proveedor cambiado exitosamente');
+      // Guardar preferencia del usuario
+      await _preferencesService.saveLastProvider(provider);
+      
+      debugPrint('   ✅ Proveedor cambiado y guardado: $provider');
       notifyListeners();
     } catch (e) {
       debugPrint('❌ [ChatProvider] Error cambiando proveedor: $e');
@@ -149,12 +255,41 @@ class ChatProvider extends ChangeNotifier {
       
       await _aiSelector.setOllamaModel(modelName);
       _currentModel = modelName;
+      
+      // Guardar preferencia del modelo
+      await _preferencesService.saveLastOllamaModel(modelName);
+      
       _showModelSelector = false; // Ocultar selector después de seleccionar
       
-      debugPrint('   ✅ Modelo cambiado exitosamente');
+      debugPrint('   ✅ Modelo cambiado y guardado: $modelName');
       notifyListeners();
     } catch (e) {
       debugPrint('❌ [ChatProvider] Error cambiando modelo: $e');
+      rethrow;
+    }
+  }
+  
+  /// Cambiar modelo de OpenAI
+  Future<void> changeOpenAIModel(String modelName) async {
+    try {
+      debugPrint('🔄 [ChatProvider] Cambiando modelo OpenAI a: $modelName');
+      
+      if (_currentProvider != AIProvider.openai) {
+        // Cambiar a OpenAI automáticamente si se selecciona un modelo
+        await changeProvider(AIProvider.openai);
+      }
+      
+      _aiSelector.setOpenAIModel(modelName);
+      
+      // Guardar preferencia del modelo
+      await _preferencesService.saveLastOpenAIModel(modelName);
+      
+      _showModelSelector = false; // Ocultar selector después de seleccionar
+      
+      debugPrint('   ✅ Modelo OpenAI cambiado y guardado: $modelName');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error cambiando modelo OpenAI: $e');
       rethrow;
     }
   }
