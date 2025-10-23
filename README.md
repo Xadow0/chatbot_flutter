@@ -19,7 +19,6 @@ El objetivo **no es crear prompts perfectos**, sino **ayudar a comprender cómo 
   - Lenguaje: **Dart**
   - Compilación nativa (AOT) para producción y **Hot Reload (JIT)** durante el desarrollo.
 - **API de Gemini (Google AI Studio)** — Para integración con modelos de IA generativa.
-- **flutter_secure_storage** — Para el manejo seguro de claves API.
 - **VSCode** + **Android Studio** — Entornos de desarrollo utilizados.
 - Compatibilidad: **Android**, **Windows**, **iOS** y **Web** (en desarrollo).
 
