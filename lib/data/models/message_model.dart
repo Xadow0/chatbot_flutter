@@ -34,6 +34,10 @@ class Message {
   String get displayPrefix => type == MessageType.user ? '👤' : '🤖';
   String get displayName => type == MessageType.user ? 'Usuario' : 'Bot';
 
+  // Compatibility getters used across the codebase
+  bool get isUser => type == MessageType.user;
+  String get text => content;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'content': content,

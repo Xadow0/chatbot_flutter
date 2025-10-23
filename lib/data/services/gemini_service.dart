@@ -5,7 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class GeminiService {
   // Cambia la versión de la API a v1 (no v1beta)
   static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1';
-  // Puedes usar 'gemini-1.5-flash' o 'gemini-pro' según disponibilidad
+  // Puedes usar 'gemini-2.5-flash' o 'gemini-pro' según disponibilidad
   static const String _model = 'gemini-2.5-flash';
   
   late final String _apiKey;
