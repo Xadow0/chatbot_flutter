@@ -176,7 +176,7 @@ class OllamaService {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    if (_apiKey != null) headers['X-API-Key'] = _apiKey!;
+    if (_apiKey != null) headers['X-API-Key'] = _apiKey;
     return headers;
   }
   
