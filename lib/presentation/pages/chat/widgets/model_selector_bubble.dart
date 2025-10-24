@@ -5,7 +5,7 @@ import '../../../../data/models/ollama_models.dart';
 import '../../../../data/services/ai_service_selector.dart';
 
 class ModelSelectorBubble extends StatelessWidget {
-  const ModelSelectorBubble({Key? key}) : super(key: key);
+  const ModelSelectorBubble({super.key});
 
   @override
   Widget build(BuildContext context) {
