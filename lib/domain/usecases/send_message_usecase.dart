@@ -3,7 +3,7 @@ import '../../data/repositories/chat_repository.dart';
 import 'command_processor.dart';
 
 /// Caso de uso que decide cómo procesar un mensaje:
-/// - Si contiene un comando válido, lo procesa con el CommandProcessor (que puede usar Gemini).
+/// - Si contiene un comando válido, lo procesa con el CommandProcessor usando la IA seleccionada.
 /// - Si NO contiene un comando, devuelve una respuesta local directa (sin usar IA).
 class SendMessageUseCase {
   final CommandProcessor _commandProcessor;

@@ -495,4 +495,28 @@ class OllamaService {
     debugPrint('🔴 [OllamaService] Cerrando conexión...');
     _connectionController.close();
   }
+
+  Future<String> generateContent(
+  String prompt, {
+  String? model,
+  double temperature = 0.7,
+  int maxTokens = 2048,
+}) async {
+  // Si no se proporciona modelo, usar uno por defecto
+  final selectedModel = model ?? 'phi3:latest';
+  
+  debugPrint('📝 [OllamaService] generateContent llamado');
+  debugPrint('   🤖 Modelo: $selectedModel');
+  debugPrint('   💬 Prompt: ${prompt.length > 50 ? "${prompt.substring(0, 50)}..." : prompt}');
+  
+  // Usar el método generate existente
+  return await generateResponse(
+    model: selectedModel,
+    prompt: prompt,
+    options: {
+      'temperature': temperature,
+      'num_predict': maxTokens,
+    },
+  );
+}
 }

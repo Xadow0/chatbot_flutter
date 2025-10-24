@@ -1,5 +1,3 @@
-import '../../data/services/gemini_service.dart';
-
 enum CommandType {
   probarPrompt,
   none,
@@ -42,10 +40,18 @@ class CommandResult {
   }
 }
 
-class CommandProcessor {
-  final GeminiService _geminiService;
+/// Interfaz base que todos los servicios de IA deben implementar
+/// Esto permite que CommandProcessor funcione con cualquier servicio
+abstract class AIServiceBase {
+  Future<String> generateContent(String prompt);
+}
 
-  CommandProcessor(this._geminiService);
+class CommandProcessor {
+  // Ya no tiene una dependencia fija de GeminiService
+  // Ahora recibe cualquier servicio que implemente AIServiceBase
+  final AIServiceBase _aiService;
+
+  CommandProcessor(this._aiService);
 
   /// Detecta si el mensaje es un comando y lo procesa
   Future<CommandResult> processMessage(String message) async {
@@ -60,7 +66,7 @@ class CommandProcessor {
     return CommandResult.notCommand();
   }
 
-  /// Procesa el comando "/tryprompt"
+  /// Procesa el comando "/tryprompt" usando la IA seleccionada
   Future<CommandResult> _processProbarPrompt(String message) async {
     try {
       // Extraer el contenido después del comando
@@ -73,11 +79,11 @@ class CommandProcessor {
         );
       }
 
-      // Construir el prompt modificado para Gemini
+      // Construir el prompt modificado
       final enhancedPrompt = _buildEnhancedPrompt(content);
 
-      // Llamar a la API de Gemini
-      final response = await _geminiService.generateContent(enhancedPrompt);
+      // Llamar a la IA seleccionada (podría ser Gemini, OpenAI, Ollama o Local)
+      final response = await _aiService.generateContent(enhancedPrompt);
 
       return CommandResult.success(CommandType.probarPrompt, response);
     } catch (e) {
@@ -97,7 +103,7 @@ class CommandProcessor {
     return message.substring(contentStart).trim();
   }
 
-  /// Construye el prompt mejorado para Gemini
+  /// Construye el prompt mejorado para la IA
   String _buildEnhancedPrompt(String userContent) {
     return '''
       Actúa como un evaluador y mejorador de prompts para el prompt que adjunto como "Mensaje del usuario". No repitas tu función ni el mensaje del usuario, céntrate en mejorar el prompt. 

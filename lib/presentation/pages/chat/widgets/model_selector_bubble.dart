@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/chat_provider.dart';
+import '../../../widgets/model_download_dialog.dart';
 import '../../../../data/models/ollama_models.dart';
+import '../../../../data/models/local_llm_models.dart';
 import '../../../../data/services/ai_service_selector.dart';
 
 class ModelSelectorBubble extends StatelessWidget {
@@ -49,10 +51,16 @@ class ModelSelectorBubble extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Indicador de estado de conexión (solo para Ollama)
+            // Indicador de estado de conexión (solo para Ollama y LLM Local)
             if (chatProvider.currentProvider == AIProvider.ollama)
               _buildConnectionIndicator(chatProvider.connectionInfo),
             if (chatProvider.currentProvider == AIProvider.ollama)
+              const SizedBox(width: 8),
+            
+            // NUEVO: Indicador de estado para LLM Local
+            if (chatProvider.currentProvider == AIProvider.localLLM)
+              _buildLocalLLMIndicator(context, chatProvider.localLLMStatus),
+            if (chatProvider.currentProvider == AIProvider.localLLM)
               const SizedBox(width: 8),
             
             // Icono del proveedor actual
@@ -151,6 +159,11 @@ class ModelSelectorBubble extends StatelessWidget {
           
           // Sección Ollama
           _buildOllamaSection(context, chatProvider),
+          
+          const SizedBox(height: 8),
+          
+          // NUEVA: Sección LLM Local
+          _buildLocalLLMSection(context, chatProvider),
         ],
       ),
     );
@@ -551,6 +564,179 @@ class ModelSelectorBubble extends StatelessWidget {
     );
   }
 
+  // NUEVA SECCIÓN: LLM Local
+  Widget _buildLocalLLMSection(BuildContext context, ChatProvider chatProvider) {
+    final isLocalLLMSelected = chatProvider.currentProvider == AIProvider.localLLM;
+    final status = chatProvider.localLLMStatus;
+    final isAvailable = status == LocalLLMStatus.ready;
+    final isLoading = status == LocalLLMStatus.loading;
+    final isStopped = status == LocalLLMStatus.stopped;
+    final isError = status == LocalLLMStatus.error;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header del LLM Local
+        InkWell(
+          onTap: isAvailable ? () => _selectProvider(context, chatProvider, AIProvider.localLLM) : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Opacity(
+            opacity: isAvailable ? 1.0 : 0.6,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isLocalLLMSelected 
+                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                  : null,
+                borderRadius: BorderRadius.circular(12),
+                border: isLocalLLMSelected 
+                  ? Border.all(color: Theme.of(context).colorScheme.primary)
+                  : Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.phone_android,
+                    color: isAvailable
+                      ? (isLocalLLMSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant)
+                      : Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'LLM en Dispositivo',
+                              style: TextStyle(
+                                fontWeight: isLocalLLMSelected ? FontWeight.w600 : FontWeight.w500,
+                                color: isLocalLLMSelected 
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildLocalLLMIndicator(context, status),
+                          ],
+                        ),
+                        Text(
+                          _getLocalLLMSubtitle(status),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Botones de acción según el estado
+                  if (isStopped) ...[
+                    TextButton.icon(
+                      onPressed: () => _startLocalLLM(context, chatProvider),
+                      icon: const Icon(Icons.play_arrow, size: 16),
+                      label: const Text('Iniciar', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ] else if (isLoading) ...[
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ] else if (isError) ...[
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => _showLocalLLMError(context, chatProvider),
+                          icon: const Icon(Icons.info_outline, size: 16),
+                          constraints: const BoxConstraints(),
+                          padding: EdgeInsets.zero,
+                          tooltip: 'Ver error',
+                        ),
+                        const SizedBox(width: 4),
+                        TextButton.icon(
+                          onPressed: () => _retryLocalLLM(context, chatProvider),
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Reintentar', style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (isAvailable) ...[
+                    Row(
+                      children: [
+                        if (!isLocalLLMSelected)
+                          IconButton(
+                            onPressed: () => _stopLocalLLM(context, chatProvider),
+                            icon: const Icon(Icons.stop, size: 16),
+                            constraints: const BoxConstraints(),
+                            padding: EdgeInsets.zero,
+                            tooltip: 'Detener modelo',
+                          ),
+                        if (isLocalLLMSelected)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Icon(
+                              Icons.check_circle,
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 20,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        
+        // Info adicional cuando está listo
+        if (isAvailable && !isLocalLLMSelected) ...[
+          const SizedBox(height: 8),
+          Container(
+            margin: const EdgeInsets.only(left: 44),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  size: 14,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Modelo Phi-3 cargado y listo para usar',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildModelOption({
     required BuildContext context,
     required OllamaModel model,
@@ -633,6 +819,33 @@ class ModelSelectorBubble extends StatelessWidget {
     return Icon(icon, color: color, size: 12);
   }
 
+  // NUEVO: Indicador de estado para LLM Local
+  Widget _buildLocalLLMIndicator(BuildContext context, LocalLLMStatus status) {
+    Color color;
+    IconData icon;
+    
+    switch (status) {
+      case LocalLLMStatus.stopped:
+        color = Colors.grey;
+        icon = Icons.circle_outlined;
+        break;
+      case LocalLLMStatus.loading:
+        color = Colors.orange;
+        icon = Icons.sync;
+        break;
+      case LocalLLMStatus.ready:
+        color = Colors.green;
+        icon = Icons.circle;
+        break;
+      case LocalLLMStatus.error:
+        color = Colors.red;
+        icon = Icons.error;
+        break;
+    }
+    
+    return Icon(icon, color: color, size: 12);
+  }
+
   IconData _getProviderIcon(AIProvider provider) {
     switch (provider) {
       case AIProvider.gemini:
@@ -641,6 +854,8 @@ class ModelSelectorBubble extends StatelessWidget {
         return Icons.computer;
       case AIProvider.openai:
         return Icons.bolt;
+      case AIProvider.localLLM:
+        return Icons.phone_android;
     }
   }
 
@@ -652,6 +867,8 @@ class ModelSelectorBubble extends StatelessWidget {
         return 'Ollama';
       case AIProvider.openai:
         return 'ChatGPT';
+      case AIProvider.localLLM:
+        return 'LLM Local';
     }
   }
 
@@ -663,6 +880,22 @@ class ModelSelectorBubble extends StatelessWidget {
         return chatProvider.currentModel.replaceAll(':latest', '');
       case AIProvider.openai:
         return chatProvider.currentOpenAIModel;
+      case AIProvider.localLLM:
+        return 'Phi-3 Mini';
+    }
+  }
+
+  // NUEVO: Obtener subtítulo según estado del LLM local
+  String _getLocalLLMSubtitle(LocalLLMStatus status) {
+    switch (status) {
+      case LocalLLMStatus.stopped:
+        return 'Modelo detenido - No consume recursos';
+      case LocalLLMStatus.loading:
+        return 'Cargando modelo en memoria...';
+      case LocalLLMStatus.ready:
+        return 'Modelo Phi-3 - Privado y sin internet';
+      case LocalLLMStatus.error:
+        return 'Error al cargar el modelo';
     }
   }
 
@@ -703,7 +936,6 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _selectOpenAIModel(BuildContext context, ChatProvider chatProvider, String modelName) async {
     try {
-      // Usar el método del provider que guarda la preferencia
       await chatProvider.changeOpenAIModel(modelName);
     } catch (e) {
       _showError(context, 'Error cambiando modelo OpenAI: $e');
@@ -722,6 +954,126 @@ class ModelSelectorBubble extends StatelessWidget {
     } catch (e) {
       _showError(context, 'Error refrescando: $e');
     }
+  }
+
+  // NUEVOS MÉTODOS: Gestión del LLM Local
+  Future<void> _startLocalLLM(BuildContext context, ChatProvider chatProvider) async {
+    bool loadingShown = false;
+    try {
+      final localService = chatProvider.aiSelector.localLLMService;
+
+      // Si el modelo no está descargado, mostrar diálogo de descarga
+      if (!await localService.isModelDownloaded()) {
+        final downloadResult = await showModelDownloadDialog(context, localService.downloadService);
+
+        if (downloadResult == null || !downloadResult.success) {
+          // Si el usuario canceló la descarga, volver a la pantalla de Chat Libre
+          if (downloadResult != null && downloadResult.error == 'cancelled_by_user') {
+            Navigator.pushNamed(context, '/chat', arguments: {'mode': 'free'});
+            return;
+          }
+
+          // Mostrar error al usuario
+          _showError(context, 'No se pudo descargar el modelo: ${downloadResult?.error ?? 'cancelado'}');
+          return;
+        }
+      }
+
+      // Mostrar diálogo de carga mientras se inicializa el modelo
+      loadingShown = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Cargando modelo local...'),
+              SizedBox(height: 8),
+              Text(
+                'Esto puede tardar unos segundos',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final result = await chatProvider.initializeLocalLLM();
+
+      // Cerrar diálogo de carga
+      if (loadingShown && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ ${result.modelName} cargado correctamente'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        _showError(context, 'No se pudo cargar el modelo: ${result.error}');
+      }
+    } catch (e) {
+      if (loadingShown && Navigator.canPop(context)) Navigator.of(context).pop();
+      _showError(context, 'Error iniciando LLM local: $e');
+    }
+  }
+
+  Future<void> _stopLocalLLM(BuildContext context, ChatProvider chatProvider) async {
+    try {
+      await chatProvider.stopLocalLLM();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Modelo local detenido'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      _showError(context, 'Error deteniendo modelo: $e');
+    }
+  }
+
+  Future<void> _retryLocalLLM(BuildContext context, ChatProvider chatProvider) async {
+    await _startLocalLLM(context, chatProvider);
+  }
+
+  void _showLocalLLMError(BuildContext context, ChatProvider chatProvider) {
+    final error = chatProvider.localLLMError ?? 'Error desconocido';
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Error del Modelo Local'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Text(error),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cerrar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _retryLocalLLM(context, chatProvider);
+            },
+            child: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showError(BuildContext context, String message) {
