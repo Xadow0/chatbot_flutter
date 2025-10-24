@@ -135,7 +135,7 @@ class ModelSelectorBubble extends StatelessWidget {
             chatProvider: chatProvider,
             provider: AIProvider.gemini,
             title: 'Gemini (Google)',
-            subtitle: 'IA en la nube - Gratis con límites por minuto (Google)',
+            subtitle: 'IA en la nube - Gratis con límites',
             icon: Icons.auto_awesome,
             isSelected: chatProvider.currentProvider == AIProvider.gemini,
             isAvailable: true,
@@ -478,7 +478,7 @@ class ModelSelectorBubble extends StatelessWidget {
                         ),
                         Text(
                           chatProvider.ollamaAvailable 
-                            ? 'IA en tu servidor - Gratis y privado con dinstintos modelos' 
+                            ? 'IA en tu servidor - Gratis y privado' 
                             : 'No disponible - Verificar Tailscale',
                           style: TextStyle(
                             fontSize: 12,
@@ -703,9 +703,8 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _selectOpenAIModel(BuildContext context, ChatProvider chatProvider, String modelName) async {
     try {
-      // Cambiar modelo usando el método del provider que internamente usa aiSelector
-      chatProvider.aiSelector.setOpenAIModel(modelName);
-      chatProvider.hideModelSelector();
+      // Usar el método del provider que guarda la preferencia
+      await chatProvider.changeOpenAIModel(modelName);
     } catch (e) {
       _showError(context, 'Error cambiando modelo OpenAI: $e');
     }
