@@ -309,10 +309,10 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
               child: Text(_currentIterationIndex < _sequence.length - 1 ? 'Siguiente paso' : 'Finalizar módulo'),
             ),
           ),
-        if (_waitingForUserInput && !_exerciseComplete)
+          if (_waitingForUserInput && !_exerciseComplete)
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, -2))]),
+            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, boxShadow: [BoxShadow(color: Colors.black.withAlpha((0.1 * 255).round()), blurRadius: 4, offset: const Offset(0, -2))]),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

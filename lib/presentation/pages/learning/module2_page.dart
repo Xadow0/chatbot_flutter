@@ -117,7 +117,7 @@ class _IntroPage extends StatelessWidget {
           Text(
             'Aprende a comunicarte efectivamente con la IA',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7),
+              color: theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
             ),
             textAlign: TextAlign.center,
           ),
@@ -326,7 +326,7 @@ class _ComparisonPageState extends State<_ComparisonPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+              color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
@@ -368,8 +368,8 @@ class _ComparisonPageState extends State<_ComparisonPage> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    theme.colorScheme.primary.withOpacity(0.2),
-                    theme.colorScheme.secondary.withOpacity(0.2),
+                    theme.colorScheme.primary.withAlpha((0.2 * 255).round()),
+                    theme.colorScheme.secondary.withAlpha((0.2 * 255).round()),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(16),
@@ -425,7 +425,7 @@ class _ComparisonPageState extends State<_ComparisonPage> {
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.3),
+          color: theme.colorScheme.outline.withAlpha((0.3 * 255).round()),
           width: 1,
         ),
       ),
@@ -524,7 +524,7 @@ class _ComparisonPageState extends State<_ComparisonPage> {
                   Text(
                     'Generando respuesta...',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round()),
                     ),
                   ),
                 ],
@@ -907,7 +907,7 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
               color: theme.colorScheme.surfaceContainerHighest,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withAlpha((0.1 * 255).round()),
                   blurRadius: 4,
                   offset: const Offset(0, -2),
                 ),

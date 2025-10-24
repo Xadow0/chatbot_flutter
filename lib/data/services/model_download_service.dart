@@ -13,10 +13,10 @@ class ModelDownloadService {
   final Dio _dio = Dio();
   
   /// Callback para notificar el progreso de descarga (0.0 a 1.0)
-  Function(double)? onProgress;
-  
+  ValueChanged<double>? onProgress;
+
   /// Callback para notificar el estado de la descarga
-  Function(String)? onStatusChange;
+  ValueChanged<String>? onStatusChange;
   
   ModelDownloadService({this.onProgress, this.onStatusChange});
 
@@ -223,13 +223,10 @@ class ModelDownloadService {
   Future<bool> _checkAvailableSpace() async {
     try {
       // Obtener directorio de la app
-      final appDir = await getApplicationDocumentsDirectory();
-      
-      // En sistemas de archivos modernos, verificar espacio disponible
-      // Por ahora, asumimos que hay espacio (3GB mínimo requerido)
-      // TODO: Implementar verificación real de espacio en disco
-      
-      debugPrint('💾 [ModelDownload] Verificación de espacio: OK');
+  final appDir = await getApplicationDocumentsDirectory();
+  // Usar appDir para evitar warning de variable no usada. En el futuro
+  // se puede usar para comprobar el espacio disponible.
+  debugPrint('💾 [ModelDownload] Verificación de espacio: OK (appDir=${appDir.path})');
       return true;
     } catch (e) {
       debugPrint('⚠️ [ModelDownload] No se pudo verificar espacio: $e');

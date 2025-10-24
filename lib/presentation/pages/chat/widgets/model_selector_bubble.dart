@@ -23,13 +23,13 @@ class ModelSelectorBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withAlpha((0.1 * 255).round()),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
               border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                color: Theme.of(context).colorScheme.outline.withAlpha((0.2 * 255).round()),
               ),
             ),
             child: chatProvider.showModelSelector
@@ -187,14 +187,14 @@ class ModelSelectorBubble extends StatelessWidget {
         opacity: isAvailable ? 1.0 : 0.5,
         child: Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
+            decoration: BoxDecoration(
             color: isSelected 
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+              ? Theme.of(context).colorScheme.primary.withAlpha((0.1 * 255).round())
               : null,
             borderRadius: BorderRadius.circular(12),
             border: isSelected 
               ? Border.all(color: Theme.of(context).colorScheme.primary)
-              : Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
+              : Border.all(color: Theme.of(context).colorScheme.outline.withAlpha((0.2 * 255).round())),
           ),
           child: Row(
             children: [
@@ -282,12 +282,12 @@ class ModelSelectorBubble extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: isOpenAISelected 
-                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                  ? Theme.of(context).colorScheme.primary.withAlpha((0.1 * 255).round())
                   : null,
                 borderRadius: BorderRadius.circular(12),
                 border: isOpenAISelected 
                   ? Border.all(color: Theme.of(context).colorScheme.primary)
-                  : Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
+                  : Border.all(color: Theme.of(context).colorScheme.outline.withAlpha((0.2 * 255).round())),
               ),
               child: Row(
                 children: [
@@ -392,9 +392,9 @@ class ModelSelectorBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         margin: const EdgeInsets.symmetric(vertical: 2),
-        decoration: BoxDecoration(
+          decoration: BoxDecoration(
           color: isSelected 
-            ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+            ? Theme.of(context).colorScheme.primary.withAlpha((0.1 * 255).round())
             : null,
           borderRadius: BorderRadius.circular(8),
         ),
@@ -453,13 +453,13 @@ class ModelSelectorBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isOllamaSelected 
-                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                  : null,
+                    color: isOllamaSelected 
+                      ? Theme.of(context).colorScheme.primary.withAlpha((0.1 * 255).round())
+                      : null,
                 borderRadius: BorderRadius.circular(12),
                 border: isOllamaSelected 
                   ? Border.all(color: Theme.of(context).colorScheme.primary)
-                  : Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
+                  : Border.all(color: Theme.of(context).colorScheme.outline.withAlpha((0.2 * 255).round())),
               ),
               child: Row(
                 children: [
@@ -548,7 +548,7 @@ class ModelSelectorBubble extends StatelessWidget {
             margin: const EdgeInsets.only(left: 44),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+              color: Theme.of(context).colorScheme.errorContainer.withAlpha((0.3 * 255).round()),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -586,12 +586,12 @@ class ModelSelectorBubble extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: isLocalLLMSelected 
-                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                  ? Theme.of(context).colorScheme.primary.withAlpha((0.1 * 255).round())
                   : null,
                 borderRadius: BorderRadius.circular(12),
                 border: isLocalLLMSelected 
                   ? Border.all(color: Theme.of(context).colorScheme.primary)
-                  : Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
+                  : Border.all(color: Theme.of(context).colorScheme.outline.withAlpha((0.2 * 255).round())),
               ),
               child: Row(
                 children: [
@@ -709,7 +709,7 @@ class ModelSelectorBubble extends StatelessWidget {
             margin: const EdgeInsets.only(left: 44),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+              color: Theme.of(context).colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -751,7 +751,7 @@ class ModelSelectorBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 2),
         decoration: BoxDecoration(
           color: isSelected 
-            ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+            ? Theme.of(context).colorScheme.primary.withAlpha((0.1 * 255).round())
             : null,
           borderRadius: BorderRadius.circular(8),
         ),

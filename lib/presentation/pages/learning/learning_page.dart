@@ -87,12 +87,12 @@ class _LearningPageState extends State<LearningPage> {
                     const SizedBox(height: 4),
                     Text(
                       description,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.7),
-                          ),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context)
+            .colorScheme
+            .onSurface
+            .withAlpha((0.7 * 255).round()),
+          ),
                     ),
                   ],
                 ),
@@ -151,7 +151,7 @@ class _LearningPageState extends State<LearningPage> {
               child: Text(
                 'Aprende sobre IA a través de módulos interactivos',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  color: theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
                 ),
               ),
             ),

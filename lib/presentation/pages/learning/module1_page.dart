@@ -114,7 +114,7 @@ class _IntroPage extends StatelessWidget {
           Text(
             'Descubre los fundamentos básicos de la Inteligencia Artificial',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7),
+              color: theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
             ),
             textAlign: TextAlign.center,
           ),
@@ -245,7 +245,7 @@ class _ExplanationPageState extends State<_ExplanationPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+              color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
@@ -284,11 +284,11 @@ class _ExplanationPageState extends State<_ExplanationPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: showCorrect
-                          ? Colors.green.withOpacity(0.2)
-                          : showIncorrect
-                              ? Colors.red.withOpacity(0.2)
-                              : theme.colorScheme.secondaryContainer,
+            color: showCorrect
+              ? Colors.green.withAlpha((0.2 * 255).round())
+              : showIncorrect
+                ? Colors.red.withAlpha((0.2 * 255).round())
+                : theme.colorScheme.secondaryContainer,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: showCorrect
@@ -461,7 +461,7 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
           Text(
             'Elige las opciones que una IA pueda hacer:',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7),
+              color: theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
             ),
             textAlign: TextAlign.center,
           ),
@@ -738,7 +738,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+              color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
@@ -791,7 +791,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withOpacity(0.2),
+                            color: theme.colorScheme.primary.withAlpha((0.2 * 255).round()),
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
                               color: theme.colorScheme.primary,
@@ -824,7 +824,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                     Text(
                       'Candidatas:',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round()),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -839,14 +839,14 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: isSelected
-                                ? theme.colorScheme.primary.withOpacity(0.1)
-                                : theme.colorScheme.surfaceContainerHigh,
+              color: isSelected
+                ? theme.colorScheme.primary.withAlpha((0.1 * 255).round())
+                : theme.colorScheme.surfaceContainerHigh,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: isSelected
                                   ? theme.colorScheme.primary
-                                  : theme.colorScheme.outline.withOpacity(0.3),
+                                  : theme.colorScheme.outline.withAlpha((0.3 * 255).round()),
                               width: isSelected ? 2 : 1,
                             ),
                           ),
@@ -855,7 +855,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: isSelected
                                   ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurface.withOpacity(0.7),
+                                  : theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
                               fontWeight: isSelected
                                   ? FontWeight.bold
                                   : FontWeight.normal,

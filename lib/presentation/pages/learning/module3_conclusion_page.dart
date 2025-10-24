@@ -17,7 +17,7 @@ class _Module3ConclusionPageState extends State<Module3ConclusionPage>
       'Ahora ya sabes que la clave no solo está en el prompt... '
       'sino en cómo lo mejoras. ¡Cada mensaje es una oportunidad para afinar el resultado!';
 
-  bool _mainTextComplete = false;
+  // Removed unused `_mainTextComplete` - kept animation flow via other flags
   bool _showAnimation = false;
   bool _showWarning = false;
   bool _showButton = false;
@@ -80,11 +80,9 @@ class _Module3ConclusionPageState extends State<Module3ConclusionPage>
           _displayedMainText = _fullMainText.substring(0, charIndex + 1);
         });
         charIndex++;
-      } else {
+        } else {
         timer.cancel();
-        setState(() {
-          _mainTextComplete = true;
-        });
+        // main text finished; proceed to show the iteration animation shortly
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
             setState(() {
@@ -133,15 +131,15 @@ class _Module3ConclusionPageState extends State<Module3ConclusionPage>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  theme.colorScheme.primaryContainer.withOpacity(0.3),
-                  theme.colorScheme.secondaryContainer.withOpacity(0.3),
+                  theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
+                  theme.colorScheme.secondaryContainer.withAlpha((0.3 * 255).round()),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: theme.colorScheme.primary.withOpacity(0.3),
+                color: theme.colorScheme.primary.withAlpha((0.3 * 255).round()),
                 width: 2,
               ),
             ),
@@ -203,10 +201,10 @@ class _Module3ConclusionPageState extends State<Module3ConclusionPage>
                                     vertical: 12,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: step.color.withOpacity(0.2),
+                                    color: step.color.withAlpha((0.2 * 255).round()),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: step.color.withOpacity(value),
+                                      color: step.color.withAlpha((value * 255).round()),
                                       width: 2,
                                     ),
                                   ),
@@ -215,7 +213,7 @@ class _Module3ConclusionPageState extends State<Module3ConclusionPage>
                                     children: [
                                       Icon(
                                         isActive ? Icons.check_circle : Icons.circle_outlined,
-                                        color: step.color.withOpacity(value),
+                                        color: step.color.withAlpha((value * 255).round()),
                                         size: 20,
                                       ),
                                       const SizedBox(width: 8),
@@ -223,7 +221,7 @@ class _Module3ConclusionPageState extends State<Module3ConclusionPage>
                                         step.label,
                                         style: theme.textTheme.bodyMedium?.copyWith(
                                           fontWeight: FontWeight.bold,
-                                          color: theme.colorScheme.onSurface.withOpacity(value),
+                                          color: theme.colorScheme.onSurface.withAlpha((value * 255).round()),
                                         ),
                                       ),
                                     ],
@@ -259,10 +257,10 @@ class _Module3ConclusionPageState extends State<Module3ConclusionPage>
                   child: Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.errorContainer.withOpacity(0.2),
+                      color: theme.colorScheme.errorContainer.withAlpha((0.2 * 255).round()),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: theme.colorScheme.error.withOpacity(0.5),
+                        color: theme.colorScheme.error.withAlpha((0.5 * 255).round()),
                         width: 2,
                       ),
                     ),
@@ -374,8 +372,8 @@ class _IterationPainter extends CustomPainter {
 
       // Determinar color y opacidad basado en el progreso
       final stepProgress = (currentStep >= i + 1) ? 1.0 : 0.3;
-      paint.color = primaryColor.withOpacity(stepProgress);
-      arrowPaint.color = primaryColor.withOpacity(stepProgress);
+  paint.color = primaryColor.withAlpha((stepProgress * 255).round());
+  arrowPaint.color = primaryColor.withAlpha((stepProgress * 255).round());
 
       // Dibujar línea curva
       final path = Path();
@@ -405,8 +403,8 @@ class _IterationPainter extends CustomPainter {
       final y = size.height * steps[i].position;
       final centerX = size.width / 2;
       final isActive = i <= currentStep;
-      final pointPaint = Paint()
-        ..color = steps[i].color.withOpacity(isActive ? 1.0 : 0.3)
+  final pointPaint = Paint()
+  ..color = steps[i].color.withAlpha(((isActive ? 1.0 : 0.3) * 255).round())
         ..style = PaintingStyle.fill;
 
       // Punto central
@@ -419,7 +417,7 @@ class _IterationPainter extends CustomPainter {
       // Anillo exterior si está activo
       if (isActive) {
         final ringPaint = Paint()
-          ..color = steps[i].color.withOpacity(0.3)
+          ..color = steps[i].color.withAlpha((0.3 * 255).round())
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2;
 

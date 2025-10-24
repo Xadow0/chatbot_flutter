@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import '../models/local_llm_models.dart';
 import 'model_download_service.dart';
 
@@ -16,7 +15,7 @@ class LocalLLMService {
   static const int _contextSize = 2048;
   static const int _maxTokens = 512;
   
-  final List<Function(LocalLLMStatus)> _statusListeners = [];
+  final List<ValueChanged<LocalLLMStatus>> _statusListeners = [];
   
   // Servicio de descarga
   final ModelDownloadService _downloadService = ModelDownloadService();
@@ -35,11 +34,11 @@ class LocalLLMService {
   bool get isAvailable => _status == LocalLLMStatus.ready;
   bool get isLoading => _status == LocalLLMStatus.loading;
 
-  void addStatusListener(Function(LocalLLMStatus) listener) {
+  void addStatusListener(ValueChanged<LocalLLMStatus> listener) {
     _statusListeners.add(listener);
   }
 
-  void removeStatusListener(Function(LocalLLMStatus) listener) {
+  void removeStatusListener(ValueChanged<LocalLLMStatus> listener) {
     _statusListeners.remove(listener);
   }
 
@@ -72,18 +71,15 @@ class LocalLLMService {
       
       // Configurar callbacks para el progreso solo si no han sido asignados
       // (la UI puede asignarlos previamente para mostrar un diálogo)
-      if (_downloadService.onProgress == null) {
-        _downloadService.onProgress = (progress) {
-          // Aquí podrías notificar a la UI del progreso
-          debugPrint('📊 Descarga: ${(progress * 100).toStringAsFixed(1)}%');
-        };
-      }
+      // Only set default callbacks if none were provided by the UI.
+      _downloadService.onProgress ??= (progress) {
+        // Aquí podrías notificar a la UI del progreso
+        debugPrint('📊 Descarga: ${(progress * 100).toStringAsFixed(1)}%');
+      };
 
-      if (_downloadService.onStatusChange == null) {
-        _downloadService.onStatusChange = (status) {
-          debugPrint('📡 Estado: $status');
-        };
-      }
+      _downloadService.onStatusChange ??= (status) {
+        debugPrint('📡 Estado: $status');
+      };
       
       final result = await _downloadService.downloadModel();
       
@@ -338,6 +334,8 @@ class LocalLLMService {
   void dispose() {
     debugPrint('🧹 [LocalLLMService] Liberando recursos...');
     _statusListeners.clear();
-    stopModel();
+    // stopModel is async; don't await in dispose. Use unawaited to avoid
+    // analyzer warnings while still requesting the stop operation.
+    unawaited(stopModel());
   }
 }
