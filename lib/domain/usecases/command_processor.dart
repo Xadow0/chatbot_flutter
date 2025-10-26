@@ -82,8 +82,10 @@ class CommandProcessor {
       // Construir el prompt modificado
       final enhancedPrompt = _buildEnhancedPrompt(content);
 
-      // Llamar a la IA seleccionada (podría ser Gemini, OpenAI, Ollama o Local)
-      final response = await _aiService.generateContent(enhancedPrompt);
+  // Normalizar espacios al inicio/final antes de enviar a la IA
+  final trimmedPrompt = enhancedPrompt.trim();
+  // Llamar a la IA seleccionada (podría ser Gemini, OpenAI, Ollama o Local)
+  final response = await _aiService.generateContent(trimmedPrompt);
 
       return CommandResult.success(CommandType.probarPrompt, response);
     } catch (e) {
