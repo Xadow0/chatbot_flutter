@@ -28,7 +28,7 @@ class OpenAIServiceAdapter implements AIServiceBase {
   }
 }
 
-/// Adaptador para OllamaService
+/// Adaptador para OllamaService (servidor remoto)
 /// IMPORTANTE: Este adaptador necesita saber qué modelo usar
 class OllamaServiceAdapter implements AIServiceBase {
   final OllamaService _service;
@@ -52,7 +52,9 @@ class OllamaServiceAdapter implements AIServiceBase {
   }
 }
 
-/// Adaptador para LocalLLMService
+/// Adaptador para LocalLLMService (Ollama Local)
+/// Este servicio se conecta a una instancia de Ollama ejecutándose 
+/// localmente en la máquina del usuario
 class LocalLLMServiceAdapter implements AIServiceBase {
   final LocalLLMService _service;
 
@@ -62,4 +64,7 @@ class LocalLLMServiceAdapter implements AIServiceBase {
   Future<String> generateContent(String prompt) async {
     return await _service.generateContent(prompt);
   }
+  
+  /// Obtener el servicio subyacente para funcionalidades adicionales
+  LocalLLMService get service => _service;
 }

@@ -1,341 +1,433 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../models/local_llm_models.dart';
-import 'model_download_service.dart';
+import 'package:http/http.dart' as http;
+import '../models/ollama_local_models.dart';
 
-/// Servicio para ejecutar modelos LLM localmente en el dispositivo
+/// Servicio para ejecutar modelos LLM localmente usando Ollama
+/// 
+/// Este servicio se conecta a una instancia de Ollama ejecutándose localmente
+/// en la máquina del usuario (http://localhost:11434)
+/// 
+/// Requisitos:
+/// - Ollama instalado en la máquina local
+/// - Ejecutar 'ollama serve' antes de usar
+/// - Descargar modelos con 'ollama pull phi3' (u otros modelos)
 class LocalLLMService {
-  LocalLLMStatus _status = LocalLLMStatus.stopped;
+  OllamaLocalStatus _status = OllamaLocalStatus.stopped;
   String? _errorMessage;
   
-  dynamic _llamaInstance;
+  final OllamaLocalConfig _config;
+  String _currentModel;
+  List<String> _availableModels = [];
   
-  static const String _defaultModelName = 'phi-3-mini';
-  static const int _contextSize = 2048;
-  static const int _maxTokens = 512;
+  final List<ValueChanged<OllamaLocalStatus>> _statusListeners = [];
   
-  final List<ValueChanged<LocalLLMStatus>> _statusListeners = [];
-  
-  // Servicio de descarga
-  final ModelDownloadService _downloadService = ModelDownloadService();
-
-  /// Exponer el servicio de descarga para que la UI pueda conectar callbacks
-  ModelDownloadService get downloadService => _downloadService;
-  
-  LocalLLMService() {
-    debugPrint('🤖 [LocalLLMService] Servicio inicializado');
-    debugPrint('   📦 Modelo por defecto: $_defaultModelName');
-    debugPrint('   🧠 Tamaño de contexto: $_contextSize tokens');
+  /// Constructor con configuración opcional
+  LocalLLMService({
+    OllamaLocalConfig? config,
+    String? initialModel,
+  }) : _config = config ?? const OllamaLocalConfig(),
+       _currentModel = initialModel ?? const OllamaLocalConfig().defaultModel {
+    debugPrint('🤖 [LocalLLMService] Servicio Ollama Local inicializado');
+    debugPrint('   🌐 URL base: ${_config.baseUrl}');
+    debugPrint('   📦 Modelo por defecto: $_currentModel');
   }
 
-  LocalLLMStatus get status => _status;
+  // Getters
+  OllamaLocalStatus get status => _status;
   String? get errorMessage => _errorMessage;
-  bool get isAvailable => _status == LocalLLMStatus.ready;
-  bool get isLoading => _status == LocalLLMStatus.loading;
+  bool get isAvailable => _status == OllamaLocalStatus.ready;
+  bool get isConnecting => _status == OllamaLocalStatus.connecting;
+  String get currentModel => _currentModel;
+  List<String> get availableModels => _availableModels;
+  OllamaLocalConfig get config => _config;
 
-  void addStatusListener(ValueChanged<LocalLLMStatus> listener) {
+  // Listeners
+  void addStatusListener(ValueChanged<OllamaLocalStatus> listener) {
     _statusListeners.add(listener);
   }
 
-  void removeStatusListener(ValueChanged<LocalLLMStatus> listener) {
+  void removeStatusListener(ValueChanged<OllamaLocalStatus> listener) {
     _statusListeners.remove(listener);
   }
 
-  void _notifyStatusChange(LocalLLMStatus newStatus) {
+  void _notifyStatusChange(OllamaLocalStatus newStatus) {
     _status = newStatus;
     for (var listener in _statusListeners) {
       listener(newStatus);
     }
   }
 
-  /// Verificar si el modelo está descargado
-  Future<bool> isModelDownloaded() async {
-    return await _downloadService.isModelDownloaded();
-  }
-
-  /// Descargar el modelo (si no está descargado)
-  Future<ModelDownloadResult> downloadModelIfNeeded() async {
-    try {
-      debugPrint('🔍 [LocalLLMService] Verificando si el modelo está descargado...');
-      
-      if (await _downloadService.isModelDownloaded()) {
-        debugPrint('✅ [LocalLLMService] Modelo ya descargado');
-        return ModelDownloadResult(
-          success: true,
-          message: 'Modelo ya disponible',
-        );
-      }
-      
-      debugPrint('⬇️ [LocalLLMService] Iniciando descarga del modelo...');
-      
-      // Configurar callbacks para el progreso solo si no han sido asignados
-      // (la UI puede asignarlos previamente para mostrar un diálogo)
-      // Only set default callbacks if none were provided by the UI.
-      _downloadService.onProgress ??= (progress) {
-        // Aquí podrías notificar a la UI del progreso
-        debugPrint('📊 Descarga: ${(progress * 100).toStringAsFixed(1)}%');
-      };
-
-      _downloadService.onStatusChange ??= (status) {
-        debugPrint('📡 Estado: $status');
-      };
-      
-      final result = await _downloadService.downloadModel();
-      
-      if (result.success) {
-        debugPrint('✅ [LocalLLMService] Modelo descargado correctamente');
-      } else {
-        debugPrint('❌ [LocalLLMService] Error en descarga: ${result.error}');
-      }
-      
-      return result;
-    } catch (e) {
-      debugPrint('❌ [LocalLLMService] Error descargando modelo: $e');
-      return ModelDownloadResult(
-        success: false,
-        message: 'Error al descargar',
-        error: e.toString(),
-      );
-    }
-  }
-
-  /// Inicializar y cargar el modelo LLM local
-  Future<LocalLLMInitResult> initializeModel({
-    String? modelPath,
-    int contextSize = _contextSize,
-    bool autoDownload = true,
+  /// Inicializar conexión con Ollama Local
+  Future<OllamaLocalInitResult> initializeModel({
+    String? modelName,
   }) async {
     try {
-      debugPrint('🚀 [LocalLLMService] === INICIANDO CARGA DEL MODELO ===');
-      _notifyStatusChange(LocalLLMStatus.loading);
+      debugPrint('🚀 [LocalLLMService] === INICIANDO CONEXIÓN CON OLLAMA LOCAL ===');
+      _notifyStatusChange(OllamaLocalStatus.connecting);
       _errorMessage = null;
 
-      // 1. Verificar/descargar el modelo si es necesario
-      if (autoDownload) {
-        debugPrint('   📥 Verificando y descargando modelo si es necesario...');
-        final downloadResult = await downloadModelIfNeeded();
-        
-        if (!downloadResult.success) {
-          throw LocalLLMException(
-            'Error al descargar modelo',
-            details: downloadResult.error ?? 'Error desconocido',
+      // Usar modelo especificado o el actual
+      final targetModel = modelName ?? _currentModel;
+
+      // 1. Verificar que Ollama esté ejecutándose
+      debugPrint('   💓 Verificando servidor Ollama...');
+      final isRunning = await _checkOllamaRunning();
+      if (!isRunning) {
+        throw OllamaLocalException(
+          'Ollama no está ejecutándose',
+          details: 'Ejecuta "ollama serve" en tu terminal',
+        );
+      }
+      debugPrint('   ✅ Servidor Ollama activo');
+
+      // 2. Obtener lista de modelos disponibles
+      debugPrint('   📋 Cargando modelos disponibles...');
+      _availableModels = await _getAvailableModels();
+      debugPrint('   ✅ Modelos encontrados: ${_availableModels.join(", ")}');
+
+      // 3. Verificar que el modelo objetivo esté disponible
+      if (!_availableModels.contains(targetModel)) {
+        // Si no está disponible y hay otros modelos, usar el primero
+        if (_availableModels.isNotEmpty) {
+          debugPrint('   ⚠️ Modelo "$targetModel" no encontrado, usando "${_availableModels.first}"');
+          _currentModel = _availableModels.first;
+        } else {
+          throw OllamaLocalException(
+            'Modelo no encontrado',
+            details: targetModel,
           );
         }
+      } else {
+        _currentModel = targetModel;
+        debugPrint('   ✅ Modelo "$_currentModel" disponible');
       }
 
-      // 2. Verificar que el dispositivo tenga recursos suficientes
-      final hasResources = await _checkDeviceResources();
-      if (!hasResources) {
-        throw LocalLLMException(
-          'Recursos insuficientes',
-          details: 'El dispositivo no tiene suficiente RAM disponible (mínimo 2GB recomendado)',
-        );
-      }
-
-      // 3. Obtener ruta del modelo
-      final resolvedModelPath = modelPath ?? await _downloadService.getModelPath();
-      debugPrint('   📁 Ruta del modelo: $resolvedModelPath');
-
-      final modelExists = await _checkModelExists(resolvedModelPath);
-      if (!modelExists) {
-        throw LocalLLMException(
-          'Modelo no encontrado',
-          details: 'El archivo del modelo no existe en: $resolvedModelPath\n'
-                   'Por favor, verifica la instalación.',
-        );
-      }
-
-      // 4. Cargar el modelo con llama.cpp
-      debugPrint('   ⏳ Cargando modelo en memoria...');
-      await _loadModel(resolvedModelPath, contextSize);
-
-      // 5. Realizar test de inferencia
+      // 4. Hacer una prueba rápida de inferencia
       debugPrint('   🧪 Realizando test de inferencia...');
-      final testResult = await _testInference();
-      if (!testResult) {
-        throw LocalLLMException(
+      final testSuccess = await _testInference();
+      if (!testSuccess) {
+        throw OllamaLocalException(
           'Error en test de inferencia',
-          details: 'El modelo se cargó pero no responde correctamente',
+          details: 'El modelo no responde correctamente',
         );
       }
+      debugPrint('   ✅ Test de inferencia exitoso');
 
-      debugPrint('   ✅ Modelo cargado y funcional');
-      debugPrint('🟢 [LocalLLMService] === MODELO LISTO ===\n');
-
-      _notifyStatusChange(LocalLLMStatus.ready);
+      debugPrint('🟢 [LocalLLMService] === OLLAMA LOCAL LISTO ===\n');
+      _notifyStatusChange(OllamaLocalStatus.ready);
       
-      return LocalLLMInitResult(
+      return OllamaLocalInitResult(
         success: true,
-        modelName: _defaultModelName,
-        modelSize: await _getModelSize(resolvedModelPath),
-        loadTimeMs: 0,
+        modelName: _currentModel,
+        availableModels: _availableModels,
       );
 
-    } on LocalLLMException catch (e) {
+    } on OllamaLocalException catch (e) {
       debugPrint('❌ [LocalLLMService] Error conocido: ${e.message}');
       debugPrint('   💡 Detalles: ${e.details}');
       _errorMessage = e.userFriendlyMessage;
-      _notifyStatusChange(LocalLLMStatus.error);
+      _notifyStatusChange(OllamaLocalStatus.error);
       
-      return LocalLLMInitResult(
+      return OllamaLocalInitResult(
         success: false,
         error: e.userFriendlyMessage,
       );
 
     } catch (e) {
       debugPrint('❌ [LocalLLMService] Error inesperado: $e');
-      _errorMessage = 'Error al inicializar el modelo: $e';
-      _notifyStatusChange(LocalLLMStatus.error);
+      _errorMessage = 'Error al inicializar: $e';
+      _notifyStatusChange(OllamaLocalStatus.error);
       
-      return LocalLLMInitResult(
+      return OllamaLocalInitResult(
         success: false,
-        error: 'Error al inicializar: $e',
+        error: 'Error al conectar con Ollama: $e',
       );
     }
   }
 
+  /// Generar contenido usando el modelo actual
   Future<String> generateContent(
     String prompt, {
     double temperature = 0.7,
-    int maxTokens = _maxTokens,
+    int maxTokens = 2048,
+    String? systemPrompt,
   }) async {
-    if (_status != LocalLLMStatus.ready) {
-      throw LocalLLMException(
-        'Modelo no disponible',
-        details: 'El modelo debe estar cargado antes de generar contenido. Estado actual: $_status',
+    if (_status != OllamaLocalStatus.ready) {
+      throw OllamaLocalException(
+        'Ollama no está listo',
+        details: 'Estado actual: ${_status.displayText}',
       );
     }
 
     try {
       debugPrint('🔵 [LocalLLMService] === GENERANDO RESPUESTA ===');
+      debugPrint('   🤖 Modelo: $_currentModel');
       debugPrint('   💬 Prompt: ${prompt.length > 50 ? "${prompt.substring(0, 50)}..." : prompt}');
       debugPrint('   🌡️ Temperature: $temperature');
       debugPrint('   📊 Max tokens: $maxTokens');
 
-      await Future.delayed(const Duration(seconds: 1));
+      final url = Uri.parse('${_config.baseUrl}/api/generate');
       
-      final response = _simulateLocalResponse(prompt);
-      
-      debugPrint('   ✅ Respuesta generada: ${response.length} caracteres');
-      debugPrint('🟢 [LocalLLMService] === GENERACIÓN EXITOSA ===\n');
+      final requestBody = {
+        'model': _currentModel,
+        'prompt': prompt,
+        'stream': false,
+        'options': {
+          'temperature': temperature,
+          'num_predict': maxTokens,
+        },
+      };
 
-      return response;
+      // Agregar system prompt si se proporciona
+      if (systemPrompt != null) {
+        requestBody['system'] = systemPrompt;
+      }
 
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      ).timeout(_config.timeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['response'] != null) {
+          final content = data['response'] as String;
+          debugPrint('   ✅ Respuesta generada: ${content.length} caracteres');
+          debugPrint('🟢 [LocalLLMService] === GENERACIÓN EXITOSA ===\n');
+          return content;
+        } else {
+          throw OllamaLocalException(
+            'Respuesta inválida',
+            details: 'No se encontró el campo "response" en la respuesta',
+          );
+        }
+      } else {
+        throw OllamaLocalException(
+          'Error HTTP ${response.statusCode}',
+          details: response.body,
+        );
+      }
+
+    } on TimeoutException {
+      debugPrint('⏱️ [LocalLLMService] Timeout');
+      throw OllamaLocalException('Timeout');
     } catch (e) {
       debugPrint('❌ [LocalLLMService] Error en generación: $e');
-      throw LocalLLMException(
+      if (e is OllamaLocalException) rethrow;
+      throw OllamaLocalException(
         'Error al generar respuesta',
         details: e.toString(),
       );
     }
   }
 
-  Future<void> stopModel() async {
-    try {
-      debugPrint('🛑 [LocalLLMService] Deteniendo modelo...');
-      
-      if (_llamaInstance != null) {
-        _llamaInstance = null;
-      }
-
-      _notifyStatusChange(LocalLLMStatus.stopped);
-      _errorMessage = null;
-      
-      debugPrint('   ✅ Modelo detenido y recursos liberados');
-      
-    } catch (e) {
-      debugPrint('⚠️ [LocalLLMService] Error al detener modelo: $e');
-      _errorMessage = 'Error al detener el modelo';
-      _notifyStatusChange(LocalLLMStatus.error);
+  /// Generar contenido con historial de chat
+  Future<String> chatWithHistory({
+    required String prompt,
+    required List<Map<String, String>> history,
+    double temperature = 0.7,
+    int maxTokens = 2048,
+  }) async {
+    if (_status != OllamaLocalStatus.ready) {
+      throw OllamaLocalException(
+        'Ollama no está listo',
+        details: 'Estado actual: ${_status.displayText}',
+      );
     }
-  }
 
-  Future<LocalLLMInitResult> retry() async {
-    debugPrint('🔄 [LocalLLMService] Reintentando inicialización...');
-    return await initializeModel();
-  }
-
-  Future<bool> _checkDeviceResources() async {
     try {
-      debugPrint('   🔍 Verificando recursos del dispositivo...');
-      return true;
-    } catch (e) {
-      debugPrint('   ⚠️ No se pudo verificar recursos: $e');
-      return true;
-    }
-  }
+      debugPrint('💬 [LocalLLMService] === CHAT CON HISTORIAL ===');
+      debugPrint('   🤖 Modelo: $_currentModel');
+      debugPrint('   📝 Mensajes en historial: ${history.length}');
 
-  Future<bool> _checkModelExists(String path) async {
-    try {
-      final file = File(path);
-      final exists = await file.exists();
+      final url = Uri.parse('${_config.baseUrl}/api/chat');
+
+      // Construir mensajes en formato Ollama
+      final messages = <Map<String, String>>[];
       
-      if (exists) {
-        final size = await file.length();
-        final sizeMB = (size / (1024 * 1024)).toStringAsFixed(1);
-        debugPrint('   ✓ Modelo encontrado: $sizeMB MB');
+      // Agregar historial
+      messages.addAll(history);
+      
+      // Agregar mensaje actual
+      messages.add({'role': 'user', 'content': prompt});
+
+      final requestBody = {
+        'model': _currentModel,
+        'messages': messages,
+        'stream': false,
+        'options': {
+          'temperature': temperature,
+          'num_predict': maxTokens,
+        },
+      };
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      ).timeout(_config.timeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['message'] != null && data['message']['content'] != null) {
+          final content = data['message']['content'] as String;
+          debugPrint('   ✅ Chat exitoso: ${content.length} caracteres');
+          debugPrint('🟢 [LocalLLMService] === CHAT EXITOSO ===\n');
+          return content;
+        } else {
+          throw OllamaLocalException(
+            'Respuesta inválida en chat',
+            details: 'Formato de respuesta desconocido',
+          );
+        }
       } else {
-        debugPrint('   ✗ Modelo no encontrado en: $path');
+        throw OllamaLocalException(
+          'Error HTTP ${response.statusCode}',
+          details: response.body,
+        );
       }
-      
-      return exists;
-    } catch (e) {
-      debugPrint('   ⚠️ Error verificando modelo: $e');
-      return false;
-    }
-  }
 
-  Future<void> _loadModel(String modelPath, int contextSize) async {
-    try {
-      await Future.delayed(const Duration(seconds: 2));
-      _llamaInstance = 'MODELO_SIMULADO';
-      
+    } on TimeoutException {
+      debugPrint('⏱️ [LocalLLMService] Timeout en chat');
+      throw OllamaLocalException('Timeout');
     } catch (e) {
-      throw LocalLLMException(
-        'Error al cargar modelo',
-        details: 'No se pudo cargar el modelo en memoria: $e',
+      debugPrint('❌ [LocalLLMService] Error en chat: $e');
+      if (e is OllamaLocalException) rethrow;
+      throw OllamaLocalException(
+        'Error en chat',
+        details: e.toString(),
       );
     }
   }
 
-  Future<bool> _testInference() async {
+  /// Cambiar el modelo actual
+  Future<bool> changeModel(String modelName) async {
     try {
-      await Future.delayed(const Duration(milliseconds: 500));
+      debugPrint('🔄 [LocalLLMService] Cambiando modelo a: $modelName');
+      
+      // Verificar que el modelo esté disponible
+      if (!_availableModels.contains(modelName)) {
+        debugPrint('   ❌ Modelo no disponible');
+        throw OllamaLocalException(
+          'Modelo no encontrado',
+          details: modelName,
+        );
+      }
+
+      _currentModel = modelName;
+      debugPrint('   ✅ Modelo cambiado a: $_currentModel');
+      
+      // Hacer un test rápido
+      final testSuccess = await _testInference();
+      if (!testSuccess) {
+        throw OllamaLocalException(
+          'Error al cambiar modelo',
+          details: 'El modelo no responde',
+        );
+      }
+
       return true;
     } catch (e) {
-      debugPrint('   ✗ Test de inferencia falló: $e');
+      debugPrint('❌ [LocalLLMService] Error cambiando modelo: $e');
       return false;
     }
   }
 
-  Future<String> _getModelSize(String path) async {
+  /// Detener el servicio (liberar recursos)
+  Future<void> stopModel() async {
     try {
-      final file = File(path);
-      if (await file.exists()) {
-        final bytes = await file.length();
-        final mb = bytes / (1024 * 1024);
-        return '${mb.toStringAsFixed(1)} MB';
-      }
+      debugPrint('🛑 [LocalLLMService] Deteniendo servicio...');
+      
+      _notifyStatusChange(OllamaLocalStatus.stopped);
+      _errorMessage = null;
+      
+      debugPrint('   ✅ Servicio detenido');
+      
     } catch (e) {
-      debugPrint('   ⚠️ Error obteniendo tamaño: $e');
+      debugPrint('⚠️ [LocalLLMService] Error al detener: $e');
+      _errorMessage = 'Error al detener el servicio';
+      _notifyStatusChange(OllamaLocalStatus.error);
     }
-    return 'Desconocido';
   }
 
-  String _simulateLocalResponse(String prompt) {
-    return '🤖 [Modelo Local - Phi-3 Simulado]\n\n'
-           'Esta es una respuesta simulada del modelo local. '
-           'Cuando se integre llama.cpp, aquí aparecerá la respuesta real del modelo Phi-3.\n\n'
-           'Tu pregunta fue: "${prompt.length > 100 ? "${prompt.substring(0, 100)}..." : prompt}"\n\n'
-           '⚠️ Nota: Esta es una simulación. El modelo real se integrará próximamente.';
+  /// Reintentar inicialización
+  Future<OllamaLocalInitResult> retry() async {
+    debugPrint('🔄 [LocalLLMService] Reintentando inicialización...');
+    return await initializeModel();
   }
 
+  // ==================== MÉTODOS PRIVADOS ====================
+
+  /// Verificar si Ollama está ejecutándose
+  Future<bool> _checkOllamaRunning() async {
+    try {
+      final url = Uri.parse('${_config.baseUrl}/api/version');
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('   ❌ Error verificando Ollama: $e');
+      return false;
+    }
+  }
+
+  /// Obtener lista de modelos disponibles
+  Future<List<String>> _getAvailableModels() async {
+    try {
+      final url = Uri.parse('${_config.baseUrl}/api/tags');
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['models'] != null) {
+          final models = (data['models'] as List)
+              .map((model) => model['name'] as String)
+              .toList();
+          return models;
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('   ⚠️ Error obteniendo modelos: $e');
+      return [];
+    }
+  }
+
+  /// Test rápido de inferencia
+  Future<bool> _testInference() async {
+    try {
+      final url = Uri.parse('${_config.baseUrl}/api/generate');
+      
+      final requestBody = {
+        'model': _currentModel,
+        'prompt': 'Hi',
+        'stream': false,
+        'options': {
+          'num_predict': 10, // Solo 10 tokens para ser rápido
+        },
+      };
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      ).timeout(const Duration(seconds: 30));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('   ❌ Test de inferencia falló: $e');
+      return false;
+    }
+  }
+
+  /// Liberar recursos
   void dispose() {
     debugPrint('🧹 [LocalLLMService] Liberando recursos...');
     _statusListeners.clear();
-    // stopModel is async; don't await in dispose. Use unawaited to avoid
-    // analyzer warnings while still requesting the stop operation.
     unawaited(stopModel());
   }
 }
