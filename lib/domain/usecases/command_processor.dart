@@ -1,8 +1,12 @@
+import 'package:flutter/foundation.dart';
+
+/// Tipos de comandos disponibles en el sistema
 enum CommandType {
-  probarPrompt,
-  none,
+  probarPrompt, // Comando /tryprompt para evaluar y mejorar prompts
+  none,        // No es un comando
 }
 
+/// Resultado del procesamiento de un comando
 class CommandResult {
   final bool isCommand;
   final CommandType type;
@@ -16,6 +20,7 @@ class CommandResult {
     this.error,
   });
 
+  /// Constructor para cuando el mensaje NO es un comando
   factory CommandResult.notCommand() {
     return CommandResult(
       isCommand: false,
@@ -23,6 +28,7 @@ class CommandResult {
     );
   }
 
+  /// Constructor para cuando el comando se procesó exitosamente
   factory CommandResult.success(CommandType type, String message) {
     return CommandResult(
       isCommand: true,
@@ -31,6 +37,7 @@ class CommandResult {
     );
   }
 
+  /// Constructor para cuando hubo un error al procesar el comando
   factory CommandResult.error(CommandType type, String error) {
     return CommandResult(
       isCommand: true,
@@ -41,54 +48,95 @@ class CommandResult {
 }
 
 /// Interfaz base que todos los servicios de IA deben implementar
-/// Esto permite que CommandProcessor funcione con cualquier servicio
+/// Esto permite que CommandProcessor funcione con cualquier servicio:
+/// - GeminiService (a través de GeminiServiceAdapter)
+/// - OpenAIService (a través de OpenAIServiceAdapter)
+/// - OllamaService (a través de OllamaServiceAdapter)
+/// - LocalOllamaService (a través de LocalOllamaServiceAdapter)
 abstract class AIServiceBase {
   Future<String> generateContent(String prompt);
 }
 
+/// Procesador de comandos que utiliza el servicio de IA actualmente seleccionado
+/// 
+/// Este procesador detecta y ejecuta comandos especiales que comienzan con '/'.
+/// Cada comando utiliza la IA seleccionada por el usuario (Gemini, OpenAI, Ollama, etc.)
+/// para generar respuestas especializadas.
+/// 
+/// **Flujo de trabajo:**
+/// 1. El usuario escribe un mensaje
+/// 2. ChatProvider -> SendMessageUseCase -> CommandProcessor
+/// 3. Si es un comando, se procesa con la IA activa
+/// 4. Si NO es un comando, se devuelve un eco local (sin IA)
 class CommandProcessor {
-  // Ya no tiene una dependencia fija de GeminiService
-  // Ahora recibe cualquier servicio que implemente AIServiceBase
   final AIServiceBase _aiService;
 
   CommandProcessor(this._aiService);
 
   /// Detecta si el mensaje es un comando y lo procesa
+  /// 
+  /// Retorna:
+  /// - [CommandResult.notCommand()] si no es un comando
+  /// - [CommandResult.success()] si el comando se procesó correctamente
+  /// - [CommandResult.error()] si hubo un error al procesar el comando
   Future<CommandResult> processMessage(String message) async {
     final normalizedMessage = message.trim().toLowerCase();
 
+    debugPrint('🔍 [CommandProcessor] Analizando mensaje...');
+    debugPrint('   📝 Contenido: ${message.length > 50 ? "${message.substring(0, 50)}..." : message}');
+
     // Detectar comando "/tryprompt"
     if (normalizedMessage.startsWith('/tryprompt')) {
+      debugPrint('   ✅ Comando detectado: /tryprompt');
       return await _processProbarPrompt(message);
     }
 
+    // TODO: Agregar más comandos aquí en el futuro
+    // if (normalizedMessage.startsWith('/traducir')) { ... }
+    // if (normalizedMessage.startsWith('/resumir')) { ... }
+
     // No es un comando
+    debugPrint('   ℹ️ No es un comando, retornando como mensaje normal');
     return CommandResult.notCommand();
   }
 
   /// Procesa el comando "/tryprompt" usando la IA seleccionada
+  /// 
+  /// Este comando evalúa y mejora el prompt proporcionado por el usuario,
+  /// utilizando la IA actualmente seleccionada (Gemini, OpenAI, Ollama, etc.)
   Future<CommandResult> _processProbarPrompt(String message) async {
     try {
+      debugPrint('🔧 [CommandProcessor] Procesando comando /tryprompt...');
+      
       // Extraer el contenido después del comando
       final content = _extractContentAfterCommand(message, '/tryprompt');
       
       if (content.isEmpty) {
+        debugPrint('   ⚠️ Comando sin contenido');
         return CommandResult.error(
           CommandType.probarPrompt,
           'Por favor, escribe algo después de "/tryprompt".\nEjemplo: /tryprompt ¿Qué es Flutter?',
         );
       }
 
-      // Construir el prompt modificado
+      debugPrint('   📝 Contenido extraído: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
+      
+      // Construir el prompt especializado para evaluación
       final enhancedPrompt = _buildEnhancedPrompt(content);
+      debugPrint('   🎯 Prompt especializado creado (${enhancedPrompt.length} caracteres)');
 
-  // Normalizar espacios al inicio/final antes de enviar a la IA
-  final trimmedPrompt = enhancedPrompt.trim();
-  // Llamar a la IA seleccionada (podría ser Gemini, OpenAI, Ollama o Local)
-  final response = await _aiService.generateContent(trimmedPrompt);
+      // Normalizar espacios antes de enviar a la IA
+      final trimmedPrompt = enhancedPrompt.trim();
+      
+      debugPrint('   🤖 Enviando a la IA seleccionada...');
+      // Llamar a la IA seleccionada (podría ser Gemini, OpenAI, Ollama o LocalOllama)
+      final response = await _aiService.generateContent(trimmedPrompt);
+      
+      debugPrint('   ✅ Respuesta recibida de la IA (${response.length} caracteres)');
 
       return CommandResult.success(CommandType.probarPrompt, response);
     } catch (e) {
+      debugPrint('   ❌ Error procesando comando: $e');
       return CommandResult.error(
         CommandType.probarPrompt,
         'Error al procesar el comando: ${e.toString()}',
@@ -105,43 +153,64 @@ class CommandProcessor {
     return message.substring(contentStart).trim();
   }
 
-  /// Construye el prompt mejorado para la IA
+  /// Construye el prompt especializado para evaluación y mejora de prompts
+  /// 
+  /// Este prompt instruye a la IA para que analice y mejore el prompt del usuario,
+  /// identificando los tres componentes clave: Task, Context y Referencias
   String _buildEnhancedPrompt(String userContent) {
     return '''
-      Actúa como un evaluador y mejorador de prompts para el prompt que adjunto como "Mensaje del usuario". No repitas tu función ni el mensaje del usuario, céntrate en mejorar el prompt. 
-      El usuario mandará un prompt para que lo evalúes y mejores, para cada caso, debes identificar los tres pasos que cualquier prompt debería tener:
-      1. Task 
-      2. Context
-      3. Referencias
-      Si cualquiera de las tres partes es faltante o deficiente, debes indicar al usuario como mejorarlo, haciendo las preguntas generales para que el usuario las conteste en el tema en específico del que trate el prompt.
-      Estos son los pasos que debes cumplir para evaluar y mejorar el prompt:
+Actúa como un evaluador y mejorador de prompts para el prompt que adjunto como "Mensaje del usuario". No repitas tu función ni el mensaje del usuario, céntrate en mejorar el prompt. 
+El usuario mandará un prompt para que lo evalúes y mejores, para cada caso, debes identificar los tres pasos que cualquier prompt debería tener:
+1. Task 
+2. Context
+3. Referencias
 
-      Instrucciones
-      **Identifica el objetivo principal** cuál es el objetivo que este prompt busca que tú (la IA) cumplas.
-      **Tamaño y complejidad del objetivo:** ¿Es el objetivo que el prompt propone grande y complicado para la IA?  Si es así, ¿como desglosarlo en objetivos mas pequeños?
-      **Estructura y expresión del prompt:** ¿Está este prompt bien estructurado y expresado para lograr su objetivo de manera efectiva?    
-      **Necesidades de un prompt complejo:** Si el objetivo es grande y/o complicado, ¿incluye este prompt un contexto completo, instrucciones claras y por pasos, ejemplos relevantes y un formato de respuesta adecuado para la IA?
-      **Añade una referencias adecuadas para el resultado:** ¿Que tipo de estructura quieres que tenga la respuesta (lista, tabla, párrafos)? ¿Que tono, longitud y estilo? Es necesario un ejemplo claro de respuesta?
-      **Reescribe el prompt mejorado** incorporando todas las mejoras que hayas señalado. Asegúrate de que el prompt resultante sea claro y completo. Proporciona este prompt mejorado en un formato markdown. Todas las partes que deban ser reemplazadas o completadas por el usuario estaran entre corchetes [].
+Si cualquiera de las tres partes es faltante o deficiente, debes indicar al usuario como mejorarlo, haciendo las preguntas generales para que el usuario las conteste en el tema en específico del que trate el prompt.
 
+Estos son los pasos que debes cumplir para evaluar y mejorar el prompt:
 
-      Restricciones:
-      *   Tu respuesta no debe superar los 4000 tokens.
-      *   Céntrate en la explicación de las mejoras y en la generación del prompt mejorado, sin dar rodeos o información superflua en el formato de la explicación.
+**Instrucciones:**
+1. **Identifica el objetivo principal** cuál es el objetivo que este prompt busca que tú (la IA) cumplas.
+2. **Tamaño y complejidad del objetivo:** ¿Es el objetivo que el prompt propone grande y complicado para la IA?  Si es así, ¿como desglosarlo en objetivos mas pequeños?
+3. **Estructura y expresión del prompt:** ¿Está este prompt bien estructurado y expresado para lograr su objetivo de manera efectiva?    
+4. **Necesidades de un prompt complejo:** Si el objetivo es grande y/o complicado, ¿incluye este prompt un contexto completo, instrucciones claras y por pasos, ejemplos relevantes y un formato de respuesta adecuado para la IA?
+5. **Añade una referencias adecuadas para el resultado:** ¿Que tipo de estructura quieres que tenga la respuesta (lista, tabla, párrafos)? ¿Que tono, longitud y estilo? Es necesario un ejemplo claro de respuesta?
+6. **Reescribe el prompt mejorado** incorporando todas las mejoras que hayas señalado. Asegúrate de que el prompt resultante sea claro y completo. Proporciona este prompt mejorado en un formato markdown. Todas las partes que deban ser reemplazadas o completadas por el usuario estaran entre corchetes [].
 
-      Mensaje del usuario:
-      $userContent
+**Restricciones:**
+* Tu respuesta no debe superar los 4000 tokens.
+* Céntrate en la explicación de las mejoras y en la generación del prompt mejorado, sin dar rodeos o información superflua en el formato de la explicación.
 
+**Mensaje del usuario:**
+$userContent
 
-      Fin del mensaje del usuario.
-      ''';
-    }
+**Fin del mensaje del usuario.**
+''';
+  }
 }
 
-// Comandos adicionales que puedes implementar en el futuro:
+// ============================================================================
+// COMANDOS FUTUROS
+// ============================================================================
+// Esta sección documenta comandos que se pueden implementar en el futuro
+
+/// Comandos adicionales que se pueden implementar en el futuro
 class FutureCommands {
-  // Ejemplo: /traductor [idioma] [texto]
-  // Ejemplo: /resumen [texto largo]
-  // Ejemplo: /codigo [descripción]
-  // Ejemplo: /corregir [texto]
+  // /traducir [idioma] [texto]
+  // Ejemplo: /traducir inglés Hola, ¿cómo estás?
+  
+  // /resumir [texto largo]
+  // Ejemplo: /resumir [pegar artículo largo]
+  
+  // /codigo [descripción]
+  // Ejemplo: /codigo función para ordenar lista de números
+  
+  // /corregir [texto]
+  // Ejemplo: /corregir Este es un teksto con herrores
+  
+  // /explicar [concepto]
+  // Ejemplo: /explicar ¿Qué es async/await?
+  
+  // /comparar [opción A] vs [opción B]
+  // Ejemplo: /comparar Flutter vs React Native
 }

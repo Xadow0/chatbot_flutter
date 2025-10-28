@@ -11,7 +11,6 @@ import '../../data/services/local_ollama_service.dart';
 import '../../data/services/ai_service_selector.dart';
 import '../../data/services/preferences_service.dart';
 import '../../data/services/ai_service_adapters.dart';
-import '../../data/repositories/chat_repository.dart';
 import '../../data/repositories/conversation_repository.dart';
 import '../../domain/usecases/command_processor.dart';
 import '../../domain/usecases/send_message_usecase.dart';
@@ -74,11 +73,9 @@ class ChatProvider extends ChangeNotifier {
     
     // Inicializar CommandProcessor con Gemini por defecto
     _commandProcessor = CommandProcessor(_geminiAdapter);
-    final localRepository = LocalChatRepository();
 
     _sendMessageUseCase = SendMessageUseCase(
       commandProcessor: _commandProcessor,
-      chatRepository: localRepository,
     );
 
     _initializeModels();
@@ -131,10 +128,8 @@ class ChatProvider extends ChangeNotifier {
     _commandProcessor = CommandProcessor(currentAdapter);
     
     // Actualizar SendMessageUseCase
-    final localRepository = LocalChatRepository();
     _sendMessageUseCase = SendMessageUseCase(
       commandProcessor: _commandProcessor,
-      chatRepository: localRepository,
     );
     
     debugPrint('🔄 [ChatProvider] CommandProcessor actualizado para: $_currentProvider');
@@ -495,28 +490,11 @@ Puedes elegir entre diferentes proveedores de IA:
     try {
       String botResponse;
       
-      // Los comandos se procesan según el proveedor actual
-      if (content.startsWith('/')) {
-        debugPrint('   🔸 Detectado comando, procesando con $_currentProvider');
-        final response = await _sendMessageUseCase.execute(content);
-        botResponse = response.content;
-      } 
-      // Caso especial: Ollama remoto con historial
-      else if (_currentProvider == AIProvider.ollama && _aiSelector.ollamaAvailable) {
-        debugPrint('   🟪 Usando Ollama (servidor remoto)...');
-        botResponse = await _sendToOllama(content);
-      }
-      // Caso especial: Ollama Local con historial
-      else if (_currentProvider == AIProvider.localOllama && _aiSelector.localOllamaAvailable) {
-        debugPrint('   🟠 Usando Ollama Embebido...');
-        botResponse = await _sendToLocalLLM(content);
-      }
-      // Resto de proveedores (Gemini, OpenAI)
-      else {
-        debugPrint('   🟦 Usando $_currentProvider...');
-        final response = await _sendMessageUseCase.execute(content);
-        botResponse = response.content;
-      }
+      // TODOS los mensajes (comandos y normales) pasan por SendMessageUseCase
+      // SendMessageUseCase decide si es comando (usa IA) o mensaje normal (eco local)
+      debugPrint('   🔸 Procesando mensaje a través de SendMessageUseCase...');
+      final response = await _sendMessageUseCase.execute(content);
+      botResponse = response.content;
       
       _messages.add(Message.bot(botResponse));
       debugPrint('✅ [ChatProvider] Mensaje procesado exitosamente');
@@ -549,6 +527,19 @@ Puedes elegir entre diferentes proveedores de IA:
     }
   }
 
+  // ============================================================================
+  // MÉTODOS DEPRECATED - Ya no se usan en v1.0.0
+  // ============================================================================
+  // Estos métodos se usaban antes para enviar mensajes directamente a Ollama
+  // sin pasar por CommandProcessor. Ahora TODOS los mensajes pasan por
+  // SendMessageUseCase, que decide si usar IA (comando) o eco local (sin comando).
+  // 
+  // Se mantienen comentados para:
+  // 1. Referencia histórica
+  // 2. Posible uso futuro en "Modo Chat Directo" (v1.1.0)
+  // ============================================================================
+  
+  /*
   // Enviar a Ollama (servidor remoto) con historial
   Future<String> _sendToOllama(String content) async {
     try {
@@ -609,6 +600,7 @@ Puedes elegir entre diferentes proveedores de IA:
 
     return messages;
   }
+  */
 
   void _updateQuickResponses() {
     _quickResponses = QuickResponseProvider.getContextualResponses(_messages);
