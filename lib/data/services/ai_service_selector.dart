@@ -233,6 +233,25 @@ class AIServiceSelector extends ChangeNotifier {
     notifyListeners();
     debugPrint('   ✅ Modelo OpenAI cambiado a $modelName');
   }
+
+  /// Cambia el modelo activo en el servicio de Ollama Local
+  Future<bool> changeLocalOllamaModel(String modelName) async {
+    debugPrint('🔄 [AIServiceSelector] Cambiando modelo Ollama Local a: $modelName');
+    
+    // El método changeModel en el servicio ya se encarga de
+    // descargar si es necesario y actualizar el estado.
+    final success = await _localOllamaService.changeModel(modelName);
+    
+    if (success) {
+      debugPrint('   ✅ Modelo Ollama Local cambiado a $modelName');
+    } else {
+      debugPrint('   ❌ Error cambiando modelo Ollama Local');
+    }
+    
+    // El listener _onLocalOllamaStatusChanged se activará
+    // y notificará a los listeners (ChatProvider)
+    return success;
+  }
   
   Future<String> sendMessage(String message, {List<Message>? history}) async {
     debugPrint('📤 [AIServiceSelector] === ENVIANDO MENSAJE ===');

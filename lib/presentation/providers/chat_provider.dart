@@ -377,6 +377,40 @@ class ChatProvider extends ChangeNotifier {
     debugPrint('   ✅ Modelo OpenAI cambiado a $modelName');
   }
 
+  Future<void> changeLocalOllamaModel(String modelName) async {
+    if (_currentProvider != AIProvider.localOllama) {
+      debugPrint('   ⚠️ Solo se puede cambiar modelo en Ollama Local');
+      return;
+    }
+    
+    final currentLocalModel = _aiSelector.localOllamaService.currentModel;
+    if (currentLocalModel != null && (currentLocalModel == modelName || currentLocalModel.startsWith('$modelName:'))) {
+      debugPrint('   ℹ️ Ya estás usando el modelo $modelName');
+      return;
+    }
+
+    debugPrint('🔄 [ChatProvider] Cambiando modelo Ollama Local a $modelName');
+
+    try {
+      final success = await _aiSelector.changeLocalOllamaModel(modelName);
+      
+      if (success) {
+        // (Opcional) Guardar preferencia
+        // await _preferencesService.saveLastLocalOllamaModel(modelName);
+        
+        debugPrint('   ✅ Modelo Ollama Local cambiado a $modelName');
+      } else {
+        debugPrint('   ❌ Error cambiando modelo local');
+      }
+      
+      // El listener _onAiSelectorChanged se encargará de notificar a la UI
+      
+    } catch (e) {
+      debugPrint('   ❌ Error cambiando modelo local: $e');
+      rethrow;
+    }
+  }
+
   Future<void> refreshModels() async {
     debugPrint('🔄 [ChatProvider] Refrescando modelos de Ollama...');
     

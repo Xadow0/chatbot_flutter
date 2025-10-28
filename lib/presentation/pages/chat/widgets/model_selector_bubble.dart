@@ -585,6 +585,7 @@ class ModelSelectorBubble extends StatelessWidget {
     final status = chatProvider.localOllamaStatus;
     final isAvailable = status == LocalOllamaStatus.ready;
     final isLoading = chatProvider.localOllamaLoading;
+    final currentModelName = chatProvider.aiSelector.localOllamaService.currentModel ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,9 +593,11 @@ class ModelSelectorBubble extends StatelessWidget {
         // Botón principal de Ollama Local
         InkWell(
           onTap: () {
+            if (isLoading) return; // No hacer nada si está ocupado
+            
             if (isAvailable) {
               _selectProvider(context, chatProvider, AIProvider.localOllama);
-            } else if (status == LocalOllamaStatus.notInitialized) {
+            } else if (status == LocalOllamaStatus.notInitialized || status == LocalOllamaStatus.error) {
               _startLocalLLM(context, chatProvider);
             }
           },
@@ -689,57 +692,105 @@ class ModelSelectorBubble extends StatelessWidget {
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.only(left: 12),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(128),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: Colors.green,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Ollama ejecutándose localmente',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Modelo Local:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '🔒 100% privado - Sin enviar datos a la nube',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '💻 Modelo: ${chatProvider.aiSelector.localOllamaService.currentModel}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 4),
+                // Usamos la lista de modelos de local_ollama_models.dart
+                ...LocalOllamaModel.recommendedModels.map((model) {
+                  // Comprobamos si el modelo actual (ej. 'phi3:latest') 
+                  // empieza con el nombre del modelo (ej. 'phi3')
+                  final isModelSelected = currentModelName.startsWith(model.name);
+                  
+                  return _buildLocalModelOption(
+                    context: context,
+                    chatProvider: chatProvider,
+                    model: model,
+                    isSelected: isModelSelected,
+                    isEnabled: !isLoading
+                  );
+                }),
+              ],
             ),
           ),
         ],
+        // --- FIN SECCIÓN MODIFICADA ---
       ],
     );
+  }
+
+  /// Construye una opción de modelo para Ollama Local
+  Widget _buildLocalModelOption({
+    required BuildContext context,
+    required ChatProvider chatProvider,
+    required LocalOllamaModel model,
+    required bool isSelected,
+    bool isEnabled = true,
+  }) {
+    return InkWell(
+      onTap: isEnabled ? () => _selectLocalOllamaModel(context, chatProvider, model.name) : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.5,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? Theme.of(context).colorScheme.primary.withAlpha(13)
+                : null,
+            borderRadius: BorderRadius.circular(8),
+            border: isSelected 
+                ? Border.all(
+                    color: Theme.of(context).colorScheme.primary.withAlpha(77),
+                  )
+                : null,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      model.displayName,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected 
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                    ),
+                    Text(
+                      '${model.parametersB}B - ${model.estimatedSize}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(
+                  Icons.check,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 16,
+                ),
+            ],
+          ),
+        ),
+      ),
+      );
   }
 
   Widget _buildConnectionIndicator(ConnectionInfo info) {
@@ -828,6 +879,8 @@ class ModelSelectorBubble extends StatelessWidget {
         return 'Descargando modelo de IA...';
       case LocalOllamaStatus.starting:
         return 'Iniciando servidor local...';
+      case LocalOllamaStatus.loading: 
+        return 'Cargando modelo en memoria...';
       case LocalOllamaStatus.ready:
         return '100% privado - Listo para usar';
       case LocalOllamaStatus.error:
@@ -845,6 +898,7 @@ class ModelSelectorBubble extends StatelessWidget {
       case LocalOllamaStatus.installing:
       case LocalOllamaStatus.downloadingModel:
       case LocalOllamaStatus.starting:
+      case LocalOllamaStatus.loading:
         return Colors.orange;
       case LocalOllamaStatus.ready:
         return Colors.green;
@@ -888,8 +942,22 @@ class ModelSelectorBubble extends StatelessWidget {
       case AIProvider.openai:
         return chatProvider.currentOpenAIModel;
       case AIProvider.localOllama:
-        // Mostrar el modelo actual de Ollama Local
-        return chatProvider.aiSelector.localOllamaService.currentModel ?? 'phi3';
+        final currentModel = chatProvider.aiSelector.localOllamaService.currentModel;
+        if (currentModel == null) return 'No seleccionado';
+        
+        // Busca en los modelos recomendados un nombre que coincida
+        final modelDef = LocalOllamaModel.recommendedModels.firstWhere(
+          (m) => currentModel.startsWith(m.name),
+          orElse: () => LocalOllamaModel(
+            name: currentModel, 
+            displayName: currentModel.split(':').first, // fallback
+            description: '', 
+            isDownloaded: true, 
+            estimatedSize: '', 
+            parametersB: 0
+          ),
+        );
+        return modelDef.displayName;
     }
   }
 
@@ -937,6 +1005,18 @@ class ModelSelectorBubble extends StatelessWidget {
     }
   }
 
+  Future<void> _selectLocalOllamaModel(BuildContext context, ChatProvider chatProvider, String modelName) async {
+    if (chatProvider.localOllamaLoading) {
+      _showError(context, 'Espera a que termine el proceso actual...');
+      return;
+    }
+    try {
+      await chatProvider.changeLocalOllamaModel(modelName);
+    } catch (e) {
+      _showError(context, 'Error cambiando modelo local: $e');
+    }
+  }
+
   Future<void> _refreshOllama(BuildContext context, ChatProvider chatProvider) async {
     try {
       await chatProvider.refreshModels();
@@ -975,6 +1055,7 @@ class ModelSelectorBubble extends StatelessWidget {
   }
 
   Future<void> _retryLocalLLM(BuildContext context, ChatProvider chatProvider) async {
+    if (chatProvider.localOllamaLoading) return; 
     await _startLocalLLM(context, chatProvider);
   }
 

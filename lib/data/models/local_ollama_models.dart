@@ -20,6 +20,8 @@ enum LocalOllamaStatus {
   
   /// Iniciando servidor Ollama
   starting,
+
+  loading,
   
   /// Listo para usar
   ready,
@@ -43,6 +45,8 @@ extension LocalOllamaStatusExtension on LocalOllamaStatus {
         return 'Descargando modelo de IA...';
       case LocalOllamaStatus.starting:
         return 'Iniciando servidor...';
+      case LocalOllamaStatus.loading:
+        return 'Cargando modelo...';
       case LocalOllamaStatus.ready:
         return 'Listo';
       case LocalOllamaStatus.error:
@@ -59,6 +63,7 @@ extension LocalOllamaStatusExtension on LocalOllamaStatus {
       case LocalOllamaStatus.installing:
       case LocalOllamaStatus.downloadingModel:
       case LocalOllamaStatus.starting:
+      case LocalOllamaStatus.loading:
         return '🟡';
       case LocalOllamaStatus.ready:
         return '🟢';
@@ -74,7 +79,8 @@ extension LocalOllamaStatusExtension on LocalOllamaStatus {
            this == LocalOllamaStatus.downloadingInstaller ||
            this == LocalOllamaStatus.installing ||
            this == LocalOllamaStatus.downloadingModel ||
-           this == LocalOllamaStatus.starting;
+           this == LocalOllamaStatus.starting ||
+           this == LocalOllamaStatus.loading;
   }
 }
 

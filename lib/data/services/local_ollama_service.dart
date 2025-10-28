@@ -612,25 +612,58 @@ class OllamaManagedService {
 
   /// Cambiar modelo activo
   Future<bool> changeModel(String modelName) async {
-    if (!_availableModels.contains(modelName)) {
-      debugPrint('⚠️ [OllamaManaged] Modelo $modelName no disponible');
-      
-      // Intentar descargar
-      debugPrint('   📥 Descargando modelo...');
-      try {
+    debugPrint('🔄 [OllamaManaged] Solicitud para cambiar modelo a: $modelName');
+
+    // 1. Comprobar si ya está activo
+    if (_currentModel != null && (_currentModel == modelName || _currentModel!.startsWith('$modelName:'))) {
+      debugPrint('   ℹ️ Modelo $modelName ya está activo.');
+      // Asegurarse de que el estado sea 'listo'
+      if (_status != LocalOllamaStatus.ready) {
+        _updateStatus(LocalOllamaStatus.ready);
+      }
+      return true;
+    }
+
+    try {
+      // 2. Comprobar si el modelo existe
+      final modelExists = _availableModels.any((m) => m == modelName || m.startsWith('$modelName:'));
+
+      if (!modelExists) {
+        debugPrint('   📥 Modelo $modelName no encontrado localmente, descargando...');
+        // El estado se actualiza a downloadingModel y se notifica el progreso
+        // automáticamente desde _downloadModel
         await _downloadModel(modelName);
         await _refreshAvailableModels();
-      } catch (e) {
-        debugPrint('   ❌ Error descargando modelo al cambiar: $e');
-        return false;
+        debugPrint('   ✅ Descarga de $modelName completada.');
+      } else {
+        debugPrint('   ℹ️ Modelo $modelName ya está descargado.');
       }
+
+      // 3. Encontrar el nombre completo del modelo (ej. 'llama3:latest')
+      final fullModelName = _availableModels.firstWhere(
+        (m) => m == modelName || m.startsWith('$modelName:'),
+        orElse: () => throw LocalOllamaException('Modelo no encontrado', details: 'No se pudo encontrar $modelName después de descargar.'),
+      );
+
+      // 4. Cargar el modelo en memoria (el paso que faltaba)
+      debugPrint('   ⏳ Cargando modelo $fullModelName en memoria...');
+      _currentModel = fullModelName; // Asignar *antes* de testInference
+      _updateStatus(LocalOllamaStatus.loading); // <<< NUEVO ESTADO
+      
+      await _testInference(); // Esto fuerza a Ollama a cargar el modelo
+
+      // 5. Éxito
+      debugPrint('   ✅ [OllamaManaged] Modelo cambiado y listo: $_currentModel');
+      _updateStatus(LocalOllamaStatus.ready); // <<< ESTADO FINAL CORRECTO
+      
+      return true;
+
+    } catch (e) {
+      debugPrint('   ❌ Error en changeModel: $e');
+      final errorMsg = (e is LocalOllamaException) ? e.toString() : e.toString();
+      _updateStatus(LocalOllamaStatus.error, error: errorMsg);
+      return false;
     }
-    
-    _currentModel = modelName;
-    debugPrint('✅ [OllamaManaged] Modelo cambiado a: $modelName');
-    _updateStatus(_status); // Notificar listeners
-    
-    return true;
   }
 
   /// Pausar servicio (liberar recursos)
@@ -682,7 +715,7 @@ class OllamaManagedService {
   /// Reintentar inicialización después de un error
   Future<LocalOllamaInitResult> retry() async {
     debugPrint('🔄 [OllamaManaged] Reintentando inicialización...');
-    return await initialize(modelName: _currentModel);
+    return await initialize(modelName: _currentModel ?? LocalOllamaModel.defaultModel);
   }
 
   /// Verificar salud del servicio
