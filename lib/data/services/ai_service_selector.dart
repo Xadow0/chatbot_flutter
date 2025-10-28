@@ -1,24 +1,24 @@
 import 'package:flutter/foundation.dart';
 import '../models/message_model.dart';
 import '../models/ollama_models.dart';
-import '../models/ollama_local_models.dart'; // CAMBIADO: nuevo import
+import '../models/local_ollama_models.dart';
 import 'gemini_service.dart';
 import 'ollama_service.dart';
 import 'openai_service.dart';
-import 'local_llm_service.dart';
+import 'local_ollama_service.dart';
 
 enum AIProvider {
   gemini,
   ollama,
   openai,
-  localLLM, // Ollama Local (ejecutándose en la máquina del usuario)
+  localOllama,
 }
 
 class AIServiceSelector extends ChangeNotifier {
   final GeminiService _geminiService;
   final OllamaService _ollamaService;
   final OpenAIService _openaiService;
-  final LocalLLMService _localLLMService;
+  final OllamaManagedService _localOllamaService;
   
   AIProvider _currentProvider = AIProvider.gemini;
   String _currentOllamaModel = 'phi3:latest';
@@ -26,21 +26,19 @@ class AIServiceSelector extends ChangeNotifier {
   List<OllamaModel> _availableModels = [];
   bool _ollamaAvailable = false;
   bool _openaiAvailable = false;
-  OllamaLocalStatus _localLLMStatus = OllamaLocalStatus.stopped; // CAMBIADO: nuevo tipo
+  LocalOllamaStatus _localOllamaStatus = LocalOllamaStatus.notInitialized;
   
   AIServiceSelector({
     required GeminiService geminiService,
     required OllamaService ollamaService,
     required OpenAIService openaiService,
-    required LocalLLMService localLLMService,
+    required OllamaManagedService localOllamaService,
   }) : _geminiService = geminiService,
        _ollamaService = ollamaService,
        _openaiService = openaiService,
-       _localLLMService = localLLMService {
+       _localOllamaService = localOllamaService {
     _initializeServices();
-    
-    // Escuchar cambios de estado del LLM local
-    _localLLMService.addStatusListener(_onLocalLLMStatusChanged);
+    _localOllamaService.addStatusListener(_onLocalOllamaStatusChanged);
   }
   
   // Getters
@@ -55,24 +53,21 @@ class AIServiceSelector extends ChangeNotifier {
   OpenAIService get openaiService => _openaiService;
   ConnectionInfo get connectionInfo => _ollamaService.connectionInfo;
   
-  // Getters para LLM local (Ollama Local)
-  LocalLLMService get localLLMService => _localLLMService;
-  OllamaLocalStatus get localLLMStatus => _localLLMStatus; // CAMBIADO: nuevo tipo
-  bool get localLLMAvailable => _localLLMStatus == OllamaLocalStatus.ready; // CAMBIADO
-  bool get localLLMLoading => _localLLMStatus == OllamaLocalStatus.connecting; // CAMBIADO
-  String? get localLLMError => _localLLMService.errorMessage;
+  // Getters para Ollama Local
+  OllamaManagedService get localOllamaService => _localOllamaService;
+  LocalOllamaStatus get localOllamaStatus => _localOllamaStatus;
+  bool get localOllamaAvailable => _localOllamaStatus == LocalOllamaStatus.ready;
+  bool get localOllamaLoading => _localOllamaStatus.isProcessing;
+  String? get localOllamaError => _localOllamaService.errorMessage;
   
-  // Stream de estado de conexión
   Stream<ConnectionInfo> get connectionStream => _ollamaService.connectionStream;
   
-  // Callback para cambios de estado del LLM local
-  void _onLocalLLMStatusChanged(OllamaLocalStatus status) { // CAMBIADO: nuevo tipo
-    debugPrint('📡 [AIServiceSelector] Estado LLM local cambió a: ${status.displayText}');
-    _localLLMStatus = status;
+  void _onLocalOllamaStatusChanged(LocalOllamaStatus status) {
+    debugPrint('📡 [AIServiceSelector] Estado Ollama Local cambió a: ${status.displayText}');
+    _localOllamaStatus = status;
     notifyListeners();
   }
   
-  // NUEVO: Método público para refrescar conexión y modelos de Ollama
   Future<void> refreshOllama() async {
     debugPrint('🔄 [AIServiceSelector] Refrescando Ollama...');
     try {
@@ -87,26 +82,19 @@ class AIServiceSelector extends ChangeNotifier {
     }
   }
   
-  // Inicializar todos los servicios
   Future<void> _initializeServices() async {
     debugPrint('🎬 [AIServiceSelector] Inicializando servicios de IA...');
     
-    // Inicializar Ollama (servidor remoto)
     await _initializeOllama();
-    
-    // Inicializar OpenAI
     _initializeOpenAI();
-    
-    // El LLM local se inicializa bajo demanda, no automáticamente
     
     debugPrint('✅ [AIServiceSelector] Servicios inicializados');
     debugPrint('   📊 Gemini: Siempre disponible');
     debugPrint('   📊 Ollama (remoto): ${_ollamaAvailable ? "Disponible" : "No disponible"}');
     debugPrint('   📊 OpenAI: ${_openaiAvailable ? "Disponible" : "No disponible"}');
-    debugPrint('   📊 LLM Local (Ollama): ${_localLLMStatus.displayText}');
+    debugPrint('   📊 Ollama Local: ${_localOllamaStatus.displayText}');
   }
   
-  // Inicializar Ollama (servidor remoto)
   Future<void> _initializeOllama() async {
     try {
       debugPrint('🔷 [AIServiceSelector] Inicializando Ollama remoto...');
@@ -122,7 +110,6 @@ class AIServiceSelector extends ChangeNotifier {
     notifyListeners();
   }
   
-  // Inicializar OpenAI
   void _initializeOpenAI() {
     _openaiAvailable = _openaiService.isAvailable;
     if (_openaiAvailable) {
@@ -133,11 +120,10 @@ class AIServiceSelector extends ChangeNotifier {
     }
   }
   
-  // MODIFICADO: Inicializar LLM Local (Ollama Local)
-  Future<OllamaLocalInitResult> initializeLocalLLM() async { // CAMBIADO: nuevo tipo de retorno
+  Future<LocalOllamaInitResult> initializeLocalOllama() async {
     debugPrint('🚀 [AIServiceSelector] Iniciando Ollama Local...');
     
-    final result = await _localLLMService.initializeModel();
+    final result = await _localOllamaService.initialize();
     
     if (result.success) {
       debugPrint('✅ [AIServiceSelector] Ollama Local inicializado correctamente');
@@ -151,27 +137,23 @@ class AIServiceSelector extends ChangeNotifier {
     return result;
   }
   
-  // MODIFICADO: Detener LLM Local
-  Future<void> stopLocalLLM() async {
+  Future<void> stopLocalOllama() async {
     debugPrint('🛑 [AIServiceSelector] Deteniendo Ollama Local...');
     
-    // Si el proveedor actual es el LLM local, cambiar a Gemini
-    if (_currentProvider == AIProvider.localLLM) {
+    if (_currentProvider == AIProvider.localOllama) {
       debugPrint('   🔄 Cambiando a Gemini antes de detener');
       await setProvider(AIProvider.gemini);
     }
     
-    await _localLLMService.stopModel();
+    await _localOllamaService.stop();
     notifyListeners();
   }
   
-  // MODIFICADO: Reintentar inicialización del LLM local
-  Future<OllamaLocalInitResult> retryLocalLLM() async { // CAMBIADO: nuevo tipo de retorno
+  Future<LocalOllamaInitResult> retryLocalOllama() async {
     debugPrint('🔄 [AIServiceSelector] Reintentando inicialización de Ollama Local...');
-    return await _localLLMService.retry();
+    return await _localOllamaService.retry();
   }
   
-  // Verificar disponibilidad de Ollama (servidor remoto)
   Future<void> _checkOllamaAvailability() async {
     try {
       debugPrint('💓 [AIServiceSelector] Verificando disponibilidad de Ollama remoto...');
@@ -184,13 +166,11 @@ class AIServiceSelector extends ChangeNotifier {
     }
   }
   
-  // Cargar modelos disponibles (Ollama remoto)
   Future<void> _loadAvailableModels() async {
     try {
       debugPrint('📋 [AIServiceSelector] Cargando modelos de Ollama remoto...');
       _availableModels = await _ollamaService.getModels();
       
-      // Si el modelo actual no está disponible, seleccionar el primero
       if (_availableModels.isNotEmpty && 
           !_availableModels.any((m) => m.name == _currentOllamaModel)) {
         final oldModel = _currentOllamaModel;
@@ -205,60 +185,57 @@ class AIServiceSelector extends ChangeNotifier {
     }
   }
   
-  // Cambiar proveedor
   Future<void> setProvider(AIProvider provider) async {
     debugPrint('🔄 [AIServiceSelector] Cambiando proveedor a: $provider');
     
-    // Validaciones según el proveedor
-    if (provider == AIProvider.ollama) {
-      await _checkOllamaAvailability();
-      if (!_ollamaAvailable) {
-        debugPrint('❌ [AIServiceSelector] No se puede cambiar a Ollama: no disponible');
-        throw Exception('Ollama no está disponible. Verifica que el servidor esté accesible.');
-      }
-    } else if (provider == AIProvider.openai) {
-      if (!_openaiAvailable) {
-        debugPrint('❌ [AIServiceSelector] No se puede cambiar a OpenAI: no disponible');
-        throw Exception('OpenAI no está disponible. Verifica tu API Key.');
-      }
-    } else if (provider == AIProvider.localLLM) {
-      if (_localLLMStatus != OllamaLocalStatus.ready) { // CAMBIADO
-        debugPrint('❌ [AIServiceSelector] No se puede cambiar a Ollama Local: no disponible');
-        throw Exception('Ollama Local no está disponible. Inicializa primero.');
-      }
+    if (provider == AIProvider.ollama && !_ollamaAvailable) {
+      debugPrint('   ⚠️ Ollama remoto no está disponible');
+      throw Exception('Ollama remoto no está disponible');
+    }
+    
+    if (provider == AIProvider.openai && !_openaiAvailable) {
+      debugPrint('   ⚠️ OpenAI no está disponible');
+      throw Exception('OpenAI no está disponible. Configure API Key en .env');
+    }
+    
+    if (provider == AIProvider.localOllama && !localOllamaAvailable) {
+      debugPrint('   ⚠️ Ollama Local no está listo');
+      throw Exception('Ollama Local no está listo. Inicialízalo primero.');
     }
     
     _currentProvider = provider;
     notifyListeners();
-    debugPrint('✅ [AIServiceSelector] Proveedor cambiado a: $provider');
+    debugPrint('   ✅ Proveedor cambiado a $provider');
   }
   
-  // Cambiar modelo de Ollama remoto
   Future<void> setOllamaModel(String modelName) async {
-    debugPrint('🔄 [AIServiceSelector] Cambiando modelo de Ollama a: $modelName');
+    debugPrint('🔄 [AIServiceSelector] Cambiando modelo Ollama a: $modelName');
     
-    // Verificar que el modelo esté disponible
-    final isAvailable = await _ollamaService.isModelAvailable(modelName);
-    if (!isAvailable) {
-      debugPrint('❌ [AIServiceSelector] Modelo no disponible: $modelName');
-      throw Exception('Modelo $modelName no disponible');
+    if (!_availableModels.any((m) => m.name == modelName)) {
+      debugPrint('   ❌ Modelo $modelName no disponible');
+      throw Exception('Modelo no disponible');
     }
     
     _currentOllamaModel = modelName;
     notifyListeners();
-    debugPrint('✅ [AIServiceSelector] Modelo de Ollama cambiado a: $modelName');
+    debugPrint('   ✅ Modelo Ollama cambiado a $modelName');
   }
   
-  // Cambiar modelo de OpenAI
-  void setOpenAIModel(String modelName) {
-    debugPrint('🔄 [AIServiceSelector] Cambiando modelo de OpenAI a: $modelName');
+  Future<void> setOpenAIModel(String modelName) async {
+    debugPrint('🔄 [AIServiceSelector] Cambiando modelo OpenAI a: $modelName');
+    
+    if (!OpenAIService.availableModels.contains(modelName)) {
+      debugPrint('   ❌ Modelo $modelName no disponible');
+      throw Exception('Modelo no disponible');
+    }
+    
     _currentOpenAIModel = modelName;
     notifyListeners();
+    debugPrint('   ✅ Modelo OpenAI cambiado a $modelName');
   }
   
-  // Enviar mensaje al proveedor actual
   Future<String> sendMessage(String message, {List<Message>? history}) async {
-    debugPrint('📨 [AIServiceSelector] === ENVIANDO MENSAJE ===');
+    debugPrint('📤 [AIServiceSelector] === ENVIANDO MENSAJE ===');
     debugPrint('   🎯 Proveedor: $_currentProvider');
     debugPrint('   💬 Mensaje: ${message.length > 50 ? "${message.substring(0, 50)}..." : message}');
     debugPrint('   📚 Historial: ${history?.length ?? 0} mensajes');
@@ -270,12 +247,11 @@ class AIServiceSelector extends ChangeNotifier {
         return await _sendToOllama(message, history);
       case AIProvider.openai:
         return await _sendToOpenAI(message, history);
-      case AIProvider.localLLM:
-        return await _sendToLocalLLM(message, history);
+      case AIProvider.localOllama:
+        return await _sendToLocalOllama(message, history);
     }
   }
   
-  // Enviar a Gemini
   Future<String> _sendToGemini(String message, List<Message>? history) async {
     try {
       debugPrint('   💎 Usando Gemini...');
@@ -289,12 +265,10 @@ class AIServiceSelector extends ChangeNotifier {
     }
   }
   
-  // Enviar a Ollama (servidor remoto)
   Future<String> _sendToOllama(String message, List<Message>? history) async {
     try {
       debugPrint('   🔍 Verificando disponibilidad del modelo $_currentOllamaModel...');
       
-      // Verificar que el modelo esté disponible
       final isAvailable = await _ollamaService.isModelAvailable(_currentOllamaModel);
       if (!isAvailable) {
         debugPrint('   ❌ Modelo $_currentOllamaModel no disponible');
@@ -329,7 +303,6 @@ class AIServiceSelector extends ChangeNotifier {
     }
   }
   
-  // Enviar a OpenAI
   Future<String> _sendToOpenAI(String message, List<Message>? history) async {
     try {
       debugPrint('   🔍 Usando modelo: $_currentOpenAIModel');
@@ -376,13 +349,12 @@ class AIServiceSelector extends ChangeNotifier {
     }
   }
   
-  // MODIFICADO: Enviar a Ollama Local
-  Future<String> _sendToLocalLLM(String message, List<Message>? history) async {
+  Future<String> _sendToLocalOllama(String message, List<Message>? history) async {
     try {
       debugPrint('   🔍 Verificando estado de Ollama Local...');
       
-      if (_localLLMStatus != OllamaLocalStatus.ready) { // CAMBIADO
-        debugPrint('   ❌ Ollama Local no está listo: ${_localLLMStatus.displayText}');
+      if (_localOllamaStatus != LocalOllamaStatus.ready) {
+        debugPrint('   ❌ Ollama Local no está listo: ${_localOllamaStatus.displayText}');
         throw Exception('Ollama Local no está listo');
       }
       
@@ -393,7 +365,6 @@ class AIServiceSelector extends ChangeNotifier {
       if (history != null && history.isNotEmpty) {
         debugPrint('   📝 Usando chat con historial (${history.length} mensajes)');
         
-        // Convertir historial al formato correcto
         final chatHistory = <Map<String, String>>[];
         final recentHistory = history.length > 10 
             ? history.sublist(history.length - 10) 
@@ -406,13 +377,13 @@ class AIServiceSelector extends ChangeNotifier {
           });
         }
         
-        response = await _localLLMService.chatWithHistory(
+        response = await _localOllamaService.chatWithHistory(
           prompt: message,
           history: chatHistory,
         );
       } else {
         debugPrint('   💭 Usando generación simple');
-        response = await _localLLMService.generateContent(message);
+        response = await _localOllamaService.generateContent(message);
       }
       
       debugPrint('✅ [AIServiceSelector] Respuesta de Ollama Local recibida (${response.length} chars)');
@@ -420,18 +391,10 @@ class AIServiceSelector extends ChangeNotifier {
       return response;
     } catch (e) {
       debugPrint('❌ [AIServiceSelector] Error con Ollama Local: $e');
-      
-      // Proporcionar información de diagnóstico
-      debugPrint('💡 [AIServiceSelector] DIAGNÓSTICO:');
-      debugPrint('   1. Verifica que Ollama esté ejecutándose (ollama serve)');
-      debugPrint('   2. Comprueba que el modelo esté descargado (ollama list)');
-      debugPrint('   3. Intenta con un prompt más corto');
-      
       throw Exception('Error con Ollama Local: $e');
     }
   }
-  
-  // Convertir historial a formato de chat para Ollama remoto
+    
   List<ChatMessage> _convertHistoryToChatMessages(List<Message> history, String newMessage) {
     final messages = <ChatMessage>[
       ChatMessage(
@@ -464,8 +427,8 @@ class AIServiceSelector extends ChangeNotifier {
   @override
   void dispose() {
     debugPrint('🔴 [AIServiceSelector] Disposing...');
-    _localLLMService.removeStatusListener(_onLocalLLMStatusChanged);
-    _localLLMService.dispose();
+    _localOllamaService.removeStatusListener(_onLocalOllamaStatusChanged);
+    _localOllamaService.dispose();
     _ollamaService.dispose();
     super.dispose();
   }

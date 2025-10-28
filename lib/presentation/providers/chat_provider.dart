@@ -3,11 +3,11 @@ import 'dart:io';
 import '../../data/models/message_model.dart';
 import '../../data/models/quick_response_model.dart';
 import '../../data/models/ollama_models.dart';
-import '../../data/models/ollama_local_models.dart'; // CAMBIADO: nuevo import para Ollama Local
+import '../../data/models/local_ollama_models.dart';
 import '../../data/services/gemini_service.dart';
 import '../../data/services/ollama_service.dart';
 import '../../data/services/openai_service.dart';
-import '../../data/services/local_llm_service.dart';
+import '../../data/services/local_ollama_service.dart';
 import '../../data/services/ai_service_selector.dart';
 import '../../data/services/preferences_service.dart';
 import '../../data/services/ai_service_adapters.dart';
@@ -30,13 +30,13 @@ class ChatProvider extends ChangeNotifier {
   late final GeminiService _geminiService;
   late final OllamaService _ollamaService;
   late final OpenAIService _openaiService;
-  late final LocalLLMService _localLLMService;
+  late final OllamaManagedService _localOllamaService;
   
   // Adaptadores
   late final GeminiServiceAdapter _geminiAdapter;
   late OllamaServiceAdapter _ollamaAdapter; // No final porque se recrea
   late final OpenAIServiceAdapter _openaiAdapter;
-  late final LocalLLMServiceAdapter _localLLMAdapter;
+  late final LocalOllamaServiceAdapter _localOllamaAdapter;
   
   // CommandProcessor que se actualizará
   late CommandProcessor _commandProcessor; // No final - se actualiza al cambiar proveedor
@@ -51,13 +51,13 @@ class ChatProvider extends ChangeNotifier {
     _geminiService = GeminiService();
     _ollamaService = OllamaService();
     _openaiService = OpenAIService();
-    _localLLMService = LocalLLMService();
+    _localOllamaService = OllamaManagedService();
     
     // Crear adaptadores
     _geminiAdapter = GeminiServiceAdapter(_geminiService);
     _ollamaAdapter = OllamaServiceAdapter(_ollamaService, _currentModel);
     _openaiAdapter = OpenAIServiceAdapter(_openaiService);
-    _localLLMAdapter = LocalLLMServiceAdapter(_localLLMService);
+    _localOllamaAdapter = LocalOllamaServiceAdapter(_localOllamaService);
     
     _preferencesService = PreferencesService();
     
@@ -65,8 +65,12 @@ class ChatProvider extends ChangeNotifier {
       geminiService: _geminiService,
       ollamaService: _ollamaService,
       openaiService: _openaiService,
-      localLLMService: _localLLMService,
+      localOllamaService: _localOllamaService,
     );
+    
+    // <--- AÑADIR ESTA LÍNEA ---
+    // Suscribirse a los cambios del selector (¡ESTA ES LA CORRECCIÓN!)
+    _aiSelector.addListener(_onAiSelectorChanged);
     
     // Inicializar CommandProcessor con Gemini por defecto
     _commandProcessor = CommandProcessor(_geminiAdapter);
@@ -79,6 +83,23 @@ class ChatProvider extends ChangeNotifier {
 
     _initializeModels();
     _addWelcomeMessage();
+  }
+
+  // <--- AÑADIR ESTE MÉTODO ---
+  /// Escucha los cambios de AIServiceSelector y notifica a los listeners de ChatProvider
+  void _onAiSelectorChanged() {
+    debugPrint('🔄 [ChatProvider] AIServiceSelector notificó cambios, actualizando UI...');
+    
+    // Sincronizar estado interno si es necesario (ej. modelo remoto)
+    if (_currentProvider == AIProvider.ollama &&
+        _aiSelector.ollamaAvailable &&
+        _currentModel != _aiSelector.currentOllamaModel) {
+      _currentModel = _aiSelector.currentOllamaModel;
+      _ollamaAdapter.updateModel(_currentModel);
+    }
+    
+    // Notificar a la UI (ModelSelectorBubble) para que se reconstruya
+    notifyListeners();
   }
 
   /// Actualiza el CommandProcessor según el proveedor actual
@@ -100,9 +121,9 @@ class ChatProvider extends ChangeNotifier {
         currentAdapter = _openaiAdapter;
         debugPrint('   🟢 Usando OpenAIAdapter');
         break;
-      case AIProvider.localLLM:
-        currentAdapter = _localLLMAdapter;
-        debugPrint('   🟠 Usando LocalLLMAdapter (Ollama Local)');
+      case AIProvider.localOllama:
+        currentAdapter = _localOllamaAdapter;
+        debugPrint('   🟠 Usando LocalLLMAdapter (Ollama Embebido)');
         break;
     }
     
@@ -136,11 +157,9 @@ class ChatProvider extends ChangeNotifier {
   List<String> get availableOpenAIModels => _aiSelector.availableOpenAIModels;
   
   // Getters para Ollama Local
-  OllamaLocalStatus get localLLMStatus => _aiSelector.localLLMStatus; // CAMBIADO: tipo actualizado
-  bool get localLLMAvailable => _aiSelector.localLLMAvailable;
-  bool get localLLMLoading => _aiSelector.localLLMLoading;
-  String? get localLLMError => _aiSelector.localLLMError;
-  LocalLLMService get localLLMService => _aiSelector.localLLMService; // NUEVO: acceso al servicio
+  LocalOllamaStatus get localOllamaStatus => _aiSelector.localOllamaStatus;
+  bool get localOllamaAvailable => _aiSelector.localOllamaAvailable;
+  bool get localOllamaLoading => _aiSelector.localOllamaLoading;
   
   Stream<ConnectionInfo> get connectionStream => _aiSelector.connectionStream;
 
@@ -195,10 +214,10 @@ class ChatProvider extends ChangeNotifier {
             }
             break;
             
-          case AIProvider.localLLM:
-            canRestore = _aiSelector.localLLMAvailable;
+          case AIProvider.localOllama:
+            canRestore = _aiSelector.localOllamaAvailable;
             if (!canRestore) {
-              debugPrint('   ⚠️ Ollama Local no disponible, usando Gemini por defecto');
+              debugPrint('   ⚠️ Ollama Embebido no disponible, usando Gemini por defecto');
             }
             break;
         }
@@ -213,16 +232,14 @@ class ChatProvider extends ChangeNotifier {
         } else {
           _currentProvider = AIProvider.gemini;
           await _aiSelector.setProvider(AIProvider.gemini);
-          _updateCommandProcessor();
-          debugPrint('   ℹ️ Usando Gemini por defecto');
+          debugPrint('   ✅ Usando proveedor por defecto: Gemini');
         }
       } else {
-        debugPrint('   ℹ️ No hay preferencias previas, usando Gemini');
+        debugPrint('   ℹ️ No hay preferencias guardadas, usando Gemini');
       }
+      
     } catch (e) {
       debugPrint('❌ [ChatProvider] Error restaurando preferencias: $e');
-      _currentProvider = AIProvider.gemini;
-      _updateCommandProcessor();
     }
   }
   
@@ -240,180 +257,166 @@ class ChatProvider extends ChangeNotifier {
           
         case AIProvider.openai:
           final lastModel = await _preferencesService.getLastOpenAIModel();
-          if (lastModel != null) {
-            _aiSelector.setOpenAIModel(lastModel);
+          if (lastModel != null && _aiSelector.availableOpenAIModels.contains(lastModel)) {
+            await _aiSelector.setOpenAIModel(lastModel);
             debugPrint('   ✅ Restaurado modelo OpenAI: $lastModel');
           }
           break;
           
-        case AIProvider.localLLM:
-          // Ollama Local no necesita restaurar modelo específico
-          // El servicio usa el modelo que esté configurado en Ollama
-          debugPrint('   ℹ️ Ollama Local usará el modelo disponible');
+        case AIProvider.localOllama:
+          // El modelo de Ollama Local se gestiona automáticamente
+          debugPrint('   ℹ️ Ollama Local usa modelo gestionado automáticamente');
           break;
           
         case AIProvider.gemini:
-          // Gemini no tiene selección de modelo
+          // Gemini solo tiene un modelo
           break;
       }
     } catch (e) {
-      debugPrint('⚠️ [ChatProvider] Error restaurando modelo: $e');
+      debugPrint('❌ [ChatProvider] Error restaurando modelo del proveedor: $e');
     }
   }
 
   void toggleModelSelector() {
     _showModelSelector = !_showModelSelector;
+    debugPrint('🔄 [ChatProvider] Selector de modelos: ${_showModelSelector ? "Mostrado" : "Oculto"}');
     notifyListeners();
   }
 
   void hideModelSelector() {
     if (_showModelSelector) {
       _showModelSelector = false;
+      debugPrint('🔽 [ChatProvider] Selector de modelos oculto');
       notifyListeners();
     }
   }
 
   Future<void> changeProvider(AIProvider newProvider) async {
-    debugPrint('🔄 [ChatProvider] Cambiando proveedor a: $newProvider');
-    
-    try {
-      await _aiSelector.setProvider(newProvider);
-      _currentProvider = newProvider;
-      _updateCommandProcessor();
-      
-      await _preferencesService.saveLastProvider(newProvider);
-      
-      notifyListeners();
-      debugPrint('✅ [ChatProvider] Proveedor cambiado exitosamente');
-    } catch (e) {
-      debugPrint('❌ [ChatProvider] Error cambiando proveedor: $e');
-      rethrow;
+    if (_currentProvider == newProvider) {
+      debugPrint('   ℹ️ Ya estás usando $newProvider');
+      return;
     }
+
+    debugPrint('🔄 [ChatProvider] Cambiando proveedor de $_currentProvider a $newProvider');
+
+    // Validar disponibilidad
+    bool isAvailable = false;
+    switch (newProvider) {
+      case AIProvider.gemini:
+        isAvailable = true;
+        break;
+      case AIProvider.ollama:
+        isAvailable = _aiSelector.ollamaAvailable;
+        break;
+      case AIProvider.openai:
+        isAvailable = _aiSelector.openaiAvailable;
+        break;
+      case AIProvider.localOllama:
+        isAvailable = _aiSelector.localOllamaAvailable;
+        break;
+    }
+
+    if (!isAvailable) {
+      debugPrint('   ❌ $newProvider no está disponible');
+      throw Exception('$newProvider no está disponible');
+    }
+
+    _currentProvider = newProvider;
+    await _aiSelector.setProvider(newProvider);
+    
+    // Actualizar el CommandProcessor
+    _updateCommandProcessor();
+    
+    // Guardar preferencia
+    await _preferencesService.saveLastProvider(newProvider);
+    
+    notifyListeners();
+    debugPrint('   ✅ Proveedor cambiado a $newProvider');
   }
 
   Future<void> changeModel(String modelName) async {
-    debugPrint('🔄 [ChatProvider] Cambiando modelo Ollama a: $modelName');
-    
-    try {
-      await _aiSelector.setOllamaModel(modelName);
-      _currentModel = modelName;
-      _ollamaAdapter.updateModel(modelName);
-      _updateCommandProcessor();
-      
-      await _preferencesService.saveLastOllamaModel(modelName);
-      
-      notifyListeners();
-      debugPrint('✅ [ChatProvider] Modelo cambiado exitosamente');
-    } catch (e) {
-      debugPrint('❌ [ChatProvider] Error cambiando modelo: $e');
-      rethrow;
+    if (_currentProvider != AIProvider.ollama) {
+      debugPrint('   ⚠️ Solo se puede cambiar modelo en Ollama remoto');
+      return;
     }
+
+    if (_currentModel == modelName) {
+      debugPrint('   ℹ️ Ya estás usando el modelo $modelName');
+      return;
+    }
+
+    debugPrint('🔄 [ChatProvider] Cambiando modelo Ollama de $_currentModel a $modelName');
+
+    _currentModel = modelName;
+    _ollamaAdapter.updateModel(modelName);
+    
+    // Actualizar el modelo en el selector
+    await _aiSelector.setOllamaModel(modelName);
+    
+    // Guardar preferencia
+    await _preferencesService.saveLastOllamaModel(modelName);
+    
+    notifyListeners();
+    debugPrint('   ✅ Modelo Ollama cambiado a $modelName');
   }
 
   Future<void> changeOpenAIModel(String modelName) async {
-    debugPrint('🔄 [ChatProvider] Cambiando modelo OpenAI a: $modelName');
-    
-    try {
-      _aiSelector.setOpenAIModel(modelName);
-      
-      await _preferencesService.saveLastOpenAIModel(modelName);
-      
-      notifyListeners();
-      debugPrint('✅ [ChatProvider] Modelo OpenAI cambiado exitosamente');
-    } catch (e) {
-      debugPrint('❌ [ChatProvider] Error cambiando modelo OpenAI: $e');
-      rethrow;
+    if (_currentProvider != AIProvider.openai) {
+      debugPrint('   ⚠️ Solo se puede cambiar modelo en OpenAI');
+      return;
     }
+
+    debugPrint('🔄 [ChatProvider] Cambiando modelo OpenAI a $modelName');
+
+    await _aiSelector.setOpenAIModel(modelName);
+    
+    // Guardar preferencia
+    await _preferencesService.saveLastOpenAIModel(modelName);
+    
+    notifyListeners();
+    debugPrint('   ✅ Modelo OpenAI cambiado a $modelName');
   }
 
   Future<void> refreshModels() async {
-    debugPrint('🔄 [ChatProvider] Refrescando modelos...');
+    debugPrint('🔄 [ChatProvider] Refrescando modelos de Ollama...');
     
     try {
-      // Refrescar Ollama usando el método público
       await _aiSelector.refreshOllama();
       
       if (_aiSelector.ollamaAvailable) {
         _availableModels = _aiSelector.availableModels;
         
-        // Si el modelo actual ya no está disponible, cambiar al primero
+        // Si el modelo actual ya no existe, seleccionar el primero disponible
         if (_availableModels.isNotEmpty && 
             !_availableModels.any((m) => m.name == _currentModel)) {
           _currentModel = _availableModels.first.name;
           _ollamaAdapter.updateModel(_currentModel);
-          
-          if (_currentProvider == AIProvider.ollama) {
-            _updateCommandProcessor();
-          }
-          debugPrint('   ℹ️ Modelo cambiado a: $_currentModel');
         }
-      }
-      
-      debugPrint('   ✅ Modelos refrescados');
-      notifyListeners();
-    } catch (e) {
-      debugPrint('❌ [ChatProvider] Error refrescando modelos: $e');
-    }
-  }
-
-  // MODIFICADO: Métodos para Ollama Local con nuevo tipo de retorno
-  Future<OllamaLocalInitResult> initializeLocalLLM() async {
-    debugPrint('🚀 [ChatProvider] Iniciando Ollama Local...');
-    try {
-      final result = await _aiSelector.initializeLocalLLM();
-      notifyListeners();
-      
-      if (result.success) {
-        debugPrint('✅ [ChatProvider] Ollama Local inicializado correctamente');
-        debugPrint('   📦 Modelo: ${result.modelName}');
-        debugPrint('   📋 Modelos disponibles: ${result.availableModels?.join(", ")}');
+        
+        debugPrint('   ✅ Modelos actualizados (${_availableModels.length} disponibles)');
       } else {
-        debugPrint('❌ [ChatProvider] Error inicializando Ollama Local: ${result.error}');
+        debugPrint('   ⚠️ Ollama no está disponible');
       }
       
-      return result;
+      notifyListeners();
     } catch (e) {
-      debugPrint('❌ [ChatProvider] Excepción al inicializar Ollama Local: $e');
-      notifyListeners();
-      return OllamaLocalInitResult(
-        success: false,
-        error: 'Error inesperado: $e',
-      );
+      debugPrint('   ❌ Error refrescando modelos: $e');
+      rethrow;
     }
-  }
-
-  Future<void> stopLocalLLM() async {
-    debugPrint('🛑 [ChatProvider] Deteniendo Ollama Local...');
-    try {
-      await _aiSelector.stopLocalLLM();
-      notifyListeners();
-      debugPrint('✅ [ChatProvider] Ollama Local detenido correctamente');
-    } catch (e) {
-      debugPrint('❌ [ChatProvider] Error deteniendo Ollama Local: $e');
-      notifyListeners();
-    }
-  }
-
-  Future<OllamaLocalInitResult> retryLocalLLM() async {
-    debugPrint('🔄 [ChatProvider] Reintentando inicialización de Ollama Local...');
-    return await initializeLocalLLM();
   }
 
   void _addWelcomeMessage() {
-    final welcomeMessage = '''
-¡Bienvenido al chat! 👋
+    const welcomeMessage = '''¡Bienvenido al chat! 🤖
 
-Aquí puedes conversar conmigo y utilizar los siguientes comandos:
+Puedes elegir entre diferentes proveedores de IA:
 
-**Comandos disponibles:**
+**Proveedores en la nube:**
+- **Gemini** - IA de Google (gratis con límites)
+- **ChatGPT** - IA de OpenAI (requiere API key)
+- **Ollama Remoto** - Servidor Ollama en tu red local
 
-- **/tryprompt** [escribe aquí tu prompt] -- Este comando te permite ejecutar un análisis y mejora de tu prompt, generando como resultado un prompt mejorado en caso de que sea posible.
-
-💡 **Nuevo:** Los comandos ahora usan la IA que tengas seleccionada. Cambia entre:
-• **Gemini** - Rápido y gratis
-• **ChatGPT** - Alta calidad (requiere API Key)
-• **Ollama Remoto** - Servidor Ubuntu con Phi3/Mistral
-• **Ollama Local** - 100% privado en tu PC
+**Proveedor privado:**
+- **Ollama Local** - 100% privado en tu PC (sin instalación, embebido)
 
 ¡Empieza escribiendo tu mensaje!''';
 
@@ -433,8 +436,8 @@ Aquí puedes conversar conmigo y utilizar los siguientes comandos:
       case AIProvider.ollama:
         debugPrint('   📝 Modelo Ollama (remoto): $_currentModel');
         break;
-      case AIProvider.localLLM:
-        debugPrint('   📝 Modelo Ollama Local: ${_localLLMService.currentModel}');
+      case AIProvider.localOllama:
+        debugPrint('   📝 Modelo Ollama Local: ${_localOllamaService.currentModel}');
         break;
       case AIProvider.openai:
         debugPrint('   📝 Modelo OpenAI: ${_aiSelector.currentOpenAIModel}');
@@ -470,8 +473,8 @@ Aquí puedes conversar conmigo y utilizar los siguientes comandos:
         botResponse = await _sendToOllama(content);
       }
       // Caso especial: Ollama Local con historial
-      else if (_currentProvider == AIProvider.localLLM && _aiSelector.localLLMAvailable) {
-        debugPrint('   🟠 Usando Ollama Local...');
+      else if (_currentProvider == AIProvider.localOllama && _aiSelector.localOllamaAvailable) {
+        debugPrint('   🟠 Usando Ollama Embebido...');
         botResponse = await _sendToLocalLLM(content);
       }
       // Resto de proveedores (Gemini, OpenAI)
@@ -494,10 +497,10 @@ Aquí puedes conversar conmigo y utilizar los siguientes comandos:
       if (_currentProvider == AIProvider.ollama) {
         errorMessage += '\n\n💡 El servidor Ollama remoto no está disponible.\n'
                        '¿Quieres probar con otro proveedor? Toca el selector arriba.';
-      } else if (_currentProvider == AIProvider.localLLM) {
-        errorMessage += '\n\n💡 Ollama Local no está disponible.\n'
-                       'Verifica que Ollama esté ejecutándose: ollama serve\n'
-                       'O prueba con otro proveedor.';
+      } else if (_currentProvider == AIProvider.localOllama) {
+        errorMessage += '\n\n💡 Ollama Embebido no está disponible.\n'
+                 'Puede que esté inicializándose. Espera unos segundos.\n'
+                 'O prueba con otro proveedor.';
       } else if (_currentProvider == AIProvider.openai) {
         errorMessage += '\n\n💡 Verifica tu API Key de OpenAI en .env';
       }
@@ -531,22 +534,22 @@ Aquí puedes conversar conmigo y utilizar los siguientes comandos:
     }
   }
 
-  // NUEVO: Enviar a Ollama Local con historial
+  // Enviar a Ollama Embebido con historial
   Future<String> _sendToLocalLLM(String content) async {
     try {
-      debugPrint('   📤 [ChatProvider] Preparando mensaje para Ollama Local...');
-      debugPrint('   🎯 Modelo: ${_localLLMService.currentModel}');
+      debugPrint('   📤 [ChatProvider] Preparando mensaje para Ollama Embebido...');
+      debugPrint('   🎯 Modelo: ${_localOllamaService.currentModel}');
       
       final response = await _aiSelector.sendMessage(
         content,
         history: _messages.where((m) => !m.content.contains('¡Bienvenido al chat!')).toList(),
       );
       
-      debugPrint('   ✅ Respuesta recibida de Ollama Local (${response.length} caracteres)');
+      debugPrint('   ✅ Respuesta recibida de Ollama Embebido (${response.length} caracteres)');
       return response;
     } catch (e) {
-      debugPrint('   ❌ Error con Ollama Local: $e');
-      throw Exception('Error con Ollama Local: $e');
+      debugPrint('   ❌ Error con Ollama Embebido: $e');
+      throw Exception('Error con Ollama Embebido: $e');
     }
   }
 
@@ -623,6 +626,8 @@ Aquí puedes conversar conmigo y utilizar los siguientes comandos:
   @override
   void dispose() {
     debugPrint('🔴 [ChatProvider] Disposing...');
+    _aiSelector.removeListener(_onAiSelectorChanged); // Dejar de escuchar
+    
     _aiSelector.dispose();
     super.dispose();
   }
