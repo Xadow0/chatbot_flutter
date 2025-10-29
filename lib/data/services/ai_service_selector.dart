@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/message_model.dart';
-import '../models/ollama_models.dart';
+import '../models/remote_ollama_models.dart';
 import '../models/local_ollama_models.dart';
 import 'gemini_service.dart';
 import 'ollama_service.dart';

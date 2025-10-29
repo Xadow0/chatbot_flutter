@@ -1,3 +1,5 @@
+import '../../domain/entities/message_entity.dart';
+
 enum MessageType { user, bot }
 
 class Message {
@@ -56,5 +58,32 @@ class Message {
       timestamp: DateTime.parse(json['timestamp']),
     );
   }
-}
 
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  /// Convierte el modelo de datos a una entidad de dominio
+  MessageEntity toEntity() {
+    return MessageEntity(
+      id: id,
+      content: content,
+      type: type == MessageType.user 
+          ? MessageTypeEntity.user 
+          : MessageTypeEntity.bot,
+      timestamp: timestamp,
+    );
+  }
+
+  /// Crea un modelo de datos desde una entidad de dominio
+  factory Message.fromEntity(MessageEntity entity) {
+    return Message(
+      id: entity.id,
+      content: entity.content,
+      type: entity.type == MessageTypeEntity.user 
+          ? MessageType.user 
+          : MessageType.bot,
+      timestamp: entity.timestamp,
+    );
+  }
+}

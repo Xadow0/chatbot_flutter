@@ -7,6 +7,8 @@ import 'widgets/message_list.dart';
 import 'widgets/message_input.dart';
 import 'widgets/quick_responses.dart';
 import 'widgets/model_selector_bubble.dart';
+import '../../../data/models/message_model.dart';
+import '../../../data/models/quick_response_model.dart';
 
 class ChatPage extends StatelessWidget {
   final File? preloadedConversationFile;
@@ -82,12 +84,18 @@ class _ChatBodyState extends State<_ChatBody> {
                 
                 // Lista de mensajes
                 Expanded(
-                  child: MessageList(messages: chatProvider.messages),
+                  child: MessageList(
+                    messages: chatProvider.messages
+                        .map((e) => Message.fromEntity(e))
+                        .toList(),
+                  ),
                 ),
                 
                 // Respuestas rápidas
                 QuickResponsesWidget(
-                  responses: chatProvider.quickResponses,
+                  responses: chatProvider.quickResponses
+                      .map((e) => QuickResponse.fromEntity(e))
+                      .toList(),
                   onResponseSelected: (response) =>
                       chatProvider.sendMessage(response),
                 ),

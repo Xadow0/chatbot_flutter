@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import '../models/ollama_models.dart';
+import '../models/remote_ollama_models.dart';
 
 class OllamaService {
   // URLs desde .env

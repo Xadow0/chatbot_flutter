@@ -1,6 +1,8 @@
 /// Modelos de datos para Ollama Local Gestionado (instalación automática)
 library;
 
+import '../../domain/entities/local_ollama_entity.dart';
+
 /// Estados del servicio Ollama local
 enum LocalOllamaStatus {
   /// No inicializado
@@ -82,6 +84,56 @@ extension LocalOllamaStatusExtension on LocalOllamaStatus {
            this == LocalOllamaStatus.starting ||
            this == LocalOllamaStatus.loading;
   }
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalOllamaStatusEntity toEntity() {
+    switch (this) {
+      case LocalOllamaStatus.notInitialized:
+        return LocalOllamaStatusEntity.notInitialized;
+      case LocalOllamaStatus.checkingInstallation:
+        return LocalOllamaStatusEntity.checkingInstallation;
+      case LocalOllamaStatus.downloadingInstaller:
+        return LocalOllamaStatusEntity.downloadingInstaller;
+      case LocalOllamaStatus.installing:
+        return LocalOllamaStatusEntity.installing;
+      case LocalOllamaStatus.downloadingModel:
+        return LocalOllamaStatusEntity.downloadingModel;
+      case LocalOllamaStatus.starting:
+        return LocalOllamaStatusEntity.starting;
+      case LocalOllamaStatus.loading:
+        return LocalOllamaStatusEntity.loading;
+      case LocalOllamaStatus.ready:
+        return LocalOllamaStatusEntity.ready;
+      case LocalOllamaStatus.error:
+        return LocalOllamaStatusEntity.error;
+    }
+  }
+
+  static LocalOllamaStatus fromEntity(LocalOllamaStatusEntity entity) {
+    switch (entity) {
+      case LocalOllamaStatusEntity.notInitialized:
+        return LocalOllamaStatus.notInitialized;
+      case LocalOllamaStatusEntity.checkingInstallation:
+        return LocalOllamaStatus.checkingInstallation;
+      case LocalOllamaStatusEntity.downloadingInstaller:
+        return LocalOllamaStatus.downloadingInstaller;
+      case LocalOllamaStatusEntity.installing:
+        return LocalOllamaStatus.installing;
+      case LocalOllamaStatusEntity.downloadingModel:
+        return LocalOllamaStatus.downloadingModel;
+      case LocalOllamaStatusEntity.starting:
+        return LocalOllamaStatus.starting;
+      case LocalOllamaStatusEntity.loading:
+        return LocalOllamaStatus.loading;
+      case LocalOllamaStatusEntity.ready:
+        return LocalOllamaStatus.ready;
+      case LocalOllamaStatusEntity.error:
+        return LocalOllamaStatus.error;
+    }
+  }
 }
 
 /// Información sobre la instalación de Ollama
@@ -99,6 +151,28 @@ class OllamaInstallationInfo {
   });
 
   bool get needsInstallation => !isInstalled || !canExecute;
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  OllamaInstallationInfoEntity toEntity() {
+    return OllamaInstallationInfoEntity(
+      isInstalled: isInstalled,
+      installPath: installPath,
+      version: version,
+      canExecute: canExecute,
+    );
+  }
+
+  factory OllamaInstallationInfo.fromEntity(OllamaInstallationInfoEntity entity) {
+    return OllamaInstallationInfo(
+      isInstalled: entity.isInstalled,
+      installPath: entity.installPath,
+      version: entity.version,
+      canExecute: entity.canExecute,
+    );
+  }
 }
 
 /// Progreso de descarga/instalación
@@ -126,6 +200,31 @@ class LocalOllamaInstallProgress {
     
     final percent = (progress * 100).toStringAsFixed(0);
     return '$percent%';
+  }
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalOllamaInstallProgressEntity toEntity() {
+    return LocalOllamaInstallProgressEntity(
+      status: status.toEntity(),
+      progress: progress,
+      message: message,
+      bytesDownloaded: bytesDownloaded,
+      totalBytes: totalBytes,
+    );
+  }
+
+  factory LocalOllamaInstallProgress.fromEntity(
+      LocalOllamaInstallProgressEntity entity) {
+    return LocalOllamaInstallProgress(
+      status: LocalOllamaStatusExtension.fromEntity(entity.status),
+      progress: entity.progress,
+      message: entity.message,
+      bytesDownloaded: entity.bytesDownloaded,
+      totalBytes: entity.totalBytes,
+    );
   }
 }
 
@@ -160,6 +259,32 @@ class LocalOllamaInitResult {
     } else {
       return '❌ Error: ${error ?? "Desconocido"}';
     }
+  }
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalOllamaInitResultEntity toEntity() {
+    return LocalOllamaInitResultEntity(
+      success: success,
+      error: error,
+      modelName: modelName,
+      availableModels: availableModels,
+      initTime: initTime,
+      wasNewInstallation: wasNewInstallation,
+    );
+  }
+
+  factory LocalOllamaInitResult.fromEntity(LocalOllamaInitResultEntity entity) {
+    return LocalOllamaInitResult(
+      success: entity.success,
+      error: entity.error,
+      modelName: entity.modelName,
+      availableModels: entity.availableModels,
+      initTime: entity.initTime,
+      wasNewInstallation: entity.wasNewInstallation,
+    );
   }
 }
 
@@ -206,6 +331,34 @@ class LocalOllamaModel {
 
   /// Obtener modelo por defecto
   static String get defaultModel => 'phi3';
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalOllamaModelEntity toEntity() {
+    return LocalOllamaModelEntity(
+      name: name,
+      displayName: displayName,
+      description: description,
+      isDownloaded: isDownloaded,
+      estimatedSize: estimatedSize,
+      isRecommended: isRecommended,
+      parametersB: parametersB,
+    );
+  }
+
+  factory LocalOllamaModel.fromEntity(LocalOllamaModelEntity entity) {
+    return LocalOllamaModel(
+      name: entity.name,
+      displayName: entity.displayName,
+      description: entity.description,
+      isDownloaded: entity.isDownloaded,
+      estimatedSize: entity.estimatedSize,
+      isRecommended: entity.isRecommended,
+      parametersB: entity.parametersB,
+    );
+  }
 }
 
 /// Configuración de Ollama local
@@ -239,6 +392,30 @@ class LocalOllamaConfig {
       temperature: temperature ?? this.temperature,
       maxTokens: maxTokens ?? this.maxTokens,
       timeout: timeout ?? this.timeout,
+    );
+  }
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalOllamaConfigEntity toEntity() {
+    return LocalOllamaConfigEntity(
+      baseUrl: baseUrl,
+      port: port,
+      temperature: temperature,
+      maxTokens: maxTokens,
+      timeout: timeout,
+    );
+  }
+
+  factory LocalOllamaConfig.fromEntity(LocalOllamaConfigEntity entity) {
+    return LocalOllamaConfig(
+      baseUrl: entity.baseUrl,
+      port: entity.port,
+      temperature: entity.temperature,
+      maxTokens: entity.maxTokens,
+      timeout: entity.timeout,
     );
   }
 }

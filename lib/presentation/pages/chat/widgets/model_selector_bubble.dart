@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/chat_provider.dart';
-import '../../../../data/models/ollama_models.dart';
+import '../../../../data/models/remote_ollama_models.dart';
 import '../../../../data/models/local_ollama_models.dart';
 import '../../../../data/services/ai_service_selector.dart';
 import '../../dialogs/ollama_setup_dialog.dart';
@@ -235,7 +235,7 @@ class ModelSelectorBubble extends StatelessWidget {
                               'No disponible',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: Theme.of(context).colorScheme.error,
+                                color: Theme.of(context).colorScheme.onErrorContainer,
                               ),
                             ),
                           ),
@@ -245,7 +245,7 @@ class ModelSelectorBubble extends StatelessWidget {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -266,52 +266,164 @@ class ModelSelectorBubble extends StatelessWidget {
   }
 
   Widget _buildOpenAISection(BuildContext context, ChatProvider chatProvider) {
-    final isSelected = chatProvider.currentProvider == AIProvider.openai;
     final isAvailable = chatProvider.openaiAvailable;
+    final isSelected = chatProvider.currentProvider == AIProvider.openai;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Botón principal de OpenAI
-        _buildProviderOption(
-          context: context,
-          chatProvider: chatProvider,
-          provider: AIProvider.openai,
-          title: 'ChatGPT (OpenAI)',
-          subtitle: isAvailable 
-              ? 'IA en la nube - Requiere API key'
-              : 'Requiere API key en .env',
-          icon: Icons.chat_bubble,
-          isSelected: isSelected,
-          isAvailable: isAvailable,
-          onTap: () => _selectProvider(context, chatProvider, AIProvider.openai),
+        InkWell(
+          onTap: isAvailable 
+              ? () => _selectProvider(context, chatProvider, AIProvider.openai)
+              : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Opacity(
+            opacity: isAvailable ? 1.0 : 0.5,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.primary.withAlpha(25)
+                    : null,
+                borderRadius: BorderRadius.circular(12),
+                border: isSelected 
+                    ? Border.all(color: Theme.of(context).colorScheme.primary)
+                    : Border.all(color: Theme.of(context).colorScheme.outline.withAlpha(51)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.chat_bubble,
+                    color: isSelected 
+                        ? Theme.of(context).colorScheme.primary
+                        : (isAvailable 
+                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                            : Theme.of(context).colorScheme.outline),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'ChatGPT (OpenAI)',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const Spacer(),
+                            if (!isAvailable)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'API Key requerida',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Requiere API Key (de pago)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      Icons.check_circle,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
+            ),
+          ),
         ),
-
-        // Modelos de OpenAI (solo si está seleccionado y disponible)
+        
+        // Lista de modelos OpenAI (solo si está seleccionado y disponible)
         if (isSelected && isAvailable) ...[
           const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Modelo:',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Modelo OpenAI',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                ...chatProvider.availableOpenAIModels.map(
-                  (model) => _buildOpenAIModelOption(
-                    context: context,
-                    chatProvider: chatProvider,
-                    modelName: model,
-                    isSelected: chatProvider.currentOpenAIModel == model,
-                  ),
-                ),
+                ...chatProvider.availableOpenAIModels.map((modelName) {
+                  final isCurrentModel = modelName == chatProvider.currentOpenAIModel;
+                  return InkWell(
+                    onTap: () => _selectOpenAIModel(context, chatProvider, modelName),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isCurrentModel 
+                            ? Theme.of(context).colorScheme.primary.withAlpha(51)
+                            : null,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _getOpenAIModelDisplayName(modelName),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isCurrentModel ? FontWeight.w600 : FontWeight.w500,
+                                    color: isCurrentModel 
+                                        ? Theme.of(context).colorScheme.primary
+                                        : null,
+                                  ),
+                                ),
+                                Text(
+                                  _getOpenAIModelDescription(modelName),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isCurrentModel)
+                            Icon(
+                              Icons.check_circle,
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 16,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -320,78 +432,16 @@ class ModelSelectorBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildOpenAIModelOption({
-    required BuildContext context,
-    required ChatProvider chatProvider,
-    required String modelName,
-    required bool isSelected,
-  }) {
-    return InkWell(
-      onTap: () => _selectOpenAIModel(context, chatProvider, modelName),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        margin: const EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? Theme.of(context).colorScheme.primary.withAlpha(13)
-              : null,
-          borderRadius: BorderRadius.circular(8),
-          border: isSelected 
-              ? Border.all(
-                  color: Theme.of(context).colorScheme.primary.withAlpha(77),
-                )
-              : null,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _getOpenAIModelDisplayName(modelName),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                      color: isSelected 
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                  ),
-                  Text(
-                    _getOpenAIModelDescription(modelName),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Icon(
-                Icons.check,
-                color: Theme.of(context).colorScheme.primary,
-                size: 16,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildOllamaSection(BuildContext context, ChatProvider chatProvider) {
-    final isSelected = chatProvider.currentProvider == AIProvider.ollama;
     final isAvailable = chatProvider.ollamaAvailable;
-    final connectionInfo = chatProvider.connectionInfo;
+    final isSelected = chatProvider.currentProvider == AIProvider.ollama;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Botón principal de Ollama
         InkWell(
-          onTap: isAvailable ? () => _selectProvider(context, chatProvider, AIProvider.ollama) : null,
+          onTap: isAvailable 
+              ? () => _selectProvider(context, chatProvider, AIProvider.ollama)
+              : null,
           borderRadius: BorderRadius.circular(12),
           child: Opacity(
             opacity: isAvailable ? 1.0 : 0.5,
@@ -423,43 +473,22 @@ class ModelSelectorBubble extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Expanded(
-                              child: Text(
-                                'Ollama (Servidor Remoto)',
-                                style: TextStyle(
-                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                  color: isSelected 
-                                      ? Theme.of(context).colorScheme.primary
-                                      : null,
-                                ),
-                              ),
+                            const Text(
+                              'Ollama (Servidor Remoto)',
+                              style: TextStyle(fontWeight: FontWeight.w500),
                             ),
-                            if (!isAvailable)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.errorContainer,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'Desconectado',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                ),
-                              )
-                            else
-                              _buildConnectionIndicator(connectionInfo),
+                            const SizedBox(width: 4),
+                            if (isAvailable)
+                              _buildConnectionIndicator(chatProvider.connectionInfo),
                           ],
                         ),
                         const SizedBox(height: 2),
                         Text(
                           isAvailable 
-                              ? 'Conectado a ${connectionInfo.url}'
-                              : 'Servidor en red local - No conectado',
+                              ? 'Servidor privado conectado'
+                              : 'Servidor no disponible',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -468,11 +497,10 @@ class ModelSelectorBubble extends StatelessWidget {
                   ),
                   if (isAvailable)
                     IconButton(
-                      icon: const Icon(Icons.refresh, size: 18),
+                      icon: const Icon(Icons.refresh, size: 20),
                       onPressed: () => _refreshOllama(context, chatProvider),
                       constraints: const BoxConstraints(),
                       padding: const EdgeInsets.all(8),
-                      tooltip: 'Actualizar conexión',
                     ),
                   if (isSelected)
                     Icon(
@@ -485,359 +513,224 @@ class ModelSelectorBubble extends StatelessWidget {
             ),
           ),
         ),
-
-        // Modelos de Ollama (solo si está seleccionado y disponible)
+        
+        // Lista de modelos de Ollama (solo si está seleccionado y disponible)
         if (isSelected && isAvailable && chatProvider.availableModels.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Modelo:',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ...chatProvider.availableModels.map(
-                  (model) => _buildModelOption(
-                    context: context,
-                    chatProvider: chatProvider,
-                    model: model,
-                    isSelected: chatProvider.currentModel == model.name,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildModelOption({
-    required BuildContext context,
-    required ChatProvider chatProvider,
-    required OllamaModel model,
-    required bool isSelected,
-  }) {
-    return InkWell(
-      onTap: () => _selectModel(context, chatProvider, model.name),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        margin: const EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? Theme.of(context).colorScheme.primary.withAlpha(13)
-              : null,
-          borderRadius: BorderRadius.circular(8),
-          border: isSelected 
-              ? Border.all(
-                  color: Theme.of(context).colorScheme.primary.withAlpha(77),
-                )
-              : null,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    model.name.replaceAll(':latest', ''),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Modelos disponibles',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                      color: isSelected 
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                  ),
-                  Text(
-                    model.sizeFormatted,
-                    style: TextStyle(
-                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Icon(
-                Icons.check,
-                color: Theme.of(context).colorScheme.primary,
-                size: 16,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocalLLMSection(BuildContext context, ChatProvider chatProvider) {
-    final isSelected = chatProvider.currentProvider == AIProvider.localOllama;
-    final status = chatProvider.localOllamaStatus;
-    final isAvailable = status == LocalOllamaStatus.ready;
-    final isLoading = chatProvider.localOllamaLoading;
-    final currentModelName = chatProvider.aiSelector.localOllamaService.currentModel ?? '';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Botón principal de Ollama Local
-        InkWell(
-          onTap: () {
-            if (isLoading) return; // No hacer nada si está ocupado
-            
-            if (isAvailable) {
-              _selectProvider(context, chatProvider, AIProvider.localOllama);
-            } else if (status == LocalOllamaStatus.notInitialized || status == LocalOllamaStatus.error) {
-              _startLocalLLM(context, chatProvider);
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected 
-                  ? Theme.of(context).colorScheme.primary.withAlpha(25)
-                  : null,
-              borderRadius: BorderRadius.circular(12),
-              border: isSelected 
-                  ? Border.all(color: Theme.of(context).colorScheme.primary)
-                  : Border.all(color: Theme.of(context).colorScheme.outline.withAlpha(51)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.computer,
-                  color: isSelected 
-                      ? Theme.of(context).colorScheme.primary
-                      : (isAvailable 
-                          ? Theme.of(context).colorScheme.onSurfaceVariant
-                          : Theme.of(context).colorScheme.outline),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                ...chatProvider.availableModels.map((model) {
+                  final isCurrentModel = model.name == chatProvider.currentModel;
+                  return InkWell(
+                    onTap: () => _selectModel(context, chatProvider, model.name),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isCurrentModel 
+                            ? Theme.of(context).colorScheme.primary.withAlpha(51)
+                            : null,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              'Ollama Local (Embebido)',
-                              style: TextStyle(
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                color: isSelected 
-                                    ? Theme.of(context).colorScheme.primary
-                                    : null,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  model.displayName,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isCurrentModel ? FontWeight.w600 : FontWeight.w500,
+                                    color: isCurrentModel 
+                                        ? Theme.of(context).colorScheme.primary
+                                        : null,
+                                  ),
+                                ),
+                                Text(
+                                  model.sizeFormatted,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          _buildLocalLLMIndicator(context, status),
+                          if (isCurrentModel)
+                            Icon(
+                              Icons.check_circle,
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 16,
+                            ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _getLocalLLMSubtitle(status),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (isLoading)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else if (status == LocalOllamaStatus.notInitialized)
-                  Icon(
-                    Icons.play_circle_outline,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 24,
-                  )
-                else if (status == LocalOllamaStatus.error)
-                  IconButton(
-                    icon: const Icon(Icons.refresh, size: 20),
-                    onPressed: () => _retryLocalLLM(context, chatProvider),
-                    constraints: const BoxConstraints(),
-                    padding: const EdgeInsets.all(4),
-                    tooltip: 'Reintentar',
-                  )
-                else if (isSelected)
-                  Icon(
-                    Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
-                  ),
-              ],
-            ),
-          ),
-        ),
-
-        // Información adicional cuando está seleccionado
-        if (isSelected && isAvailable) ...[
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Modelo Local:',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Usamos la lista de modelos de local_ollama_models.dart
-                ...LocalOllamaModel.recommendedModels.map((model) {
-                  // Comprobamos si el modelo actual (ej. 'phi3:latest') 
-                  // empieza con el nombre del modelo (ej. 'phi3')
-                  final isModelSelected = currentModelName.startsWith(model.name);
-                  
-                  return _buildLocalModelOption(
-                    context: context,
-                    chatProvider: chatProvider,
-                    model: model,
-                    isSelected: isModelSelected,
-                    isEnabled: !isLoading
+                    ),
                   );
                 }),
               ],
             ),
           ),
         ],
-        // --- FIN SECCIÓN MODIFICADA ---
       ],
     );
   }
 
-  /// Construye una opción de modelo para Ollama Local
-  Widget _buildLocalModelOption({
-    required BuildContext context,
-    required ChatProvider chatProvider,
-    required LocalOllamaModel model,
-    required bool isSelected,
-    bool isEnabled = true,
-  }) {
-    return InkWell(
-      onTap: isEnabled ? () => _selectLocalOllamaModel(context, chatProvider, model.name) : null,
-      borderRadius: BorderRadius.circular(8),
-      child: Opacity(
-        opacity: isEnabled ? 1.0 : 0.5,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          margin: const EdgeInsets.only(bottom: 4),
-          decoration: BoxDecoration(
-            color: isSelected 
-                ? Theme.of(context).colorScheme.primary.withAlpha(13)
-                : null,
-            borderRadius: BorderRadius.circular(8),
-            border: isSelected 
-                ? Border.all(
-                    color: Theme.of(context).colorScheme.primary.withAlpha(77),
-                  )
-                : null,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      model.displayName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                        color: isSelected 
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
-                      ),
-                    ),
-                    Text(
-                      '${model.parametersB}B - ${model.estimatedSize}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+  Widget _buildLocalLLMSection(BuildContext context, ChatProvider chatProvider) {
+    final status = chatProvider.localOllamaStatus;
+    final isAvailable = chatProvider.localOllamaAvailable;
+    final isSelected = chatProvider.currentProvider == AIProvider.localOllama;
+    final isLoading = chatProvider.localOllamaLoading;
+
+    return Column(
+      children: [
+        InkWell(
+          onTap: () {
+            if (status == LocalOllamaStatus.notInitialized) {
+              _startLocalLLM(context, chatProvider);
+            } else if (status == LocalOllamaStatus.error) {
+              _retryLocalLLM(context, chatProvider);
+            } else if (isAvailable) {
+              _selectProvider(context, chatProvider, AIProvider.localOllama);
+            }
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Opacity(
+            opacity: isLoading ? 0.7 : 1.0,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.primary.withAlpha(25)
+                    : null,
+                borderRadius: BorderRadius.circular(12),
+                border: isSelected 
+                    ? Border.all(color: Theme.of(context).colorScheme.primary)
+                    : Border.all(color: Theme.of(context).colorScheme.outline.withAlpha(51)),
               ),
-              if (isSelected)
-                Icon(
-                  Icons.check,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 16,
-                ),
-            ],
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.computer,
+                    color: isSelected 
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'Ollama Local (Embebido)',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(width: 4),
+                            _buildLocalLLMIndicator(context, status),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _getLocalLLMSubtitle(status),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isLoading)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else if (isSelected)
+                    Icon(
+                      Icons.check_circle,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
-      );
+      ],
+    );
   }
 
   Widget _buildConnectionIndicator(ConnectionInfo info) {
     Color color;
-    IconData icon;
-
     switch (info.status) {
       case ConnectionStatus.connected:
         color = Colors.green;
-        icon = Icons.circle;
-        break;
-      case ConnectionStatus.disconnected:
-        color = Colors.red;
-        icon = Icons.circle;
         break;
       case ConnectionStatus.connecting:
         color = Colors.orange;
-        icon = Icons.circle;
         break;
+      case ConnectionStatus.disconnected:
       case ConnectionStatus.error:
         color = Colors.red;
-        icon = Icons.error;
         break;
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 8, color: color),
-        const SizedBox(width: 4),
-        Text(
-          info.statusText,
-          style: TextStyle(
-            fontSize: 10,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withAlpha(26),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withAlpha(77)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.circle,
+            size: 6,
             color: color,
-            fontWeight: FontWeight.w500,
           ),
-        ),
-      ],
+          const SizedBox(width: 4),
+          Text(
+            info.status == ConnectionStatus.connected ? 'Conectado' : 'Error',
+            style: TextStyle(
+              fontSize: 10,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildLocalLLMIndicator(BuildContext context, LocalOllamaStatus status) {
-    Color color = _getStatusColor(status, context);
-    
+    final color = _getStatusColor(status, context);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withAlpha(26),
         borderRadius: BorderRadius.circular(12),
@@ -981,9 +874,14 @@ class ModelSelectorBubble extends StatelessWidget {
     }
   }
 
+  // ============================================================================
+  // MÉTODOS CORREGIDOS - Usar nombres correctos del ChatProvider actualizado
+  // ============================================================================
+
   Future<void> _selectProvider(BuildContext context, ChatProvider chatProvider, AIProvider provider) async {
     try {
-      await chatProvider.changeProvider(provider);
+      // ✅ CORRECCIÓN: El método correcto es selectProvider
+      await chatProvider.selectProvider(provider);
     } catch (e) {
       _showError(context, 'Error cambiando proveedor: $e');
     }
@@ -991,7 +889,8 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _selectModel(BuildContext context, ChatProvider chatProvider, String modelName) async {
     try {
-      await chatProvider.changeModel(modelName);
+      // ✅ CORRECCIÓN: El método correcto es selectModel
+      await chatProvider.selectModel(modelName);
     } catch (e) {
       _showError(context, 'Error cambiando modelo: $e');
     }
@@ -999,7 +898,8 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _selectOpenAIModel(BuildContext context, ChatProvider chatProvider, String modelName) async {
     try {
-      await chatProvider.changeOpenAIModel(modelName);
+      // ✅ CORRECCIÓN: El método correcto es selectOpenAIModel
+      await chatProvider.selectOpenAIModel(modelName);
     } catch (e) {
       _showError(context, 'Error cambiando modelo OpenAI: $e');
     }
@@ -1011,7 +911,11 @@ class ModelSelectorBubble extends StatelessWidget {
       return;
     }
     try {
-      await chatProvider.changeLocalOllamaModel(modelName);
+      // ✅ NOTA: Este método no existe en el provider actual
+      // Si necesitas cambiar modelos de Ollama local, deberás agregarlo al provider
+      // Por ahora, lo dejamos comentado
+      // await chatProvider.selectLocalOllamaModel(modelName);
+      _showError(context, 'Función no implementada aún');
     } catch (e) {
       _showError(context, 'Error cambiando modelo local: $e');
     }
@@ -1019,7 +923,8 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _refreshOllama(BuildContext context, ChatProvider chatProvider) async {
     try {
-      await chatProvider.refreshModels();
+      // ✅ CORRECCIÓN: El método correcto es refreshConnection
+      await chatProvider.refreshConnection();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Conexión actualizada'),

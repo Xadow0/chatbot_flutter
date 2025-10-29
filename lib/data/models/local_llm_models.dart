@@ -1,3 +1,5 @@
+import '../../domain/entities/local_llm_entity.dart';
+
 /// Estados posibles del servicio LLM local
 enum LocalLLMStatus {
   /// El modelo está detenido y no consume recursos
@@ -44,6 +46,36 @@ extension LocalLLMStatusExtension on LocalLLMStatus {
 
   /// Indica si el servicio puede usarse
   bool get isUsable => this == LocalLLMStatus.ready;
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalLLMStatusEntity toEntity() {
+    switch (this) {
+      case LocalLLMStatus.stopped:
+        return LocalLLMStatusEntity.stopped;
+      case LocalLLMStatus.loading:
+        return LocalLLMStatusEntity.loading;
+      case LocalLLMStatus.ready:
+        return LocalLLMStatusEntity.ready;
+      case LocalLLMStatus.error:
+        return LocalLLMStatusEntity.error;
+    }
+  }
+
+  static LocalLLMStatus fromEntity(LocalLLMStatusEntity entity) {
+    switch (entity) {
+      case LocalLLMStatusEntity.stopped:
+        return LocalLLMStatus.stopped;
+      case LocalLLMStatusEntity.loading:
+        return LocalLLMStatus.loading;
+      case LocalLLMStatusEntity.ready:
+        return LocalLLMStatus.ready;
+      case LocalLLMStatusEntity.error:
+        return LocalLLMStatus.error;
+    }
+  }
 }
 
 /// Resultado de la inicialización del modelo local
@@ -71,6 +103,30 @@ class LocalLLMInitResult {
     } else {
       return '❌ Error: ${error ?? "Desconocido"}';
     }
+  }
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalLLMInitResultEntity toEntity() {
+    return LocalLLMInitResultEntity(
+      success: success,
+      error: error,
+      modelName: modelName,
+      modelSize: modelSize,
+      loadTimeMs: loadTimeMs,
+    );
+  }
+
+  factory LocalLLMInitResult.fromEntity(LocalLLMInitResultEntity entity) {
+    return LocalLLMInitResult(
+      success: entity.success,
+      error: entity.error,
+      modelName: entity.modelName,
+      modelSize: entity.modelSize,
+      loadTimeMs: entity.loadTimeMs,
+    );
   }
 }
 
@@ -132,6 +188,34 @@ class LocalLLMModelInfo {
       downloadUrl: 'https://huggingface.co/google/gemma-2b-it-GGUF',
     ),
   ];
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalLLMModelInfoEntity toEntity() {
+    return LocalLLMModelInfoEntity(
+      name: name,
+      displayName: displayName,
+      description: description,
+      filePath: filePath,
+      fileSizeBytes: fileSizeBytes,
+      isDownloaded: isDownloaded,
+      downloadUrl: downloadUrl,
+    );
+  }
+
+  factory LocalLLMModelInfo.fromEntity(LocalLLMModelInfoEntity entity) {
+    return LocalLLMModelInfo(
+      name: entity.name,
+      displayName: entity.displayName,
+      description: entity.description,
+      filePath: entity.filePath,
+      fileSizeBytes: entity.fileSizeBytes,
+      isDownloaded: entity.isDownloaded,
+      downloadUrl: entity.downloadUrl,
+    );
+  }
 }
 
 /// Excepción personalizada para errores del LLM local
@@ -154,7 +238,7 @@ class LocalLLMException implements Exception {
       case 'Modelo no encontrado':
         return '❌ El modelo no está descargado\n\n'
                '💡 Solución: Descarga el modelo Phi-3 primero\n'
-               '📁 Ubicación esperada: /models/phi-3-mini-4k-instruct-q4.gguf';
+               '📍 Ubicación esperada: /models/phi-3-mini-4k-instruct-q4.gguf';
       
       case 'Error al cargar modelo':
         return '❌ No se pudo cargar el modelo en memoria\n\n'
@@ -203,6 +287,30 @@ class LocalLLMConfig {
       temperature: temperature ?? this.temperature,
       numThreads: numThreads ?? this.numThreads,
       useGPU: useGPU ?? this.useGPU,
+    );
+  }
+
+  // ============================================================================
+  // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)
+  // ============================================================================
+
+  LocalLLMConfigEntity toEntity() {
+    return LocalLLMConfigEntity(
+      contextSize: contextSize,
+      maxTokens: maxTokens,
+      temperature: temperature,
+      numThreads: numThreads,
+      useGPU: useGPU,
+    );
+  }
+
+  factory LocalLLMConfig.fromEntity(LocalLLMConfigEntity entity) {
+    return LocalLLMConfig(
+      contextSize: entity.contextSize,
+      maxTokens: entity.maxTokens,
+      temperature: entity.temperature,
+      numThreads: entity.numThreads,
+      useGPU: entity.useGPU,
     );
   }
 }
