@@ -1,6 +1,9 @@
+// lib/presentation/pages/history/history_page.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../../data/repositories/conversation_repository.dart';
+import 'package:provider/provider.dart'; // <- 1. Importar Provider
+import '../../../presentation/providers/chat_provider.dart'; // <- 2. Importar ChatProvider
+// import '../../../data/repositories/conversation_repository.dart'; // <- 3. ELIMINAR import de 'data'
 import '../../../presentation/pages/chat/chat_page.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -20,7 +23,10 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _loadConversations() async {
-    final conversations = await ConversationRepository.listConversations();
+    // 4. Usar el Provider para acceder al método del repositorio
+    final provider = context.read<ChatProvider>();
+    final conversations = await provider.listConversations(); // <- Cambio aquí
+    
     setState(() {
       _conversations = conversations.cast<File>();
     });
@@ -51,7 +57,8 @@ class _HistoryPageState extends State<HistoryPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Conversación eliminada')),
         );
-        await _loadConversations(); // Actualiza la lista
+        // Esta llamada ahora usará el método corregido
+        await _loadConversations();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al eliminar: $e')),
@@ -61,6 +68,9 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _openConversation(File file) {
+    // Esta navegación es correcta. Al eliminar el Provider de
+    // ChatPage, esta ruta cargará ChatPage usando el
+    // provider global, que es lo que queremos.
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -95,4 +105,3 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 }
-

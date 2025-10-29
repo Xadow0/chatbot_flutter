@@ -1,3 +1,4 @@
+// lib/presentation/pages/chat/chat_page.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,8 +8,8 @@ import 'widgets/message_list.dart';
 import 'widgets/message_input.dart';
 import 'widgets/quick_responses.dart';
 import 'widgets/model_selector_bubble.dart';
-import '../../../data/models/message_model.dart';
-import '../../../data/models/quick_response_model.dart';
+import '../../../data/models/message_model.dart'; // (Estos imports de 'data' deberían
+import '../../../data/models/quick_response_model.dart'; // moverse a los widgets en un futuro)
 
 class ChatPage extends StatelessWidget {
   final File? preloadedConversationFile;
@@ -17,10 +18,21 @@ class ChatPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ChatProvider(),
-      child: _ChatBody(preloadedConversationFile: preloadedConversationFile),
-    );
+    //
+    // --- IMPORTANTE: Se elimina el ChangeNotifierProvider ---
+    //
+    // El ChatProvider ya fue inyectado en main.dart y está disponible
+    // en todo el árbol de widgets. Crear uno nuevo aquí es incorrecto
+    // y fallaría, ya que el constructor ahora espera dependencias.
+    //
+    // return ChangeNotifierProvider( <-- ELIMINADO
+    //   create: (_) => ChatProvider(), <-- ELIMINADO
+    //   child: _ChatBody(preloadedConversationFile: preloadedConversationFile), <-- ELIMINADO
+    // );
+    
+    // Simplemente renderizamos el _ChatBody, que consumirá
+    // el provider global existente.
+    return _ChatBody(preloadedConversationFile: preloadedConversationFile);
   }
 }
 
@@ -36,7 +48,10 @@ class _ChatBodyState extends State<_ChatBody> {
   @override
   void initState() {
     super.initState();
-    // Si hay una conversación preexistente, cargarla al iniciar
+    
+    // Esta lógica ahora funcionará correctamente, porque
+    // context.read<ChatProvider>() encontrará el provider
+    // global inyectado en main.dart.
     if (widget.preloadedConversationFile != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final chatProvider = context.read<ChatProvider>();
@@ -47,6 +62,8 @@ class _ChatBodyState extends State<_ChatBody> {
 
   @override
   Widget build(BuildContext context) {
+    // El Consumer<ChatProvider> también encontrará el provider
+    // global sin problemas.
     return Consumer<ChatProvider>(
       builder: (context, chatProvider, _) {
         return GestureDetector(

@@ -13,9 +13,10 @@ import '../../data/services/local_ollama_service.dart';
 import '../../data/services/ai_service_selector.dart';
 import '../../data/services/preferences_service.dart';
 import '../../data/services/ai_service_adapters.dart';
-import '../../data/repositories/conversation_repository.dart';
 import '../../domain/usecases/command_processor.dart';
 import '../../domain/usecases/send_message_usecase.dart';
+import '../../domain/repositories/chat_repository.dart';
+import '../../domain/repositories/conversation_repository.dart';
 
 /// Provider principal del chat
 /// 
@@ -33,6 +34,10 @@ class ChatProvider extends ChangeNotifier {
   late SendMessageUseCase _sendMessageUseCase; // No final - se actualiza al cambiar proveedor
   late final AIServiceSelector _aiSelector;
   late final PreferencesService _preferencesService;
+
+  // INTERFACES DE REPOSITORIO
+  final ChatRepository _chatRepository;
+  final ConversationRepository _conversationRepository;
   
   // Referencias a los servicios
   late final GeminiService _geminiService;
@@ -54,7 +59,12 @@ class ChatProvider extends ChangeNotifier {
   String _currentModel = 'phi3:latest';
   AIProvider _currentProvider = AIProvider.gemini;
 
-  ChatProvider() {
+  ChatProvider( {
+    required ChatRepository chatRepository,
+    required ConversationRepository conversationRepository,
+  })  : _chatRepository = chatRepository,
+        _conversationRepository = conversationRepository {
+
     // Inicializar servicios
     _geminiService = GeminiService();
     _ollamaService = OllamaService();
@@ -84,6 +94,7 @@ class ChatProvider extends ChangeNotifier {
 
     _sendMessageUseCase = SendMessageUseCase(
       commandProcessor: _commandProcessor,
+      chatRepository: _chatRepository, // <- Inyectar aquí
     );
 
     // Inicializar modelos y agregar mensaje de bienvenida
@@ -134,9 +145,9 @@ class ChatProvider extends ChangeNotifier {
     // Crear nuevo CommandProcessor
     _commandProcessor = CommandProcessor(currentAdapter);
     
-    // Actualizar SendMessageUseCase
     _sendMessageUseCase = SendMessageUseCase(
       commandProcessor: _commandProcessor,
+      chatRepository: _chatRepository, 
     );
     
     debugPrint('🔄 [ChatProvider] CommandProcessor actualizado para: $_currentProvider');
@@ -166,6 +177,21 @@ class ChatProvider extends ChangeNotifier {
   bool get localOllamaLoading => _aiSelector.localOllamaLoading;
   
   Stream<ConnectionInfo> get connectionStream => _aiSelector.connectionStream;
+
+  // ============================================================================
+  // MÉTODOS PARA GESTIÓN DE HISTORIAL (para HistoryPage)
+  // ============================================================================
+  
+  /// Expone el método listConversations del repositorio a la UI
+  Future<List<FileSystemEntity>> listConversations() {
+    return _conversationRepository.listConversations();
+  }
+
+  /// Expone el método deleteAllConversations del repositorio a la UI
+  Future<void> deleteAllConversations() async {
+    await _conversationRepository.deleteAllConversations();
+    notifyListeners(); // Notificar si la UI debe reaccionar
+  }
 
   Future<void> _initializeModels() async {
     try {
@@ -483,7 +509,7 @@ Soy tu asistente de aprendizaje de IA y Prompting.
     if (_messages.isEmpty) return;
     try {
       // ConversationRepository trabaja con entidades
-      await ConversationRepository.saveConversation(_messages);
+      await _conversationRepository.saveConversation(_messages);
       if (kDebugMode) {
         debugPrint("💾 [ChatProvider] Conversación guardada automáticamente (${_messages.length} mensajes)");
       }
@@ -496,7 +522,7 @@ Soy tu asistente de aprendizaje de IA y Prompting.
     debugPrint('🗑️ [ChatProvider] Limpiando mensajes...');
     
     if (saveBeforeClear && _messages.isNotEmpty) {
-      await ConversationRepository.saveConversation(_messages);
+      await _conversationRepository.saveConversation(_messages);
     }
     _messages.clear();
     _isNewConversation = true;
@@ -511,7 +537,7 @@ Soy tu asistente de aprendizaje de IA y Prompting.
     debugPrint('📂 [ChatProvider] Cargando conversación desde archivo...');
     
     // ConversationRepository retorna entidades
-    final loadedMessages = await ConversationRepository.loadConversation(file);
+    final loadedMessages = await _conversationRepository.loadConversation(file);
     _messages
       ..clear()
       ..addAll(loadedMessages);
