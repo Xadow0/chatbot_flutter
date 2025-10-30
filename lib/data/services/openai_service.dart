@@ -45,7 +45,7 @@ class OpenAIService {
     String prompt, {
     String? model,
     double temperature = 0.7,
-    int maxTokens = 2048,
+    int maxTokens = 4096,
   }) async {
     if (!_isAvailable) {
       throw Exception('OpenAI API Key no configurada. Añade OPENAI_API_KEY al archivo .env');
@@ -144,7 +144,7 @@ class OpenAIService {
     required List<Map<String, String>> messages,
     String? model,
     double temperature = 0.7,
-    int maxTokens = 2048,
+    int maxTokens = 4096,
   }) async {
     if (!_isAvailable) {
       throw Exception('OpenAI API Key no configurada. Añade OPENAI_API_KEY al archivo .env');

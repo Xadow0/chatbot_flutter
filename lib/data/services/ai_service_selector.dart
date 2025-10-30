@@ -48,7 +48,11 @@ class AIServiceSelector extends ChangeNotifier {
   List<OllamaModel> get availableModels => _availableModels;
   List<String> get availableOpenAIModels => OpenAIService.availableModels;
   bool get ollamaAvailable => _ollamaAvailable;
-  bool get openaiAvailable => _openaiAvailable;
+  
+  // ✅ CAMBIO CRÍTICO: Verificar dinámicamente la disponibilidad de OpenAI
+  // En lugar de usar una variable cached, consultamos directamente al servicio
+  bool get openaiAvailable => _openaiService.isAvailable;
+  
   OllamaService get ollamaService => _ollamaService;
   OpenAIService get openaiService => _openaiService;
   ConnectionInfo get connectionInfo => _ollamaService.connectionInfo;
@@ -86,12 +90,13 @@ class AIServiceSelector extends ChangeNotifier {
     debugPrint('🎬 [AIServiceSelector] Inicializando servicios de IA...');
     
     await _initializeOllama();
-    _initializeOpenAI();
+    // ✅ YA NO necesitamos _initializeOpenAI() porque el getter openaiAvailable
+    // ahora consulta directamente a _openaiService.isAvailable
     
     debugPrint('✅ [AIServiceSelector] Servicios inicializados');
     debugPrint('   📊 Gemini: Siempre disponible');
     debugPrint('   📊 Ollama (remoto): ${_ollamaAvailable ? "Disponible" : "No disponible"}');
-    debugPrint('   📊 OpenAI: ${_openaiAvailable ? "Disponible" : "No disponible"}');
+    debugPrint('   📊 OpenAI: ${openaiAvailable ? "Disponible" : "No disponible"}');
     debugPrint('   📊 Ollama Local: ${_localOllamaStatus.displayText}');
   }
   
@@ -110,15 +115,7 @@ class AIServiceSelector extends ChangeNotifier {
     notifyListeners();
   }
   
-  void _initializeOpenAI() {
-    _openaiAvailable = _openaiService.isAvailable;
-    if (_openaiAvailable) {
-      debugPrint('✅ [AIServiceSelector] OpenAI disponible');
-      debugPrint('   🤖 Modelos disponibles: ${OpenAIService.availableModels.join(", ")}');
-    } else {
-      debugPrint('⚠️ [AIServiceSelector] OpenAI no disponible (API Key no configurada)');
-    }
-  }
+  // ✅ ELIMINADO: Ya no necesitamos _initializeOpenAI() porque usamos el getter dinámico
   
   Future<LocalOllamaInitResult> initializeLocalOllama() async {
     debugPrint('🚀 [AIServiceSelector] Iniciando Ollama Local...');
@@ -193,7 +190,8 @@ class AIServiceSelector extends ChangeNotifier {
       throw Exception('Ollama remoto no está disponible');
     }
     
-    if (provider == AIProvider.openai && !_openaiAvailable) {
+    // ✅ CAMBIO: Ahora usa el getter dinámico
+    if (provider == AIProvider.openai && !openaiAvailable) {
       debugPrint('   ⚠️ OpenAI no está disponible');
       throw Exception('OpenAI no está disponible. Configure API Key en .env');
     }
@@ -213,7 +211,7 @@ class AIServiceSelector extends ChangeNotifier {
     
     if (!_availableModels.any((m) => m.name == modelName)) {
       debugPrint('   ❌ Modelo $modelName no disponible');
-      throw Exception('Modelo no disponible');
+      throw Exception('Modelo $modelName no disponible');
     }
     
     _currentOllamaModel = modelName;
@@ -226,19 +224,18 @@ class AIServiceSelector extends ChangeNotifier {
     
     if (!OpenAIService.availableModels.contains(modelName)) {
       debugPrint('   ❌ Modelo $modelName no disponible');
-      throw Exception('Modelo no disponible');
+      throw Exception('Modelo $modelName no disponible');
     }
     
     _currentOpenAIModel = modelName;
     notifyListeners();
     debugPrint('   ✅ Modelo OpenAI cambiado a $modelName');
   }
-
-  /// Cambia el modelo activo en el servicio de Ollama Local
-  Future<bool> changeLocalOllamaModel(String modelName) async {
+  
+  Future<bool> setLocalOllamaModel(String modelName) async {
     debugPrint('🔄 [AIServiceSelector] Cambiando modelo Ollama Local a: $modelName');
     
-    // El método changeModel en el servicio ya se encarga de
+    // Este método en el servicio verificará si el modelo está instalado,
     // descargar si es necesario y actualizar el estado.
     final success = await _localOllamaService.changeModel(modelName);
     
