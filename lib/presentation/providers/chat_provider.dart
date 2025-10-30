@@ -193,6 +193,11 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners(); // Notificar si la UI debe reaccionar
   }
 
+  Future<void> deleteConversations(List<File> files) async {
+    await _conversationRepository.deleteConversations(files);
+    notifyListeners();
+  }
+
   Future<void> _initializeModels() async {
     try {
       debugPrint('🎬 [ChatProvider] Inicializando modelos...');

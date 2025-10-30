@@ -15,4 +15,7 @@ abstract class ConversationRepository {
 
   /// Elimina todas las conversaciones
   Future<void> deleteAllConversations();
+  
+  /// Elimina múltiples conversaciones
+  Future<void> deleteConversations(List<File> files);
 }
