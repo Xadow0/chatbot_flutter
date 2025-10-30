@@ -54,7 +54,12 @@ class CommandResult {
 /// - OllamaService (a través de OllamaServiceAdapter)
 /// - LocalOllamaService (a través de LocalOllamaServiceAdapter)
 abstract class AIServiceBase {
+  /// Genera contenido CON historial de conversación (usado para chat normal)
   Future<String> generateContent(String prompt);
+  
+  /// Genera contenido SIN historial (usado para comandos como /tryprompt)
+  /// Este método debe enviar SOLO el prompt sin contexto adicional
+  Future<String> generateContentWithoutHistory(String prompt);
 }
 
 /// Procesador de comandos que utiliza el servicio de IA actualmente seleccionado
@@ -66,8 +71,11 @@ abstract class AIServiceBase {
 /// **Flujo de trabajo:**
 /// 1. El usuario escribe un mensaje
 /// 2. ChatProvider -> SendMessageUseCase -> CommandProcessor
-/// 3. Si es un comando, se procesa con la IA activa
+/// 3. Si es un comando, se procesa con la IA activa SIN HISTORIAL
 /// 4. Si NO es un comando, se devuelve un eco local (sin IA)
+/// 
+/// **IMPORTANTE:** Los comandos como /tryprompt usan `generateContentWithoutHistory`
+/// para evitar que el historial de la conversación interfiera con el análisis del prompt.
 class CommandProcessor {
   final AIServiceBase _aiService;
 
@@ -100,10 +108,13 @@ class CommandProcessor {
     return CommandResult.notCommand();
   }
 
-  /// Procesa el comando "/tryprompt" usando la IA seleccionada
+  /// Procesa el comando "/tryprompt" usando la IA seleccionada SIN HISTORIAL
   /// 
   /// Este comando evalúa y mejora el prompt proporcionado por el usuario,
   /// utilizando la IA actualmente seleccionada (Gemini, OpenAI, Ollama, etc.)
+  /// 
+  /// **IMPORTANTE:** Usa `generateContentWithoutHistory` para evitar que mensajes
+  /// anteriores interfieran con el análisis del prompt.
   Future<CommandResult> _processProbarPrompt(String message) async {
     try {
       debugPrint('🔧 [CommandProcessor] Procesando comando /tryprompt...');
@@ -128,9 +139,12 @@ class CommandProcessor {
       // Normalizar espacios antes de enviar a la IA
       final trimmedPrompt = enhancedPrompt.trim();
       
-      debugPrint('   🤖 Enviando a la IA seleccionada...');
-      // Llamar a la IA seleccionada (podría ser Gemini, OpenAI, Ollama o LocalOllama)
-      final response = await _aiService.generateContent(trimmedPrompt);
+      debugPrint('   🤖 Enviando a la IA seleccionada SIN HISTORIAL...');
+      debugPrint('   ⚡ Usando generateContentWithoutHistory para evitar interferencia del historial');
+      
+      // CRÍTICO: Usar generateContentWithoutHistory para que solo se envíe el prompt
+      // especializado sin ningún mensaje anterior de la conversación
+      final response = await _aiService.generateContentWithoutHistory(trimmedPrompt);
       
       debugPrint('   ✅ Respuesta recibida de la IA (${response.length} caracteres)');
 
