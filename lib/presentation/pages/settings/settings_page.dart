@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// 🔐 NUEVO: Importar las rutas para navegación
+import '../../../config/routes.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -20,6 +22,33 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       body: ListView(
         children: [
+          // 🔐 NUEVO: Sección de API Keys
+          _buildSection(
+            title: 'API Keys',
+            children: [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.vpn_key_rounded,
+                    color: Colors.purple[700],
+                  ),
+                ),
+                title: const Text('Gestión de API Keys'),
+                subtitle: const Text('Configurar claves de Gemini y OpenAI'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  // Navegar a la página de gestión de API keys
+                  Navigator.pushNamed(context, AppRoutes.apiKeysSettings);
+                },
+              ),
+            ],
+          ),
+          
           _buildSection(
             title: 'General',
             children: [

@@ -1,36 +1,59 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
+// 🔐 MODIFICADO: Importar ApiKeysManager en lugar de dotenv
+import 'api_keys_manager.dart';
 
 class OpenAIService {
   static const String _baseUrl = 'https://api.openai.com/v1';
   static const String _defaultModel = 'gpt-4o-mini'; // Modelo más económico y rápido
   
-  late final String _apiKey;
-  final bool _isAvailable;
+  // 🔐 MODIFICADO: Ya no cargamos la key en el constructor
+  final ApiKeysManager _apiKeysManager = ApiKeysManager();
+  String? _cachedApiKey;
 
-  OpenAIService() : _isAvailable = _checkApiKey() {
-    _apiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
+  OpenAIService() {
+    debugPrint('🔵 [OpenAIService] Servicio inicializado');
+  }
+
+  /// 🔐 NUEVO: Obtener la API key desde el almacenamiento seguro
+  Future<String> _getApiKey() async {
+    // Usar caché si está disponible
+    if (_cachedApiKey != null && _cachedApiKey!.isNotEmpty) {
+      return _cachedApiKey!;
+    }
+
+    // Cargar desde storage seguro
+    final key = await _apiKeysManager.getApiKey(ApiKeysManager.openaiApiKeyName);
     
-    if (_isAvailable) {
-      debugPrint('✅ [OpenAIService] Servicio inicializado correctamente');
-      debugPrint('   🔑 API Key configurada');
-      debugPrint('   🤖 Modelo por defecto: $_defaultModel');
-    } else {
-      debugPrint('⚠️ [OpenAIService] API Key no configurada');
-      debugPrint('   💡 Añade OPENAI_API_KEY al archivo .env para habilitar ChatGPT');
+    if (key == null || key.isEmpty) {
+      throw Exception(
+        'OPENAI_API_KEY no configurada. '
+        'Por favor, configura tu API key en Ajustes.'
+      );
+    }
+
+    // Cachear la key
+    _cachedApiKey = key;
+    debugPrint('✅ [OpenAIService] API key cargada correctamente');
+    return key;
+  }
+
+  /// 🔐 NUEVO: Limpiar caché de API key (útil después de cambiar la key)
+  void clearApiKeyCache() {
+    _cachedApiKey = null;
+    debugPrint('🗑️ [OpenAIService] Caché de API key limpiada');
+  }
+
+  /// 🔐 NUEVO: Verificar si el servicio está disponible
+  Future<bool> isAvailable() async {
+    try {
+      final key = await _apiKeysManager.getApiKey(ApiKeysManager.openaiApiKeyName);
+      return key != null && key.isNotEmpty && key.startsWith('sk-');
+    } catch (e) {
+      return false;
     }
   }
-
-  /// Verificar si la API key está disponible
-  static bool _checkApiKey() {
-    final apiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
-    return apiKey.isNotEmpty && apiKey.startsWith('sk-');
-  }
-
-  /// Getter para verificar disponibilidad
-  bool get isAvailable => _isAvailable;
 
   /// Modelos disponibles de OpenAI
   static const List<String> availableModels = [
@@ -47,11 +70,10 @@ class OpenAIService {
     double temperature = 0.7,
     int maxTokens = 4096,
   }) async {
-    if (!_isAvailable) {
-      throw Exception('OpenAI API Key no configurada. Añade OPENAI_API_KEY al archivo .env');
-    }
-
     try {
+      // 🔐 MODIFICADO: Obtener la API key desde storage seguro
+      final apiKey = await _getApiKey();
+
       debugPrint('🔵 [OpenAIService] === INICIANDO GENERACIÓN ===');
       debugPrint('   📍 URL: $_baseUrl/chat/completions');
       debugPrint('   🤖 Modelo: ${model ?? _defaultModel}');
@@ -65,7 +87,7 @@ class OpenAIService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_apiKey',
+          'Authorization': 'Bearer $apiKey',
         },
         body: jsonEncode({
           'model': model ?? _defaultModel,
@@ -84,11 +106,11 @@ class OpenAIService {
         }),
       ).timeout(const Duration(seconds: 60));
 
-      debugPrint('   📥 Response status: ${response.statusCode}');
+      debugPrint('   🔥 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('   🔍 Response keys: ${data.keys.join(", ")}');
+        debugPrint('   📄 Response keys: ${data.keys.join(", ")}');
 
         if (data['choices'] != null && data['choices'].isNotEmpty) {
           final content = data['choices'][0]['message']['content'] as String;
@@ -111,8 +133,11 @@ class OpenAIService {
         throw Exception('No se pudo obtener una respuesta válida de OpenAI');
       } else if (response.statusCode == 401) {
         debugPrint('   ❌ Error 401: API Key inválida');
-        debugPrint('   💡 SOLUCIÓN: Verifica que tu OPENAI_API_KEY en .env sea correcta');
-        throw Exception('API Key de OpenAI inválida o expirada');
+        // 🔐 NUEVO: Error de autenticación específico
+        throw Exception(
+          'API Key de OpenAI inválida o expirada. '
+          'Por favor, verifica tu clave en Ajustes.'
+        );
       } else if (response.statusCode == 429) {
         debugPrint('   ❌ Error 429: Límite de rate excedido');
         debugPrint('   💡 SOLUCIÓN: Espera unos segundos antes de reintentar');
@@ -146,11 +171,10 @@ class OpenAIService {
     double temperature = 0.7,
     int maxTokens = 4096,
   }) async {
-    if (!_isAvailable) {
-      throw Exception('OpenAI API Key no configurada. Añade OPENAI_API_KEY al archivo .env');
-    }
-
     try {
+      // 🔐 MODIFICADO: Obtener la API key desde storage seguro
+      final apiKey = await _getApiKey();
+
       debugPrint('💬 [OpenAIService] === INICIANDO CHAT ===');
       debugPrint('   📍 URL: $_baseUrl/chat/completions');
       debugPrint('   🤖 Modelo: ${model ?? _defaultModel}');
@@ -172,7 +196,7 @@ class OpenAIService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_apiKey',
+          'Authorization': 'Bearer $apiKey',
         },
         body: jsonEncode({
           'model': model ?? _defaultModel,
@@ -182,7 +206,7 @@ class OpenAIService {
         }),
       ).timeout(const Duration(seconds: 60));
 
-      debugPrint('   📥 Response status: ${response.statusCode}');
+      debugPrint('   🔥 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -201,6 +225,11 @@ class OpenAIService {
         }
 
         throw Exception('No se pudo obtener una respuesta válida de OpenAI');
+      } else if (response.statusCode == 401) {
+        throw Exception(
+          'API Key de OpenAI inválida o expirada. '
+          'Por favor, verifica tu clave en Ajustes.'
+        );
       } else {
         final errorData = jsonDecode(response.body);
         final errorMessage = errorData['error']?['message'] ?? 'Error desconocido';
@@ -229,9 +258,8 @@ class OpenAIService {
 
   /// Obtener información sobre el uso de la API (opcional)
   Future<Map<String, dynamic>?> getUsageInfo() async {
-    if (!_isAvailable) return null;
-
     try {
+      await isAvailable();
       // Nota: Este endpoint requiere permisos especiales en OpenAI
       // Por ahora, solo retornamos null
       // En el futuro se puede implementar para mostrar estadísticas de uso

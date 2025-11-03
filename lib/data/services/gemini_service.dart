@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
+// 🔐 MODIFICADO: Importar ApiKeysManager en lugar de dotenv
+import 'api_keys_manager.dart';
 
 class GeminiService {
   // Cambia la versión de la API a v1 (no v1beta)
@@ -8,20 +10,61 @@ class GeminiService {
   // Puedes usar 'gemini-2.5-flash' o 'gemini-pro' según disponibilidad
   static const String _model = 'gemini-2.5-flash';
   
-  late final String _apiKey;
+  // 🔐 MODIFICADO: Ya no cargamos la key en el constructor
+  final ApiKeysManager _apiKeysManager = ApiKeysManager();
+  String? _cachedApiKey;
 
   GeminiService() {
-    _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-    if (_apiKey.isEmpty) {
-      throw Exception('GEMINI_API_KEY not found in .env file');
+    debugPrint('🔵 [GeminiService] Servicio inicializado');
+  }
+
+  /// 🔐 NUEVO: Obtener la API key desde el almacenamiento seguro
+  Future<String> _getApiKey() async {
+    // Usar caché si está disponible
+    if (_cachedApiKey != null && _cachedApiKey!.isNotEmpty) {
+      return _cachedApiKey!;
+    }
+
+    // Cargar desde storage seguro
+    final key = await _apiKeysManager.getApiKey(ApiKeysManager.geminiApiKeyName);
+    
+    if (key == null || key.isEmpty) {
+      throw Exception(
+        'GEMINI_API_KEY no configurada. '
+        'Por favor, configura tu API key en Ajustes.'
+      );
+    }
+
+    // Cachear la key
+    _cachedApiKey = key;
+    debugPrint('✅ [GeminiService] API key cargada correctamente');
+    return key;
+  }
+
+  /// 🔐 NUEVO: Limpiar caché de API key (útil después de cambiar la key)
+  void clearApiKeyCache() {
+    _cachedApiKey = null;
+    debugPrint('🗑️ [GeminiService] Caché de API key limpiada');
+  }
+
+  /// 🔐 NUEVO: Verificar si el servicio está disponible
+  Future<bool> isAvailable() async {
+    try {
+      final key = await _apiKeysManager.getApiKey(ApiKeysManager.geminiApiKeyName);
+      return key != null && key.isNotEmpty;
+    } catch (e) {
+      return false;
     }
   }
 
   /// Genera contenido usando Gemini
   Future<String> generateContent(String prompt) async {
     try {
+      // 🔐 MODIFICADO: Obtener la API key desde storage seguro
+      final apiKey = await _getApiKey();
+      
       final url = Uri.parse(
-        '$_baseUrl/models/$_model:generateContent?key=$_apiKey',
+        '$_baseUrl/models/$_model:generateContent?key=$apiKey',
       );
 
       final response = await http.post(
@@ -66,7 +109,7 @@ class GeminiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Respuesta cruda de Gemini: $data');
+        debugPrint('Respuesta cruda de Gemini: $data');
         
         if (data['candidates'] != null && data['candidates'].isNotEmpty) {
           final candidate = data['candidates'][0];
@@ -78,11 +121,18 @@ class GeminiService {
         }
         
         return 'No se pudo obtener una respuesta válida';
+      } else if (response.statusCode == 401) {
+        // 🔐 NUEVO: Error de autenticación específico
+        throw Exception(
+          'API Key de Gemini inválida o expirada. '
+          'Por favor, verifica tu clave en Ajustes.'
+        );
       } else {
         final error = jsonDecode(response.body);
         throw Exception('Error de API: ${error['error']['message']}');
       }
     } catch (e) {
+      debugPrint('❌ [GeminiService] Error: $e');
       throw Exception('Error al conectar con Gemini: $e');
     }
   }

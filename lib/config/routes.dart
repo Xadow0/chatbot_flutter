@@ -9,6 +9,8 @@ import '../presentation/pages/learning/module2_page.dart';
 import '../presentation/pages/learning/module3_page.dart';
 
 
+import '../presentation/pages/onboarding/api_keys_onboarding_page.dart';
+import '../presentation/pages/settings/api_keys_settings_page.dart';
 
 class AppRoutes {
   static const String startMenu = '/';
@@ -19,7 +21,10 @@ class AppRoutes {
   static const String learningModule1 = '/learning/module1';
   static const String learningModule2 = '/learning/module2';
   static const String learningModule3 = '/learning/module3';
+  
 
+  static const String apiKeysOnboarding = '/api-keys-onboarding';
+  static const String apiKeysSettings = '/api-keys-settings';
 
   static Map<String, WidgetBuilder> get routes {
     return {
@@ -31,6 +36,10 @@ class AppRoutes {
       learningModule1: (context) => const Module1Page(),
       learningModule2: (context) => const Module2Page(),
       learningModule3: (context) => const Module3Page(),
+      
+
+      apiKeysOnboarding: (context) => const ApiKeysOnboardingPage(),
+      apiKeysSettings: (context) => const ApiKeysSettingsPage(),
     };
   }
 }
