@@ -17,7 +17,7 @@ import '../../domain/usecases/command_processor.dart';
 import '../../domain/usecases/send_message_usecase.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../domain/repositories/conversation_repository.dart';
-
+import '../../core/constants/commands_help.dart';
 /// Provider principal del chat
 /// 
 /// IMPORTANTE: Este provider trabaja INTERNAMENTE con ENTIDADES (domain layer).
@@ -395,19 +395,8 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _addWelcomeMessage() {
-    const welcomeMessage = '''¡Bienvenido al chat! 🎉
-
-Soy tu asistente de aprendizaje de IA y Prompting.
-
-**Proveedores disponibles:**
-- **Gemini** - IA de Google (rápida y potente)
-- **OpenAI** - ChatGPT (el más conocido)
-- **Ollama (Remoto)** - Tu propio servidor de IA
-
-**Proveedor privado:**
-- **Ollama Local** - 100% privado en tu PC (sin instalación, embebido)
-
-¡Empieza escribiendo tu mensaje!''';
+    // Obtener el mensaje de bienvenida completo desde CommandsHelp
+    final welcomeMessage = CommandsHelp.getWelcomeMessage();
 
     final welcomeEntity = MessageEntity(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
