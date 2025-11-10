@@ -6,6 +6,7 @@ import 'gemini_service.dart';
 import 'ollama_service.dart';
 import 'openai_service.dart';
 import 'local_ollama_service.dart';
+import 'dart:async';
 
 enum AIProvider {
   gemini,
@@ -29,6 +30,8 @@ class AIServiceSelector extends ChangeNotifier {
   // 🔐 NUEVO: Cache para disponibilidad de OpenAI
   bool _openaiAvailable = false;
   
+  StreamSubscription? _ollamaConnectionSubscription;
+
   LocalOllamaStatus _localOllamaStatus = LocalOllamaStatus.notInitialized;
   
   AIServiceSelector({
@@ -40,8 +43,19 @@ class AIServiceSelector extends ChangeNotifier {
        _ollamaService = ollamaService,
        _openaiService = openaiService,
        _localOllamaService = localOllamaService {
-    _initializeServices();
+    _ollamaConnectionSubscription = 
+        _ollamaService.connectionStream.listen(_onOllamaConnectionChanged);
+    
+    // 2. Escuchar el estado de Ollama Local
     _localOllamaService.addStatusListener(_onLocalOllamaStatusChanged);
+    
+    // 3. Inicializar OpenAI (esto es de una sola vez)
+    _initializeOpenAI();
+    
+    // 4. Comprobar el estado inicial de Ollama Remoto (por si ya estaba conectado)
+    _onOllamaConnectionChanged(_ollamaService.connectionInfo);
+    
+    debugPrint('✅ [AIServiceSelector] Servicios inicializados y escuchando cambios...');
   }
   
   // Getters
@@ -91,15 +105,14 @@ class AIServiceSelector extends ChangeNotifier {
   Future<void> refreshOllama() async {
     debugPrint('🔄 [AIServiceSelector] Refrescando Ollama...');
     try {
+      // Esto hará que OllamaService vuelva a comprobar su conexión.
+      // Si el estado cambia, disparará el stream,
+      // lo que activará nuestro listener _onOllamaConnectionChanged.
       await _ollamaService.reconnect();
-      await _checkOllamaAvailability();
-      if (_ollamaAvailable) {
-        await _loadAvailableModels();
-      }
-      notifyListeners();
     } catch (e) {
       debugPrint('❌ [AIServiceSelector] Error refrescando Ollama: $e');
     }
+    // No es necesario hacer nada más, el listener se encarga.
   }
   
   Future<void> _initializeServices() async {
@@ -115,6 +128,33 @@ class AIServiceSelector extends ChangeNotifier {
     debugPrint('   📊 Ollama (remoto): ${_ollamaAvailable ? "Disponible" : "No disponible"}');
     debugPrint('   📊 OpenAI: ${_openaiAvailable ? "Disponible" : "No disponible"}');
     debugPrint('   📊 Ollama Local: ${_localOllamaStatus.displayText}');
+  }
+
+  // AÑADIR ESTE MÉTODO NUEVO
+  Future<void> _onOllamaConnectionChanged(ConnectionInfo info) async {
+    debugPrint('📡 [AIServiceSelector] Estado Ollama Remoto cambió a: ${info.status}');
+    
+    if (info.status == ConnectionStatus.connected) {
+      final wasAvailable = _ollamaAvailable;
+      _ollamaAvailable = true;
+      
+      // Solo cargar modelos si es la primera vez que se conecta
+      // o si estaba previamente desconectado
+      if (!wasAvailable) {
+        debugPrint('   -> Conexión establecida. Cargando modelos...');
+        await _loadAvailableModels(); // Carga los modelos
+      }
+    } else {
+      // Si se desconecta o hay error
+      if (_ollamaAvailable) {
+        debugPrint('   -> Conexión perdida. Vaciando modelos.');
+      }
+      _ollamaAvailable = false;
+      _availableModels = []; // Limpia los modelos si no hay conexión
+    }
+    
+    // Notifica al ChatProvider sobre el cambio
+    notifyListeners();
   }
   
   Future<void> _initializeOllama() async {
@@ -195,14 +235,23 @@ class AIServiceSelector extends ChangeNotifier {
       debugPrint('📋 [AIServiceSelector] Cargando modelos de Ollama remoto...');
       _availableModels = await _ollamaService.getModels();
       
-      if (_availableModels.isNotEmpty && 
-          !_availableModels.any((m) => m.name == _currentOllamaModel)) {
-        final oldModel = _currentOllamaModel;
-        _currentOllamaModel = _availableModels.first.name;
-        debugPrint('   ⚠️ Modelo $oldModel no encontrado, usando ${_availableModels.first.name}');
+      // =========================================================
+      // ✅ CORRECCIÓN N° 3: Lógica de selección de modelo
+      // =========================================================
+      if (_availableModels.isNotEmpty) {
+        final modelExists = _availableModels.any((m) => m.name == _currentOllamaModel);
+        if (modelExists) {
+          debugPrint('   ✅ Modelo actual $_currentOllamaModel está disponible');
+        } else {
+          final oldModel = _currentOllamaModel;
+          _currentOllamaModel = _availableModels.first.name;
+          debugPrint('   ⚠️ Modelo $oldModel no encontrado, usando ${_availableModels.first.name}');
+        }
       } else {
-        debugPrint('   ✅ Modelo actual $_currentOllamaModel está disponible');
+        // Si no hay modelos, no podemos decir que el modelo actual está disponible
+        debugPrint('   ❌ No se encontraron modelos en el servidor.');
       }
+      
     } catch (e) {
       debugPrint('❌ [AIServiceSelector] Error cargando modelos: $e');
       _availableModels = [];
@@ -468,6 +517,7 @@ class AIServiceSelector extends ChangeNotifier {
   @override
   void dispose() {
     debugPrint('🔴 [AIServiceSelector] Disposing...');
+    _ollamaConnectionSubscription?.cancel(); // AÑADIDO
     _localOllamaService.removeStatusListener(_onLocalOllamaStatusChanged);
     _localOllamaService.dispose();
     _ollamaService.dispose();

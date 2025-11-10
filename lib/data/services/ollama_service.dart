@@ -223,31 +223,98 @@ class OllamaService {
     }
   }
   
-  // Listar modelos disponibles
+ // Listar modelos disponibles
   Future<List<OllamaModel>> getModels() async {
     try {
       debugPrint('📋 [OllamaService] Obteniendo lista de modelos...');
+      
+      // =========================================================
+      // ✅ CORRECCIÓN: Revertido a /api/models, según
+      //    el error "availableEndpoints" de tu servidor
+      // =========================================================
       final response = await http.get(
-        Uri.parse('$_baseUrl/api/models'),
+        Uri.parse('$_baseUrl/api/models'), // <-- REVERTIDO
         headers: _headers,
       ).timeout(_timeout);
       
       debugPrint('   📥 Status: ${response.statusCode}');
       
-      final models = _handleResponse(response, (data) {
-        return (data['models'] as List)
-            .map((model) => OllamaModel.fromJson(model))
-            .toList();
-      });
-      
-      debugPrint('   ✅ ${models.length} modelos encontrados');
-      for (var model in models) {
-        debugPrint('      • ${model.name}');
+      if (response.statusCode == 200) {
+        try {
+          final data = json.decode(response.body) as Map<String, dynamic>;
+          
+          // Función interna para parsear la lista de modelos
+          List<OllamaModel> parseModelsList(Map<String, dynamic> dataMap) {
+            if (dataMap.containsKey('models') && dataMap['models'] is List) {
+              final modelsList = dataMap['models'] as List;
+              if (modelsList.isEmpty) {
+                 debugPrint('      -> Lista "models" encontrada, pero está vacía.');
+              }
+              return modelsList
+                  .map((model) => OllamaModel.fromJson(model))
+                  .toList();
+            }
+            debugPrint('   ❌ La clave "models" no se encontró o no es una lista en el mapa: ${dataMap.keys.join(', ')}');
+            throw OllamaException('La clave "models" no se encontró o no es una lista');
+          }
+
+          List<OllamaModel> models;
+
+          // Opción 1: Detectar formato wrapper (como el tuyo)
+          if (data.containsKey('success') && data['success'] == true) {
+            debugPrint('   ✓ Formato detectado: Wrapper (success: true)');
+            
+            if (data.containsKey('models')) {
+              debugPrint('      -> Clave "models" encontrada en la raíz del wrapper');
+              models = parseModelsList(data);
+            } else if (data.containsKey('data') && data['data'] is Map<String, dynamic>) {
+              debugPrint('      -> Buscando en la clave "data"');
+              models = parseModelsList(data['data'] as Map<String, dynamic>);
+            } else if (data.containsKey('ollama') && data['ollama'] is Map<String, dynamic>) {
+              debugPrint('      -> Buscando en la clave "ollama"');
+              models = parseModelsList(data['ollama'] as Map<String, dynamic>);
+            } else {
+               debugPrint('   ❌ Wrapper detectado, pero no se encontró la clave "models", "data", ni "ollama"');
+               throw OllamaException('Formato wrapper no reconocido');
+            }
+          } 
+          // Opción 2: Detectar formato estándar de Ollama (solo la clave 'models')
+          else if (data.containsKey('models')) {
+            debugPrint('   ✓ Formato detectado: Ollama Estándar');
+            models = parseModelsList(data);
+          } 
+          // Si no es ninguno
+          else {
+            debugPrint('   ❌ Formato de respuesta no reconocido para getModels');
+            debugPrint('   📄 Response body: ${response.body}');
+            throw OllamaException('Formato de respuesta de modelos no reconocido. Keys: ${data.keys.join(", ")}');
+          }
+          
+          debugPrint('   ✅ ${models.length} modelos encontrados');
+          for (var model in models) {
+            debugPrint('      • ${model.name}');
+          }
+          return models;
+
+        } catch (e) {
+          debugPrint('   ❌ Error parseando JSON en getModels: $e');
+          debugPrint('   📄 Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+          if (e is OllamaException) rethrow;
+          throw OllamaException('Error procesando respuesta de modelos: $e');
+        }
+      } else {
+        // Error HTTP
+        debugPrint('   ❌ Error HTTP ${response.statusCode} en getModels');
+        debugPrint('   📄 Response: ${response.body}');
+        throw OllamaException(
+          'Error del servidor obteniendo modelos: ${response.statusCode}',
+          statusCode: response.statusCode,
+        );
       }
       
-      return models;
     } catch (e) {
       debugPrint('❌ [OllamaService] Error obteniendo modelos: $e');
+      if (e is OllamaException) rethrow;
       throw OllamaException('Error obteniendo modelos: $e');
     }
   }

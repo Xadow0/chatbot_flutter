@@ -435,34 +435,45 @@ class ModelSelectorBubble extends StatelessWidget {
   Widget _buildOllamaSection(BuildContext context, ChatProvider chatProvider) {
     final isAvailable = chatProvider.ollamaAvailable;
     final isSelected = chatProvider.currentProvider == AIProvider.ollama;
+    final isRetrying = chatProvider.isRetryingOllama;
 
     return Column(
       children: [
         InkWell(
-          onTap: isAvailable 
-              ? () => _selectProvider(context, chatProvider, AIProvider.ollama)
-              : null,
+          // Lógica de Tap:
+          // - Si se está reintentando, no hacer nada (null).
+          // - Si está disponible, no hacer nada (dejar que los modelos de
+          //   abajo manejen el tap)
+          // - Si NO está disponible, reintentar la conexión.
+          onTap: isRetrying
+              ? null
+              : !isAvailable
+                  ? () => _retryOllamaConnection(context, chatProvider)
+                  : null, // Si está disponible, la tarjeta no hace nada al pulsar
           borderRadius: BorderRadius.circular(12),
           child: Opacity(
-            opacity: isAvailable ? 1.0 : 0.5,
+            // Opacidad completa si está disponible o reintentando
+            // Opacidad reducida solo si está desconectado y en reposo
+            opacity: (isAvailable || isRetrying) ? 1.0 : 0.5,
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isSelected 
+                color: isSelected
                     ? Theme.of(context).colorScheme.primary.withAlpha(25)
                     : null,
                 borderRadius: BorderRadius.circular(12),
-                border: isSelected 
+                border: isSelected
                     ? Border.all(color: Theme.of(context).colorScheme.primary)
-                    : Border.all(color: Theme.of(context).colorScheme.outline.withAlpha(51)),
+                    : Border.all(
+                        color: Theme.of(context).colorScheme.outline.withAlpha(51)),
               ),
               child: Row(
                 children: [
                   Icon(
                     Icons.dns,
-                    color: isSelected 
+                    color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : (isAvailable 
+                        : (isAvailable
                             ? Theme.of(context).colorScheme.onSurfaceVariant
                             : Theme.of(context).colorScheme.outline),
                   ),
@@ -478,15 +489,18 @@ class ModelSelectorBubble extends StatelessWidget {
                               style: TextStyle(fontWeight: FontWeight.w500),
                             ),
                             const SizedBox(width: 4),
-                            if (isAvailable)
+                            if (isAvailable && !isRetrying)
                               _buildConnectionIndicator(chatProvider.connectionInfo),
                           ],
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          isAvailable 
-                              ? 'Servidor privado conectado'
-                              : 'Servidor no disponible',
+                          // Texto dinámico según el estado
+                          isRetrying
+                              ? 'Conectando con servidor...'
+                              : isAvailable
+                                  ? 'Servidor privado conectado'
+                                  : 'Servidor no disponible (Toca para reintentar)',
                           style: TextStyle(
                             fontSize: 12,
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -495,14 +509,23 @@ class ModelSelectorBubble extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (isAvailable)
+                  // Icono dinámico según el estado
+                  if (isRetrying)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else if (isAvailable)
+                    // Botón de refrescar (ahora también reintenta)
                     IconButton(
                       icon: const Icon(Icons.refresh, size: 20),
-                      onPressed: () => _refreshOllama(context, chatProvider),
+                      onPressed: () => _retryOllamaConnection(context, chatProvider),
                       constraints: const BoxConstraints(),
                       padding: const EdgeInsets.all(8),
-                    ),
-                  if (isSelected)
+                    )
+                  else if (isSelected)
+                    // Mostrar check si está seleccionado (incluso si no está disponible)
                     Icon(
                       Icons.check_circle,
                       color: Theme.of(context).colorScheme.primary,
@@ -513,9 +536,9 @@ class ModelSelectorBubble extends StatelessWidget {
             ),
           ),
         ),
-        
-        // Lista de modelos de Ollama (solo si está seleccionado y disponible)
-        if (isSelected && isAvailable && chatProvider.availableModels.isNotEmpty) ...[
+
+        // La lista de modelos solo se muestra si el servidor está disponible
+        if (isAvailable && chatProvider.availableModels.isNotEmpty) ...[
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(8),
@@ -529,7 +552,7 @@ class ModelSelectorBubble extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
-                    'Modelos disponibles',
+                    'Modelos disponibles (toca para seleccionar)',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -538,14 +561,22 @@ class ModelSelectorBubble extends StatelessWidget {
                   ),
                 ),
                 ...chatProvider.availableModels.map((model) {
-                  final isCurrentModel = model.name == chatProvider.currentModel;
+                  final isCurrentModel =
+                      isSelected && model.name == chatProvider.currentModel;
                   return InkWell(
-                    onTap: () => _selectModel(context, chatProvider, model.name),
+                    // Tocar un modelo selecciona el proveedor Y el modelo
+                    onTap: () {
+                      debugPrint('🔘 Tocado modelo: ${model.name}');
+                      // Asegura que el proveedor Ollama esté activo
+                      _selectProvider(context, chatProvider, AIProvider.ollama);
+                      // Selecciona el modelo específico
+                      _selectModel(context, chatProvider, model.name);
+                    },
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isCurrentModel 
+                        color: isCurrentModel
                             ? Theme.of(context).colorScheme.primary.withAlpha(51)
                             : null,
                         borderRadius: BorderRadius.circular(8),
@@ -560,8 +591,10 @@ class ModelSelectorBubble extends StatelessWidget {
                                   model.displayName,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    fontWeight: isCurrentModel ? FontWeight.w600 : FontWeight.w500,
-                                    color: isCurrentModel 
+                                    fontWeight: isCurrentModel
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: isCurrentModel
                                         ? Theme.of(context).colorScheme.primary
                                         : null,
                                   ),
@@ -570,7 +603,9 @@ class ModelSelectorBubble extends StatelessWidget {
                                   model.sizeFormatted,
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -877,6 +912,40 @@ class ModelSelectorBubble extends StatelessWidget {
   // ============================================================================
   // MÉTODOS CORREGIDOS - Usar nombres correctos del ChatProvider actualizado
   // ============================================================================
+
+  /// Llama al método de reintento en el provider y muestra SnackBars
+  Future<void> _retryOllamaConnection(BuildContext context, ChatProvider chatProvider) async {
+    if (chatProvider.isRetryingOllama) return; // Evitar clics múltiples
+    
+    try {
+      final success = await chatProvider.retryOllamaConnection();
+      
+      // Solo mostrar SnackBar si el widget sigue montado
+      if (!context.mounted) return;
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conexión con Ollama (remoto) establecida'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo conectar con el servidor Ollama'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showError(context, 'Error refrescando: $e');
+      }
+    }
+  }
 
   Future<void> _selectProvider(BuildContext context, ChatProvider chatProvider, AIProvider provider) async {
     try {

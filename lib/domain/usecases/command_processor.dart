@@ -87,7 +87,9 @@ class CommandProcessor {
   /// Retorna:
   /// - [CommandResult.notCommand()] si no es un comando
   /// - [CommandResult.success()] si el comando se procesó correctamente
-  /// - [CommandResult.error()] si hubo un error al procesar el comando
+  /// 
+  /// Lanza:
+  /// - [Exception] si hubo un error al procesar el comando (ej. error de red)
   Future<CommandResult> processMessage(String message) async {
     final normalizedMessage = message.trim().toLowerCase();
 
@@ -158,10 +160,14 @@ class CommandProcessor {
       return CommandResult.success(CommandType.probarPrompt, response);
     } catch (e) {
       debugPrint('   ❌ Error procesando comando: $e');
-      return CommandResult.error(
-        CommandType.probarPrompt,
-        'Error al procesar el comando: ${e.toString()}',
-      );
+      
+      // ===================================================================
+      // ▼▼▼ MODIFICACIÓN CRÍTICA ▼▼▼
+      // ===================================================================
+      // En lugar de devolver un CommandResult.error, relanzamos la excepción
+      // para que ChatProvider pueda capturarla y reaccionar.
+      rethrow;
+      // ===================================================================
     }
   }
 
@@ -208,10 +214,13 @@ class CommandProcessor {
       return CommandResult.success(CommandType.translate, response);
     } catch (e) {
       debugPrint('   ❌ Error procesando comando: $e');
-      return CommandResult.error(
-        CommandType.translate,
-        'Error al procesar el comando: ${e.toString()}',
-      );
+      
+      // ===================================================================
+      // ▼▼▼ MODIFICACIÓN CRÍTICA ▼▼▼
+      // ===================================================================
+      // Relanzamos la excepción también aquí.
+      rethrow;
+      // ===================================================================
     }
   }
 
