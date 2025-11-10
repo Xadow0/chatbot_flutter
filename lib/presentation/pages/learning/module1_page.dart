@@ -160,7 +160,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
     'más', 'probable', 'en', 'cada', 'momento'
   ];
   
-  List<String> _generatedWords = [];
+  final List<String> _generatedWords = [];
   String _currentWord = '';
   List<String> _candidateWords = [];
   int _wordIndex = 0;

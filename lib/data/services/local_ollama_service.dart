@@ -128,14 +128,26 @@ class OllamaManagedService {
         _currentInstallStream = installStream;
         
         await for (var progress in installStream) {
-          _updateStatus(progress.status, error: progress.message);
-          _notifyInstallProgress(progress);
+        // 1. Notificar a la UI sobre el progreso (para la barra de progreso)
+        // Esto DEBE llamarse en cada iteración.
+        _notifyInstallProgress(progress);
+
+        // 2. Notificar al sistema sobre un CAMBIO DE ESTADO
+        // Esto solo se llama si el estado principal cambia (ej. de descargar a instalar)
+        if (progress.status != _status) {
+          final errorMessage = (progress.status == LocalOllamaStatus.error)
+              ? progress.message
+              : null;
           
-          if (progress.status == LocalOllamaStatus.error) {
-            throw LocalOllamaException(
-              'Error instalando Ollama',
-              details: progress.message,
-            );
+          _updateStatus(progress.status, error: errorMessage);
+        }
+        
+        // 3. Si hubo un error real, detener todo
+        if (progress.status == LocalOllamaStatus.error) {
+          throw LocalOllamaException(
+            'Error instalando Ollama',
+            details: progress.message,
+          );
           }
         }
         
