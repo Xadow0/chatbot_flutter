@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../data/services/gemini_service.dart';
 import 'package:markdown_widget/markdown_widget.dart';
-// import '../../../data/repositories/conversation_repository.dart';
+
 
 class Module2Page extends StatefulWidget {
   const Module2Page({super.key});
@@ -161,15 +161,15 @@ class _ComparisonPageState extends State<_ComparisonPage> {
       'Un buen prompt es como una receta, incluye los ingredientes y las instrucciones para realizarla';
 
   // Conversación 1
-  final String _prompt1 = 'Haz un texto bonito sobre IA';
+  final String _prompt1 = 'Haz un frase bonita sobre IA';
   final String _response1 =
-      'La inteligencia artificial es fascinante. Es tecnología moderna que ayuda en muchas tareas.';
+      'La inteligencia artificial es fascinante. Es una tecnología moderna que ayuda en muchas tareas.';
 
   // Conversación 2
   final String _prompt2 =
-      'Haz un texto breve, optimista, para una presentación motivacional, sobre aprender sobre IA';
+      'Haz un texto breve, optimista, para una presentación motivacional, sobre aprender acerca de IA Generativa';
   final String _response2 =
-      '¡El futuro está en tus manos! Aprender sobre IA no es solo dominar una tecnología, '
+      'Aprender sobre IA Generativa no es solo dominar una tecnología, '
       'es abrir la puerta a infinitas posibilidades. Cada concepto que comprendes te acerca a '
       'crear soluciones innovadoras que pueden cambiar el mundo. ¡Empieza hoy y sé parte de la revolución!';
 
@@ -570,11 +570,16 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
   };
 
   final Map<String, String> _partDescriptions = {
-    'contexto': '¿Cuál es el contexto o tema sobre el que quieres trabajar?',
-    'rol': '¿Qué rol debe adoptar la IA? (profesor, experto, guía, etc.)',
-    'tarea': '¿Qué tarea específica debe realizar?',
-    'formato': '¿En qué formato deseas la respuesta? (lista, párrafo, tabla, etc.)',
-    'tono': '¿Qué tono debe usar? (formal, informal, motivador, técnico, etc.)',
+    'contexto': 'Escribe el contexto o tema sobre el que estas trabajando. Por ejemplo: '
+        '“Estoy preparando una presentación sobre IA Generativa para un público no técnico.”',
+    'rol': 'Indica que rol debe adoptar la IA (profesor, experto, guía, etc.). Por ejemplo: '
+        '“Actúa como un experto en IA Generativa con experiencia en educación.”',
+    'tarea': 'Indica la tarea específica que deseas realizar. Por ejemplo: '
+        '“Crea un esquema para una presentación de 10 minutos sobre los conceptos básicos de IA Generativa.”',
+    'formato': 'Ahora indica en que forma to quieres que te sea dada la respuesta (lista, párrafo, tabla, etc.). Por ejemplo: '
+        '“Proporciona la información en formato de lista de diapositivas con su correspondiente información y guión”',
+    'tono': 'Indica el tono más adecuado para la tarea que necesitas (formal, informal, motivador, técnico, etc.). Por ejemplo: '
+        '“Utiliza un tono motivador y accesible para una audiencia general.”',
   };
 
   int _currentPartIndex = 0;
