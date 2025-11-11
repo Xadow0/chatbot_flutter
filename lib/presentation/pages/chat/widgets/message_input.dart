@@ -11,11 +11,20 @@ class MessageInput extends StatefulWidget {
   });
 
   @override
-  State<MessageInput> createState() => _MessageInputState();
+  State<MessageInput> createState() => MessageInputState();
 }
 
-class _MessageInputState extends State<MessageInput> {
+class MessageInputState extends State<MessageInput> {
   final TextEditingController _controller = TextEditingController();
+
+  /// Inserta texto al inicio del campo de entrada
+  /// Útil para quick responses que funcionan como comandos
+  void insertTextAtStart(String text) {
+    final currentText = _controller.text;
+    _controller.text = text + currentText;
+    // Posicionar cursor al final del texto insertado
+    _controller.selection = TextSelection.collapsed(offset: text.length);
+  }
 
   void _handleSend() {
     if (_controller.text.trim().isEmpty || widget.isBlocked) return;

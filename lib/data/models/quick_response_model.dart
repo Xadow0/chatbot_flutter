@@ -33,9 +33,13 @@ class QuickResponse {
 class QuickResponseProvider {
   // Respuestas por defecto
   static const List<QuickResponse> defaultResponses = [
-    QuickResponse(text: '/tryprompt'),
-    QuickResponse(text: 'Hola'),
-    QuickResponse(text: 'Siguiente'),
+    QuickResponse(text: '/evaluarprompt ', description: 'Evalúa y mejora un prompt'),
+    QuickResponse(text: '/traducir ', description: 'Traduce texto a otro idioma'),
+    QuickResponse(text: '/resumir ', description: 'Resume un texto largo'),
+    QuickResponse(text: '/codigo ', description: 'Genera código desde descripción'),
+    QuickResponse(text: '/corregir ', description: 'Corrige ortografía y gramática'),
+    QuickResponse(text: '/explicar ', description: 'Explica un concepto'),
+    QuickResponse(text: '/comparar ', description: 'Compara dos o más opciones'),
   ];
 
   /// Respuestas por defecto como entidades

@@ -45,6 +45,9 @@ class _ChatBody extends StatefulWidget {
 }
 
 class _ChatBodyState extends State<_ChatBody> {
+  // GlobalKey para acceder al estado del MessageInput
+  final GlobalKey<MessageInputState> _messageInputKey = GlobalKey<MessageInputState>();
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +60,20 @@ class _ChatBodyState extends State<_ChatBody> {
         final chatProvider = context.read<ChatProvider>();
         await chatProvider.loadConversation(widget.preloadedConversationFile!);
       });
+    }
+  }
+
+  /// Maneja la selección de una quick response
+  /// Si el texto comienza con '/', lo inserta en el campo de entrada
+  /// Si no, lo envía directamente como mensaje
+  void _handleQuickResponseSelected(String text) {
+    if (text.startsWith('/')) {
+      // Es un comando: insertar en el campo de entrada
+      _messageInputKey.currentState?.insertTextAtStart(text);
+    } else {
+      // Es una respuesta normal: enviar directamente
+      final chatProvider = context.read<ChatProvider>();
+      chatProvider.sendMessage(text);
     }
   }
 
@@ -113,12 +130,12 @@ class _ChatBodyState extends State<_ChatBody> {
                   responses: chatProvider.quickResponses
                       .map((e) => QuickResponse.fromEntity(e))
                       .toList(),
-                  onResponseSelected: (response) =>
-                      chatProvider.sendMessage(response),
+                  onResponseSelected: _handleQuickResponseSelected,
                 ),
                 
                 // Campo de entrada
                 MessageInput(
+                  key: _messageInputKey,
                   onSendMessage: chatProvider.sendMessage,
                   isBlocked: chatProvider.isProcessing,
                 ),

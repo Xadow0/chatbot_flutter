@@ -33,7 +33,7 @@ class QuickResponsesWidget extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: 8, bottom: 8),
             child: Text(
-              'Respuestas rápidas',
+              'Lista de Comandos Rápidos',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
