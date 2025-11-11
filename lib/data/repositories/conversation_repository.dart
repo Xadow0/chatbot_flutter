@@ -27,8 +27,26 @@ class ConversationRepositoryImpl implements ConversationRepository {
     if (messages.isEmpty) return;
     
     final dir = await _getConversationsDir();
-    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final file = File('${dir.path}/$timestamp.json');
+    final now = DateTime.now();
+    
+    // Días de la semana en español
+    const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    
+    // Meses en español
+    const months = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    
+    final dayName = daysOfWeek[now.weekday - 1];
+    final dayNumber = now.day;
+    final monthName = months[now.month - 1];
+    final year = now.year;
+    final hour = now.hour.toString().padLeft(2, '0');
+    final minute = now.minute.toString().padLeft(2, '0');
+    
+    final fileName = '$dayName, $dayNumber de $monthName de $year, a las $hour horas $minute minutos.json';
+    final file = File('${dir.path}/$fileName');
     
     final models = messages.map((entity) => Message.fromEntity(entity)).toList();
     final jsonData = models.map((m) => m.toJson()).toList();
