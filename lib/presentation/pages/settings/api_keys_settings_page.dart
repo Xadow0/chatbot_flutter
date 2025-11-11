@@ -195,7 +195,7 @@ class _ApiKeysSettingsPageState extends State<ApiKeysSettingsPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue[50],
+        color: const Color.fromARGB(255, 138, 206, 255),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.blue[200]!),
       ),
@@ -232,7 +232,7 @@ class _ApiKeysSettingsPageState extends State<ApiKeysSettingsPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange[50],
+        color: const Color.fromARGB(255, 255, 207, 129),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.orange[300]!),
       ),
@@ -279,7 +279,7 @@ class _ApiKeysSettingsPageState extends State<ApiKeysSettingsPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: hasKey ? color.withOpacity(0.3) : Colors.grey[300]!,
+          color: hasKey ? color.withOpacity(0.3) : const Color.fromARGB(255, 87, 43, 43)!,
           width: 2,
         ),
       ),
@@ -359,7 +359,7 @@ class _ApiKeysSettingsPageState extends State<ApiKeysSettingsPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: const Color.fromARGB(255, 99, 77, 77),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(

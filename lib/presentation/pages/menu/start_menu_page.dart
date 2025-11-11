@@ -10,7 +10,7 @@ class StartMenuPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Menú de Inicio'),
+        title: const Text('TRAINING IA'),
         centerTitle: true,
       ),
       body: Center(
@@ -20,7 +20,7 @@ class StartMenuPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Bienvenido al Chatbot',
+                'Bienvenido a la estación de entrenamiento IA',
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),

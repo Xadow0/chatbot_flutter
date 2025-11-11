@@ -120,7 +120,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: const Text('Gestionar conversaciones anteriores'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  // TODO: Navegar a historial
+                  Navigator.pushNamed(context, AppRoutes.history);
                 },
               ),
             ],

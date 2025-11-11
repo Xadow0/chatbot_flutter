@@ -23,7 +23,7 @@ class ConversationRepositoryImpl implements ConversationRepository {
 
   /// Guarda una conversación completa (lista de entidades)
   @override
-  Future<void> saveConversation(List<MessageEntity> messages) async {
+  Future<void> saveConversation(List<MessageEntity> messages, {String? suffix}) async {
     if (messages.isEmpty) return;
     
     final dir = await _getConversationsDir();
@@ -45,7 +45,8 @@ class ConversationRepositoryImpl implements ConversationRepository {
     final hour = now.hour.toString().padLeft(2, '0');
     final minute = now.minute.toString().padLeft(2, '0');
     
-    final fileName = '$dayName, $dayNumber de $monthName de $year, a las $hour horas $minute minutos.json';
+    final suffixPart = suffix != null ? ', $suffix' : '';
+    final fileName = '$dayName, $dayNumber de $monthName de $year, a las $hour horas $minute minutos$suffixPart.json';
     final file = File('${dir.path}/$fileName');
     
     final models = messages.map((entity) => Message.fromEntity(entity)).toList();

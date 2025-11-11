@@ -6,6 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../data/services/gemini_service.dart';
 import 'package:markdown_widget/markdown_widget.dart';
+import '../../../data/repositories/conversation_repository.dart';
+import '../../../domain/entities/message_entity.dart';
+import '../../../domain/repositories/conversation_repository.dart';
 
 
 class Module2Page extends StatefulWidget {
@@ -17,6 +20,7 @@ class Module2Page extends StatefulWidget {
 
 class _Module2PageState extends State<Module2Page> {
   int _currentPage = 0;
+  final ConversationRepository _conversationRepository = ConversationRepositoryImpl();
 
   void _nextPage() {
     setState(() {
@@ -79,7 +83,10 @@ class _Module2PageState extends State<Module2Page> {
       case 1:
         return _ComparisonPage(onNext: _nextPage);
       case 2:
-        return _PromptBuilderPage(onComplete: _completeModule);
+        return _PromptBuilderPage(
+          onComplete: _completeModule,
+          conversationRepository: _conversationRepository,
+        );
       default:
         return const SizedBox();
     }
@@ -539,8 +546,12 @@ class _ComparisonPageState extends State<_ComparisonPage> {
 // ============= PÁGINA DE CONSTRUCCIÓN DE PROMPT =============
 class _PromptBuilderPage extends StatefulWidget {
   final VoidCallback onComplete;
+  final ConversationRepository conversationRepository;
 
-  const _PromptBuilderPage({required this.onComplete});
+  const _PromptBuilderPage({
+    required this.onComplete,
+    required this.conversationRepository,
+  });
 
   @override
   State<_PromptBuilderPage> createState() => _PromptBuilderPageState();
@@ -549,6 +560,7 @@ class _PromptBuilderPage extends StatefulWidget {
 class _PromptBuilderPageState extends State<_PromptBuilderPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final List<_ChatMessage> _messages = [];
   final GeminiService _geminiService = GeminiService();
 
   // Partes del prompt
@@ -583,7 +595,6 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
   };
 
   int _currentPartIndex = 0;
-  final List<_ChatMessage> _messages = [];
   bool _waitingForInput = false;
   bool _promptComplete = false;
   // bool _showingFinalPrompt = false; // removed (unused)
@@ -605,6 +616,7 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
 
   @override
   void dispose() {
+    _saveConversation();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -652,7 +664,6 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
       _messages.add(message);
     });
     _scrollToBottom();
-    _saveConversation();
   }
 
   void _scrollToBottom() {
@@ -765,7 +776,6 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
               _responseAnimationComplete = true;
             });
             // Guardar la conversación actualizada (ahora completada)
-            _saveConversation();
           },
         ),
       );
@@ -798,33 +808,18 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
     }
   }
 
-  Future<void> _saveConversation() async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final conversationsDir = Directory('${directory.path}/conversations/modulo2');
-      
-      if (!await conversationsDir.exists()) {
-        await conversationsDir.create(recursive: true);
-      }
-
-      final file = File('${conversationsDir.path}/$_conversationId.json');
-      
-      final conversationData = {
-        'id': _conversationId,
-        'module': 'modulo2',
-        'timestamp': DateTime.now().toIso8601String(),
-        'messages': _messages.map((msg) => {
-          'text': msg.text,
-          'isUser': msg.isUser,
-        }).toList(),
-        'promptParts': _promptParts,
-        'completed': _aiResponse.isNotEmpty,
-      };
-
-      await file.writeAsString(jsonEncode(conversationData));
-    } catch (e) {
-      print('Error al guardar conversación: $e');
-    }
+ Future<void> _saveConversation() async {
+    // Convertir _ChatMessage a MessageEntity
+    final messageEntities = _messages.map((chatMsg) {
+      return MessageEntity(
+        id: '${_conversationId}_${DateTime.now().millisecondsSinceEpoch}',
+        content: chatMsg.text,
+        type: chatMsg.isUser ? MessageTypeEntity.user : MessageTypeEntity.bot,
+        timestamp: DateTime.now(),
+      );
+    }).toList();
+    
+    await widget.conversationRepository.saveConversation(messageEntities, suffix: 'modulo2');
   }
 
   void _restart() {
