@@ -279,7 +279,7 @@ class _ApiKeysSettingsPageState extends State<ApiKeysSettingsPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: hasKey ? color.withOpacity(0.3) : const Color.fromARGB(255, 87, 43, 43)!,
+          color: hasKey ? color.withOpacity(0.3) : const Color.fromARGB(255, 87, 43, 43),
           width: 2,
         ),
       ),

@@ -30,15 +30,27 @@ class ChatPage extends StatelessWidget {
     //   child: _ChatBody(preloadedConversationFile: preloadedConversationFile), <-- ELIMINADO
     // );
     
+    // Obtener argumentos de navegación para determinar si es una conversación nueva
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final isNewConversation = args?['newConversation'] as bool? ?? false;
+    
     // Simplemente renderizamos el _ChatBody, que consumirá
     // el provider global existente.
-    return _ChatBody(preloadedConversationFile: preloadedConversationFile);
+    return _ChatBody(
+      preloadedConversationFile: preloadedConversationFile,
+      isNewConversation: isNewConversation,
+    );
   }
 }
 
 class _ChatBody extends StatefulWidget {
   final File? preloadedConversationFile;
-  const _ChatBody({this.preloadedConversationFile});
+  final bool isNewConversation;
+  
+  const _ChatBody({
+    this.preloadedConversationFile,
+    this.isNewConversation = false,
+  });
 
   @override
   State<_ChatBody> createState() => _ChatBodyState();
@@ -55,12 +67,21 @@ class _ChatBodyState extends State<_ChatBody> {
     // Esta lógica ahora funcionará correctamente, porque
     // context.read<ChatProvider>() encontrará el provider
     // global inyectado en main.dart.
-    if (widget.preloadedConversationFile != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final chatProvider = context.read<ChatProvider>();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final chatProvider = context.read<ChatProvider>();
+      
+      if (widget.preloadedConversationFile != null) {
+        // Si viene con un archivo preloadedConversationFile (desde History),
+        // cargar esa conversación sin añadir mensajes extra
         await chatProvider.loadConversation(widget.preloadedConversationFile!);
-      });
-    }
+      } else if (widget.isNewConversation) {
+        // Si navegamos desde el menú con newConversation=true,
+        // limpiar la conversación anterior y comenzar de cero con welcome message
+        await chatProvider.clearMessages(saveBeforeClear: true);
+      }
+      // Si no cumple ninguna condición, simplemente se muestra
+      // el estado actual del provider (última conversación o vacío)
+    });
   }
 
   /// Maneja la selección de una quick response

@@ -37,7 +37,7 @@ class StartMenuPage extends StatelessWidget {
                   Navigator.pushNamed(
                     context,
                     AppRoutes.chat,
-                    arguments: {'mode': 'free'},
+                    arguments: {'newConversation': true},
                   );
                 },
               ),

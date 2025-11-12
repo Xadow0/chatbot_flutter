@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path_provider/path_provider.dart';
 import '../../../data/services/gemini_service.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import '../../../data/repositories/conversation_repository.dart';
