@@ -789,4 +789,57 @@ class OllamaManagedService {
     _statusListeners.clear();
     _installProgressListeners.clear();
   }
+
+    /// ===========================================================================
+  /// 🔄 NUEVO: Historial persistente de conversación (similar a Gemini/OpenAI)
+  /// ===========================================================================
+  final List<Map<String, String>> _conversationHistory = [];
+
+  /// Genera contenido manteniendo el contexto conversacional.
+  /// Usa internamente chatWithHistory() y persiste el historial.
+  Future<String> generateContentContext(
+    String prompt, {
+    double? temperature,
+    int? maxTokens,
+  }) async {
+    if (!isAvailable) {
+      throw LocalOllamaException(
+        'Modelo no disponible',
+        details: 'Estado actual: ${_status.displayText}',
+      );
+    }
+
+    debugPrint('💬 [OllamaManaged] generateContentContext llamado');
+    debugPrint('   🧠 Historial actual: ${_conversationHistory.length} mensajes');
+
+    // 1️⃣ Agregar el turno del usuario al historial
+    _conversationHistory.add({
+      'role': 'user',
+      'content': prompt,
+    });
+
+    // 2️⃣ Llamar al chat con todo el historial acumulado
+    final responseText = await chatWithHistory(
+      prompt: prompt,
+      history: List<Map<String, String>>.from(_conversationHistory),
+      temperature: temperature ?? _config.temperature,
+      maxTokens: maxTokens ?? _config.maxTokens,
+    );
+
+    // 3️⃣ Guardar la respuesta del asistente en el historial
+    _conversationHistory.add({
+      'role': 'assistant',
+      'content': responseText,
+    });
+
+    debugPrint('✅ [OllamaManaged] generateContentContext completado');
+    return responseText;
+  }
+
+  /// 🔄 Limpiar historial de conversación (como en Gemini/OpenAI)
+  void clearConversation() {
+    _conversationHistory.clear();
+    debugPrint('🧹 [OllamaManaged] Historial de conversación limpiado');
+  }
+
 }

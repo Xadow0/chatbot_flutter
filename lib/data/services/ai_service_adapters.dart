@@ -8,9 +8,6 @@ import '../../domain/usecases/command_processor.dart';
 /// ============================================================================
 /// ADAPTADOR PARA GEMINI SERVICE
 /// ============================================================================
-/// 
-/// Este adaptador permite que GeminiService implemente la interfaz AIServiceBase
-/// requerida por CommandProcessor, con soporte para generación con y sin historial.
 class GeminiServiceAdapter implements AIServiceBase {
   final GeminiService _service;
 
@@ -18,20 +15,17 @@ class GeminiServiceAdapter implements AIServiceBase {
 
   @override
   Future<String> generateContent(String prompt) async {
-    debugPrint('🔵 [GeminiAdapter] generateContent llamado (con posible historial)');
-    return await _service.generateContent(prompt);
+    debugPrint('🔵 [GeminiAdapter] generateContent llamado (con HISTORIAL)');
+    return await _service.generateContentContext(prompt);
   }
 
   @override
   Future<String> generateContentWithoutHistory(String prompt) async {
-    debugPrint('🔵 [GeminiAdapter] generateContentWithoutHistory llamado');
-    debugPrint('   ⚡ Enviando prompt SIN historial a Gemini');
-    
-    // Para Gemini, el método generateContent ya funciona sin historial
-    // por defecto, ya que no mantiene estado de conversación internamente
+    debugPrint('🔵 [GeminiAdapter] generateContentWithoutHistory llamado (sin historial)');
     return await _service.generateContent(prompt);
   }
 }
+
 
 /// ============================================================================
 /// ADAPTADOR PARA OPENAI SERVICE
@@ -49,7 +43,7 @@ class OpenAIServiceAdapter implements AIServiceBase {
     debugPrint('🟢 [OpenAIAdapter] generateContent llamado (con posible historial)');
     
     // Para chat normal, usar el método estándar
-    return await _service.generateContent(prompt);
+    return await _service.generateContentContext(prompt);
   }
 
   @override
@@ -67,9 +61,6 @@ class OpenAIServiceAdapter implements AIServiceBase {
 /// ============================================================================
 /// ADAPTADOR PARA OLLAMA SERVICE (REMOTO)
 /// ============================================================================
-/// 
-/// Este adaptador maneja Ollama remoto con soporte para cambio de modelo
-/// y generación con/sin historial.
 class OllamaServiceAdapter implements AIServiceBase {
   final OllamaService _service;
   String _currentModel;
@@ -85,10 +76,10 @@ class OllamaServiceAdapter implements AIServiceBase {
 
   @override
   Future<String> generateContent(String prompt) async {
-    debugPrint('🟪 [OllamaAdapter] generateContent llamado (con posible historial)');
+    debugPrint('🟪 [OllamaAdapter] generateContent llamado (CON historial)');
     debugPrint('   🤖 Modelo: $_currentModel');
-    
-    return await _service.generateContent(
+
+    return await _service.generateContentContext(
       prompt,
       model: _currentModel,
     );
@@ -96,19 +87,21 @@ class OllamaServiceAdapter implements AIServiceBase {
 
   @override
   Future<String> generateContentWithoutHistory(String prompt) async {
-    debugPrint('🟪 [OllamaAdapter] generateContentWithoutHistory llamado');
+    debugPrint('🟪 [OllamaAdapter] generateContentWithoutHistory llamado (SIN historial)');
     debugPrint('   🤖 Modelo: $_currentModel');
-    debugPrint('   ⚡ Enviando prompt SIN historial a Ollama');
     
-    // Para Ollama remoto, usar generateResponse que solo envía el prompt
-    // sin ningún historial de conversación.
-    // El método generateResponse usa el endpoint /api/generate que NO mantiene historial.
     return await _service.generateResponse(
       model: _currentModel,
       prompt: prompt,
     );
   }
+
+  /// Permite limpiar la conversación
+  void clearConversation() {
+    _service.clearConversation();
+  }
 }
+
 
 /// ============================================================================
 /// ADAPTADOR PARA LOCAL OLLAMA SERVICE
@@ -126,7 +119,7 @@ class LocalOllamaServiceAdapter implements AIServiceBase {
     debugPrint('🟠 [LocalOllamaAdapter] generateContent llamado (con posible historial)');
     debugPrint('   🤖 Modelo: ${_service.currentModel}');
     
-    return await _service.generateContent(prompt);
+    return await _service.generateContentContext(prompt);
   }
 
   @override
@@ -140,7 +133,11 @@ class LocalOllamaServiceAdapter implements AIServiceBase {
     // Si se quisiera usar historial, se usaría chatWithHistory con el endpoint /api/chat.
     return await _service.generateContent(prompt);
   }
-  
+  /// Permite limpiar la conversación
+  void clearConversation() {
+    _service.clearConversation();
+  }
+
   /// Getter para acceder al servicio subyacente si es necesario
   OllamaManagedService get service => _service;
 }

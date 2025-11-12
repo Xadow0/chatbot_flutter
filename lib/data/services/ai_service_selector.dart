@@ -7,6 +7,8 @@ import 'ollama_service.dart';
 import 'openai_service.dart';
 import 'local_ollama_service.dart';
 import 'dart:async';
+import 'ai_service_adapters.dart';
+import '../../domain/usecases/command_processor.dart';
 
 enum AIProvider {
   gemini,
@@ -74,6 +76,7 @@ class AIServiceSelector extends ChangeNotifier {
   ConnectionInfo get connectionInfo => _ollamaService.connectionInfo;
   
   // Getters para Ollama Local
+  GeminiService get geminiService => _geminiService;
   OllamaManagedService get localOllamaService => _localOllamaService;
   LocalOllamaStatus get localOllamaStatus => _localOllamaStatus;
   bool get localOllamaAvailable => _localOllamaStatus == LocalOllamaStatus.ready;
@@ -522,5 +525,20 @@ class AIServiceSelector extends ChangeNotifier {
     _localOllamaService.dispose();
     _ollamaService.dispose();
     super.dispose();
+  }
+
+  AIServiceBase getCurrentAdapter() {
+    debugPrint('🔌 [AIServiceSelector] Obteniendo adaptador para: $_currentProvider');
+    
+    switch (_currentProvider) {
+      case AIProvider.gemini:
+        return GeminiServiceAdapter(_geminiService);
+      case AIProvider.openai:
+        return OpenAIServiceAdapter(_openaiService);
+      case AIProvider.ollama:
+        return OllamaServiceAdapter(_ollamaService, _currentOllamaModel);
+      case AIProvider.localOllama:
+        return LocalOllamaServiceAdapter(_localOllamaService);
+    }
   }
 }

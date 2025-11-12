@@ -6,44 +6,66 @@ import 'config/routes.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/providers/chat_provider.dart';
 
-// 1. Importar las INTERFACES (Dominio)
 import 'domain/repositories/chat_repository.dart';
 import 'domain/repositories/conversation_repository.dart';
+import 'data/services/ai_chat_service.dart';
 
-// 2. Importar las IMPLEMENTACIONES (Data)
 import 'data/repositories/chat_repository.dart';
 import 'data/repositories/conversation_repository.dart';
-
-// 🔐 Importar el gestor de API keys
 import 'data/services/api_keys_manager.dart';
+import 'data/services/ai_service_selector.dart';
+import 'data/services/gemini_service.dart';
+import 'data/services/openai_service.dart';
+import 'data/services/ollama_service.dart';
+import 'data/services/local_ollama_service.dart';
 
 Future<void> main() async {
-  // Asegurar inicialización de Flutter
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Cargar .env (opcional, para desarrollo o migración)
   await dotenv.load(fileName: ".env");
   
-  // 🔐 Verificar y migrar API keys si es necesario
   final initialRoute = await _determineInitialRoute();
+  
+  final geminiService = GeminiService();
+  final openaiService = OpenAIService();
+  final ollamaService = OllamaService();
+  final localOllamaService = OllamaManagedService();
+  
+  final aiServiceSelector = AIServiceSelector(
+    geminiService: geminiService,
+    openaiService: openaiService,
+    ollamaService: ollamaService,
+    localOllamaService: localOllamaService,
+  );
   
   runApp(
     MultiProvider(
       providers: [
-        // 3. Proveer las implementaciones concretas
-        Provider<ChatRepository>(
-          create: (_) => LocalChatRepository(),
+        ChangeNotifierProvider<AIServiceSelector>.value(
+          value: aiServiceSelector,
         ),
+        
+        Provider<AIChatService>(
+          create: (context) => AIChatService(
+            context.read<AIServiceSelector>(),
+          ),
+        ),
+        
+        Provider<ChatRepository>(
+          create: (context) => LocalChatRepository(
+            context.read<AIChatService>(),
+          ),
+        ),
+        
         Provider<ConversationRepository>(
           create: (_) => ConversationRepositoryImpl(),
         ),
         
-        // 4. Crear ChatProvider, leyendo las dependencias del contexto
         ChangeNotifierProvider(
           create: (context) => ChatProvider(
-            // Inyectar las interfaces (Provider encontrará las implementaciones)
             chatRepository: context.read<ChatRepository>(),
             conversationRepository: context.read<ConversationRepository>(),
+            aiServiceSelector: context.read<AIServiceSelector>(),
           ),
         ),
       ],
@@ -52,40 +74,34 @@ Future<void> main() async {
   );
 }
 
-/// 🔐 Determinar la ruta inicial basándose en si hay API keys configuradas
 Future<String> _determineInitialRoute() async {
   final apiKeysManager = ApiKeysManager();
   
-  // Verificar si ya hay API keys guardadas
   final hasKeys = await apiKeysManager.hasAnyApiKey();
   
   if (!hasKeys) {
-    debugPrint('🔑 [Main] No hay API keys guardadas');
+    debugPrint('🔒 [Main] No hay API keys guardadas');
     
-    // Intentar migración desde .env (solo para desarrollo/primera vez)
     await _migrateFromEnvIfAvailable(apiKeysManager);
     
-    // Verificar nuevamente después de la migración
     final hasKeysAfterMigration = await apiKeysManager.hasAnyApiKey();
     
     if (hasKeysAfterMigration) {
       debugPrint('✅ [Main] Keys migradas correctamente → Ir al menú principal');
       return AppRoutes.startMenu;
     } else {
-      debugPrint('🔑 [Main] Sin keys → Ir a onboarding');
+      debugPrint('🔒 [Main] Sin keys → Ir a onboarding');
       return AppRoutes.apiKeysOnboarding;
     }
   } else {
     debugPrint('✅ [Main] API keys encontradas en almacenamiento seguro');
     
-    // Mostrar estado de las keys (solo en debug)
     await apiKeysManager.printAllKeys();
     
     return AppRoutes.startMenu;
   }
 }
 
-/// Migrar API keys desde .env al almacenamiento seguro (solo primera vez)
 Future<void> _migrateFromEnvIfAvailable(ApiKeysManager apiKeysManager) async {
   try {
     final geminiKey = dotenv.env['GEMINI_API_KEY'];

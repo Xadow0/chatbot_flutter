@@ -15,6 +15,7 @@ class OllamaService {
   late String _baseUrl;
   final String? _apiKey;
   final Duration _timeout = const Duration(seconds: 60);
+  final List<ChatMessage> _conversationHistory = [];
   
   // Estado de conexión
   ConnectionInfo _connectionInfo = ConnectionInfo(
@@ -584,5 +585,46 @@ class OllamaService {
       'num_predict': maxTokens,
     },
   );
+}
+  /// Limpiar historial de conversación
+void clearConversation() {
+  _conversationHistory.clear();
+  debugPrint('🧹 [OllamaService] Historial de conversación limpiado');
+}
+
+/// Genera contenido con historial (chat contextual)
+Future<String> generateContentContext(
+  String prompt, {
+  String model = 'phi3:latest',
+  double temperature = 0.7,
+  int maxTokens = 2048,
+}) async {
+  debugPrint('💬 [OllamaService] generateContentContext llamado');
+  debugPrint('   🤖 Modelo: $model');
+  debugPrint('   🧠 Mensajes previos: ${_conversationHistory.length}');
+  debugPrint('   💬 Prompt actual: $prompt');
+
+  // Agregar nuevo mensaje del usuario al historial
+  _conversationHistory.add(ChatMessage(role: 'user', content: prompt));
+
+  try {
+    final responseText = await chatWithHistory(
+      model: model,
+      messages: _conversationHistory,
+      options: {
+        'temperature': temperature,
+        'num_predict': maxTokens,
+      },
+    );
+
+    // Agregar respuesta del modelo al historial
+    _conversationHistory.add(ChatMessage(role: 'assistant', content: responseText));
+
+    debugPrint('🧠 [OllamaService] Historial actualizado: ${_conversationHistory.length} mensajes');
+    return responseText;
+  } catch (e) {
+    debugPrint('❌ [OllamaService] Error en generateContentContext: $e');
+    throw OllamaException('Error generando contenido con historial: $e');
+  }
 }
 }

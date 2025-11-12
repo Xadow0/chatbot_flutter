@@ -1,85 +1,100 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
-// 🔐 MODIFICADO: Importar ApiKeysManager en lugar de dotenv
 import 'api_keys_manager.dart';
 
 class GeminiService {
-  // Cambia la versión de la API a v1 (no v1beta)
   static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1';
-  // Puedes usar 'gemini-2.5-flash' o 'gemini-pro' según disponibilidad
   static const String _model = 'gemini-2.5-flash';
   
-  // 🔐 MODIFICADO: Ya no cargamos la key en el constructor
   final ApiKeysManager _apiKeysManager = ApiKeysManager();
   String? _cachedApiKey;
+
+  /// Historial de conversación (contexto persistente por sesión)
+  final List<Map<String, dynamic>> _conversationHistory = [];
 
   GeminiService() {
     debugPrint('🔵 [GeminiService] Servicio inicializado');
   }
 
-  /// 🔐 NUEVO: Obtener la API key desde el almacenamiento seguro
   Future<String> _getApiKey() async {
-    // Usar caché si está disponible
     if (_cachedApiKey != null && _cachedApiKey!.isNotEmpty) {
       return _cachedApiKey!;
     }
 
-    // Cargar desde storage seguro
     final key = await _apiKeysManager.getApiKey(ApiKeysManager.geminiApiKeyName);
-    
     if (key == null || key.isEmpty) {
-      throw Exception(
-        'GEMINI_API_KEY no configurada. '
-        'Por favor, configura tu API key en Ajustes.'
-      );
+      throw Exception('GEMINI_API_KEY no configurada. Configúrala en Ajustes.');
     }
 
-    // Cachear la key
     _cachedApiKey = key;
-    debugPrint('✅ [GeminiService] API key cargada correctamente');
     return key;
   }
 
-  /// 🔐 NUEVO: Limpiar caché de API key (útil después de cambiar la key)
   void clearApiKeyCache() {
     _cachedApiKey = null;
-    debugPrint('🗑️ [GeminiService] Caché de API key limpiada');
   }
 
-  /// 🔐 NUEVO: Verificar si el servicio está disponible
   Future<bool> isAvailable() async {
     try {
       final key = await _apiKeysManager.getApiKey(ApiKeysManager.geminiApiKeyName);
       return key != null && key.isNotEmpty;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
-  /// Genera contenido usando Gemini
+  /// Petición SIN historial (prompt aislado)
   Future<String> generateContent(String prompt) async {
+    return _sendRequest(
+      contents: [
+        {
+          'role': 'user',
+          'parts': [{'text': prompt}]
+        }
+      ],
+    );
+  }
+
+  /// NUEVO: Petición CON historial (mantiene contexto)
+  Future<String> generateContentContext(String prompt) async {
+    debugPrint('💬 [GeminiService] generateContentContext llamado');
+
+    // Añadimos el nuevo turno del usuario al historial
+    _conversationHistory.add({
+      'role': 'user',
+      'parts': [{'text': prompt}],
+    });
+
+    // Enviamos todo el historial (hasta ahora)
+    final responseText = await _sendRequest(contents: _conversationHistory);
+
+    // Añadimos la respuesta del modelo al historial
+    _conversationHistory.add({
+      'role': 'model',
+      'parts': [{'text': responseText}],
+    });
+
+    return responseText;
+  }
+
+  /// Limpiar historial de conversación
+  void clearConversation() {
+    _conversationHistory.clear();
+    debugPrint('🧹 [GeminiService] Historial de conversación limpiado');
+  }
+
+  /// --- MÉTODO INTERNO COMÚN PARA ENVIAR A LA API ---
+  Future<String> _sendRequest({required List<Map<String, dynamic>> contents}) async {
     try {
-      // 🔐 MODIFICADO: Obtener la API key desde storage seguro
       final apiKey = await _getApiKey();
-      
-      final url = Uri.parse(
-        '$_baseUrl/models/$_model:generateContent?key=$apiKey',
-      );
+      final url = Uri.parse('$_baseUrl/models/$_model:generateContent?key=$apiKey');
 
       final response = await http.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt}
-              ]
-            }
-          ],
+          'contents': contents,
           'generationConfig': {
             'temperature': 0.7,
             'topK': 40,
@@ -109,24 +124,17 @@ class GeminiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('Respuesta cruda de Gemini: $data');
-        
-        if (data['candidates'] != null && data['candidates'].isNotEmpty) {
-          final candidate = data['candidates'][0];
-          if (candidate['content'] != null && 
-              candidate['content']['parts'] != null &&
-              candidate['content']['parts'].isNotEmpty) {
-            return candidate['content']['parts'][0]['text'] ?? 'Sin respuesta';
+        if (data['candidates'] != null &&
+            data['candidates'].isNotEmpty &&
+            data['candidates'][0]['content'] != null) {
+          final parts = data['candidates'][0]['content']['parts'];
+          if (parts != null && parts.isNotEmpty) {
+            return parts[0]['text'] ?? 'Sin respuesta';
           }
         }
-        
         return 'No se pudo obtener una respuesta válida';
       } else if (response.statusCode == 401) {
-        // 🔐 NUEVO: Error de autenticación específico
-        throw Exception(
-          'API Key de Gemini inválida o expirada. '
-          'Por favor, verifica tu clave en Ajustes.'
-        );
+        throw Exception('API Key de Gemini inválida o expirada.');
       } else {
         final error = jsonDecode(response.body);
         throw Exception('Error de API: ${error['error']['message']}');
@@ -137,10 +145,8 @@ class GeminiService {
     }
   }
 
-  /// Genera contenido en streaming (para futuras implementaciones)
+  /// Placeholder para streaming
   Stream<String> generateContentStream(String prompt) async* {
-    // TODO: Implementar streaming para respuestas en tiempo real
-    final response = await generateContent(prompt);
-    yield response;
+    yield await generateContent(prompt);
   }
 }

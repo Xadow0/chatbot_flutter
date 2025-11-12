@@ -269,4 +269,48 @@ class OpenAIService {
       return null;
     }
   }
+
+    /// ===========================================================================
+  /// 🔄 NUEVO: Historial persistente de conversación (similar a GeminiService)
+  /// ===========================================================================
+  final List<Map<String, String>> _conversationHistory = [];
+
+  /// Genera contenido manteniendo el contexto conversacional.
+  /// Usa internamente chatWithHistory() pero persiste el historial entre llamadas.
+  Future<String> generateContentContext(
+    String prompt, {
+    String? model,
+    double temperature = 0.7,
+    int maxTokens = 4096,
+  }) async {
+    debugPrint('💬 [OpenAIService] generateContentContext llamado');
+
+    // 1️⃣ Añadimos el turno del usuario al historial
+    _conversationHistory.add({
+      'role': 'user',
+      'content': prompt,
+    });
+
+    // 2️⃣ Enviamos todo el historial acumulado
+    final responseText = await chatWithHistory(
+      messages: List<Map<String, String>>.from(_conversationHistory),
+      model: model,
+      temperature: temperature,
+      maxTokens: maxTokens,
+    );
+
+    // 3️⃣ Guardamos la respuesta del asistente en el historial
+    _conversationHistory.add({
+      'role': 'assistant',
+      'content': responseText,
+    });
+
+    return responseText;
+  }
+
+  /// 🔄 Limpiar historial de conversación (como en Gemini)
+  void clearConversation() {
+    _conversationHistory.clear();
+    debugPrint('🧹 [OpenAIService] Historial de conversación limpiado');
+  }
 }

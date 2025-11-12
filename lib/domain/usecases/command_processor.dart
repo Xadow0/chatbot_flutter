@@ -284,14 +284,9 @@ class CommandProcessor {
       return CommandResult.success(CommandType.evaluarPrompt, response);
     } catch (e) {
       debugPrint('   ❌ Error procesando comando: $e');
-      
-      // ===================================================================
-      // ▼▼▼ MODIFICACIÓN CRÍTICA ▼▼▼
-      // ===================================================================
-      // En lugar de devolver un CommandResult.error, relanzamos la excepción
-      // para que ChatProvider pueda capturarla y reaccionar.
+
       rethrow;
-      // ===================================================================
+      
     }
   }
 
@@ -339,12 +334,7 @@ class CommandProcessor {
     } catch (e) {
       debugPrint('   ❌ Error procesando comando: $e');
       
-      // ===================================================================
-      // ▼▼▼ MODIFICACIÓN CRÍTICA ▼▼▼
-      // ===================================================================
-      // Relanzamos la excepción también aquí.
       rethrow;
-      // ===================================================================
     }
   }
     /// Procesa el comando "/resumir" usando la IA seleccionada SIN HISTORIAL

@@ -69,13 +69,14 @@ class ChatProvider extends ChangeNotifier {
   ChatProvider({
     required ChatRepository chatRepository,
     required ConversationRepository conversationRepository,
-  })  : _chatRepository = chatRepository,
-        _conversationRepository = conversationRepository {
-    // Inicializar servicios
-    _geminiService = GeminiService();
-    _ollamaService = OllamaService();
-    _openaiService = OpenAIService();
-    _localOllamaService = OllamaManagedService();
+    required AIServiceSelector aiServiceSelector,
+  })  :  _chatRepository = chatRepository,
+      _conversationRepository = conversationRepository,
+      _aiSelector = aiServiceSelector,
+      _geminiService = aiServiceSelector.geminiService,
+      _ollamaService = aiServiceSelector.ollamaService,
+      _openaiService = aiServiceSelector.openaiService,
+      _localOllamaService = aiServiceSelector.localOllamaService {
 
     // Crear adaptadores
     _geminiAdapter = GeminiServiceAdapter(_geminiService);
@@ -84,13 +85,6 @@ class ChatProvider extends ChangeNotifier {
     _localOllamaAdapter = LocalOllamaServiceAdapter(_localOllamaService);
 
     _preferencesService = PreferencesService();
-
-    _aiSelector = AIServiceSelector(
-      geminiService: _geminiService,
-      ollamaService: _ollamaService,
-      openaiService: _openaiService,
-      localOllamaService: _localOllamaService,
-    );
 
     // Suscribirse a los cambios del selector
     _aiSelector.addListener(_onAiSelectorChanged);
@@ -104,7 +98,7 @@ class ChatProvider extends ChangeNotifier {
     );
 
     // Inicializar modelos y agregar mensaje de bienvenida
-    _initializeModels().then((_) => _addWelcomeMessage());
+    _initializeModels();
   }
 
   // ===================================================================
