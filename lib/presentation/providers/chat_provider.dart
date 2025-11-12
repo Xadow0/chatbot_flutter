@@ -741,11 +741,46 @@ class ChatProvider extends ChangeNotifier {
     _messages.clear();
     _isNewConversation = true;
 
+    _clearAIServiceHistory();
+
     _addWelcomeMessage();
     notifyListeners();
 
     debugPrint('   ✅ Mensajes limpiados');
   }
+
+  /// Limpia el historial de conversación en todos los servicios de IA
+void _clearAIServiceHistory() {
+  debugPrint('🧹 [ChatProvider] Limpiando historial de servicios de IA...');
+  
+  try {
+    _geminiService.clearConversation();
+    debugPrint('   ✅ Historial de Gemini limpiado');
+  } catch (e) {
+    debugPrint('   ⚠️ Error limpiando Gemini: $e');
+  }
+  
+  try {
+    _openaiService.clearConversation();
+    debugPrint('   ✅ Historial de OpenAI limpiado');
+  } catch (e) {
+    debugPrint('   ⚠️ Error limpiando OpenAI: $e');
+  }
+  
+  try {
+    _ollamaService.clearConversation();
+    debugPrint('   ✅ Historial de Ollama (remoto) limpiado');
+  } catch (e) {
+    debugPrint('   ⚠️ Error limpiando Ollama: $e');
+  }
+  
+  try {
+    _localOllamaService.clearConversation();
+    debugPrint('   ✅ Historial de Ollama Local limpiado');
+  } catch (e) {
+    debugPrint('   ⚠️ Error limpiando Ollama Local: $e');
+  }
+}
 
   Future<void> loadConversation(File file) async {
     debugPrint('📂 [ChatProvider] Cargando conversación desde archivo...');
