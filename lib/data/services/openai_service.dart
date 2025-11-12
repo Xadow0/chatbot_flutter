@@ -313,4 +313,22 @@ class OpenAIService {
     _conversationHistory.clear();
     debugPrint('🧹 [OpenAIService] Historial de conversación limpiado');
   }
+
+  /// Añadir mensaje del usuario al historial (sin enviar request)
+void addUserMessage(String content) {
+  _conversationHistory.add({
+    'role': 'user',
+    'content': content,
+  });
+  debugPrint('📝 [OpenAIService] Mensaje de usuario añadido al historial');
+}
+
+/// Añadir mensaje del bot al historial (sin enviar request)
+void addBotMessage(String content) {
+  _conversationHistory.add({
+    'role': 'assistant',
+    'content': content,
+  });
+  debugPrint('📝 [OpenAIService] Mensaje del bot añadido al historial');
+}
 }

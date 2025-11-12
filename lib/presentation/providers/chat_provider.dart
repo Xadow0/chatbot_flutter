@@ -37,6 +37,7 @@ class ChatProvider extends ChangeNotifier {
   // Esto se usa para bloquear la selección temporalmente cuando el servidor
   // remoto se desconecta y la app cambia automáticamente a Gemini.
   bool _ollamaSelectable = true;
+  bool _needsHistoryLoad = false;
 
   late SendMessageUseCase _sendMessageUseCase; // No final - se actualiza al cambiar proveedor
   late final AIServiceSelector _aiSelector;
@@ -455,8 +456,23 @@ class ChatProvider extends ChangeNotifier {
     // ▲▲▲ FIN DE LA MODIFICACIÓN ▲▲▲
     // ===================================================================
 
+    // 🆕 Si hay historial pendiente de cargar, cargarlo en el nuevo proveedor
+    if (_needsHistoryLoad && _currentProvider != provider) {
+      debugPrint('   📚 Detectado cambio de proveedor con historial pendiente');
+      debugPrint('   🔄 Cargando historial en el nuevo proveedor: $provider');
+      
+      // Cambiar temporalmente el proveedor para cargar el historial
+      final oldProvider = _currentProvider;
+      _currentProvider = provider;
+      
+      _loadHistoryIntoAIService(_messages);
+      _needsHistoryLoad = false;
+      
+      debugPrint('   ✅ Historial transferido de $oldProvider a $provider');
+    }
+    
     _currentProvider = provider;
-    _aiSelector.setProvider(provider);
+    await _aiSelector.setProvider(provider);
     _updateCommandProcessor();
     
     // Guardar preferencia
@@ -592,6 +608,13 @@ class ChatProvider extends ChangeNotifier {
     debugPrint(
         '   💬 Contenido: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
     debugPrint('   🤖 Proveedor actual: $_currentProvider');
+
+    // 🆕 CARGAR HISTORIAL SI ES NECESARIO (conversación cargada desde archivo)
+    if (_needsHistoryLoad) {
+      debugPrint('   📚 Cargando historial en el proveedor actual antes de enviar...');
+      _loadHistoryIntoAIService(_messages);
+      _needsHistoryLoad = false;
+    }
 
     // Log del modelo según el proveedor
     switch (_currentProvider) {
@@ -740,6 +763,7 @@ class ChatProvider extends ChangeNotifier {
     }
     _messages.clear();
     _isNewConversation = true;
+    _needsHistoryLoad = false;
 
     _clearAIServiceHistory();
 
@@ -794,6 +818,8 @@ void _clearAIServiceHistory() {
 
     _isNewConversation = false;
 
+    _needsHistoryLoad = true;
+
     _updateQuickResponses();
     notifyListeners();
 
@@ -808,4 +834,104 @@ void _clearAIServiceHistory() {
     _aiSelector.dispose();
     super.dispose();
   }
+
+  /// Carga el historial de mensajes en el servicio de IA actual
+void _loadHistoryIntoAIService(List<MessageEntity> messages) {
+  debugPrint('📚 [ChatProvider] Cargando historial en servicio de IA...');
+  debugPrint('   🎯 Proveedor actual: $_currentProvider');
+  debugPrint('   📝 Mensajes a cargar: ${messages.length}');
+  
+  switch (_currentProvider) {
+    case AIProvider.gemini:
+      _loadGeminiHistory(messages);
+      break;
+    case AIProvider.openai:
+      _loadOpenAIHistory(messages);
+      break;
+    case AIProvider.ollama:
+      _loadOllamaHistory(messages);
+      break;
+    case AIProvider.localOllama:
+      _loadLocalOllamaHistory(messages);
+      break;
+  }
+}
+
+/// Carga historial en Gemini
+void _loadGeminiHistory(List<MessageEntity> messages) {
+  try {
+    // Primero limpiar historial existente
+    _geminiService.clearConversation();
+    
+    // Reconstruir historial mensaje por mensaje
+    for (final message in messages) {
+      if (message.type == MessageTypeEntity.user) {
+        _geminiService.addUserMessage(message.content);
+      } else if (message.type == MessageTypeEntity.bot) {
+        _geminiService.addBotMessage(message.content);
+      }
+    }
+    
+    debugPrint('   ✅ Historial de Gemini cargado: ${messages.length} mensajes');
+  } catch (e) {
+    debugPrint('   ⚠️ Error cargando historial en Gemini: $e');
+  }
+}
+
+/// Carga historial en OpenAI
+void _loadOpenAIHistory(List<MessageEntity> messages) {
+  try {
+    _openaiService.clearConversation();
+    
+    for (final message in messages) {
+      if (message.type == MessageTypeEntity.user) {
+        _openaiService.addUserMessage(message.content);
+      } else if (message.type == MessageTypeEntity.bot) {
+        _openaiService.addBotMessage(message.content);
+      }
+    }
+    
+    debugPrint('   ✅ Historial de OpenAI cargado: ${messages.length} mensajes');
+  } catch (e) {
+    debugPrint('   ⚠️ Error cargando historial en OpenAI: $e');
+  }
+}
+
+/// Carga historial en Ollama (remoto)
+void _loadOllamaHistory(List<MessageEntity> messages) {
+  try {
+    _ollamaService.clearConversation();
+    
+    for (final message in messages) {
+      if (message.type == MessageTypeEntity.user) {
+        _ollamaService.addUserMessage(message.content);
+      } else if (message.type == MessageTypeEntity.bot) {
+        _ollamaService.addBotMessage(message.content);
+      }
+    }
+    
+    debugPrint('   ✅ Historial de Ollama cargado: ${messages.length} mensajes');
+  } catch (e) {
+    debugPrint('   ⚠️ Error cargando historial en Ollama: $e');
+  }
+}
+
+/// Carga historial en Ollama Local
+void _loadLocalOllamaHistory(List<MessageEntity> messages) {
+  try {
+    _localOllamaService.clearConversation();
+    
+    for (final message in messages) {
+      if (message.type == MessageTypeEntity.user) {
+        _localOllamaService.addUserMessage(message.content);
+      } else if (message.type == MessageTypeEntity.bot) {
+        _localOllamaService.addBotMessage(message.content);
+      }
+    }
+    
+    debugPrint('   ✅ Historial de Ollama Local cargado: ${messages.length} mensajes');
+  } catch (e) {
+    debugPrint('   ⚠️ Error cargando historial en Ollama Local: $e');
+  }
+}
 }

@@ -149,4 +149,22 @@ class GeminiService {
   Stream<String> generateContentStream(String prompt) async* {
     yield await generateContent(prompt);
   }
+
+  /// Añadir mensaje del usuario al historial (sin enviar request)
+void addUserMessage(String content) {
+  _conversationHistory.add({
+    'role': 'user',
+    'parts': [{'text': content}],
+  });
+  debugPrint('📝 [GeminiService] Mensaje de usuario añadido al historial');
+}
+
+/// Añadir mensaje del bot al historial (sin enviar request)
+void addBotMessage(String content) {
+  _conversationHistory.add({
+    'role': 'model',
+    'parts': [{'text': content}],
+  });
+  debugPrint('📝 [GeminiService] Mensaje del bot añadido al historial');
+}
 }

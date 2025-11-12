@@ -574,12 +574,6 @@ class OllamaManagedService {
       // Convertir historial al formato de Ollama
       final messages = <Map<String, String>>[];
       
-      // Agregar mensaje de sistema
-      messages.add({
-        'role': 'system',
-        'content': 'Eres un asistente de IA útil y educativo.',
-      });
-      
       // Agregar historial
       messages.addAll(history);
       
@@ -842,4 +836,21 @@ class OllamaManagedService {
     debugPrint('🧹 [OllamaManaged] Historial de conversación limpiado');
   }
 
+  /// Añadir mensaje del usuario al historial
+  void addUserMessage(String content) {
+    _conversationHistory.add({
+      'role': 'user',
+      'content': content,
+    });
+    debugPrint('📝 [LocalOllamaService] Mensaje de usuario añadido al historial');
+  }
+
+  /// Añadir mensaje del bot al historial
+  void addBotMessage(String content) {
+    _conversationHistory.add({
+      'role': 'assistant',
+      'content': content,
+    });
+    debugPrint('📝 [LocalOllamaService] Mensaje del bot añadido al historial');
+  }
 }
