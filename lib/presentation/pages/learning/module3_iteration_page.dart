@@ -230,7 +230,7 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
 
       await _addMessage(_ChatMessage(text: response, isUser: false, isAnimated: true));
       if (mounted) {
-        // mark this iteration complete
+        // marca esta iteracion como completa
         setState(() => _exerciseComplete = true);
       }
     } catch (e) {
@@ -262,7 +262,6 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
       };
       await file.writeAsString(jsonEncode(conversationData));
     } catch (e) {
-      // ignore: avoid_print
       print('Error al guardar conversación: $e');
     }
   }
@@ -289,19 +288,19 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
             padding: const EdgeInsets.all(16),
             child: ElevatedButton(
               onPressed: () async {
-                // Move to next iteration in the same chat if available
+                // Ir a la siguiente iteración si hay más o finalizar módulo
                 if (_currentIterationIndex < _sequence.length - 1) {
                   setState(() {
                     _currentIterationIndex++;
                     _exerciseComplete = false;
                     _waitingForUserInput = false;
                   });
-                  // add the next title and start its flow
+                  // añadir el siguiente título e iniciar flujo
                   await _addMessage(_ChatMessage(text: _getTitleText(), isUser: false, isAnimated: true, isTitle: true));
                   await Future.delayed(const Duration(milliseconds: 300));
                   await _startConversationFlow();
                 } else {
-                  // last iteration finished: call parent completion
+                  // última iteracion acabada, finalizar módulo
                   widget.onNext();
                 }
               },
@@ -366,7 +365,7 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
                   text: message.text,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                   onComplete: () {
-                    // mark animation complete and signal awaiting code
+                    // marcar completa la animación para que no se repita al hacer scroll
                     message.animationCompleter?.complete();
                     if (mounted) setState(() => message.isAnimated = false);
                   },

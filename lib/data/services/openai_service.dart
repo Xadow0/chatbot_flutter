@@ -1,14 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
-// 🔐 MODIFICADO: Importar ApiKeysManager en lugar de dotenv
 import 'api_keys_manager.dart';
 
 class OpenAIService {
   static const String _baseUrl = 'https://api.openai.com/v1';
-  static const String _defaultModel = 'gpt-4o-mini'; // Modelo más económico y rápido
+  static const String _defaultModel = 'gpt-4o-mini'; 
   
-  // 🔐 MODIFICADO: Ya no cargamos la key en el constructor
+  // Ya no cargamos la key en el constructor
   final ApiKeysManager _apiKeysManager = ApiKeysManager();
   String? _cachedApiKey;
 
@@ -16,7 +15,7 @@ class OpenAIService {
     debugPrint('🔵 [OpenAIService] Servicio inicializado');
   }
 
-  /// 🔐 NUEVO: Obtener la API key desde el almacenamiento seguro
+  /// Obtener la API key desde el almacenamiento seguro
   Future<String> _getApiKey() async {
     // Usar caché si está disponible
     if (_cachedApiKey != null && _cachedApiKey!.isNotEmpty) {
@@ -39,13 +38,13 @@ class OpenAIService {
     return key;
   }
 
-  /// 🔐 NUEVO: Limpiar caché de API key (útil después de cambiar la key)
+  /// Limpiar caché de API key (útil después de cambiar la key)
   void clearApiKeyCache() {
     _cachedApiKey = null;
     debugPrint('🗑️ [OpenAIService] Caché de API key limpiada');
   }
 
-  /// 🔐 NUEVO: Verificar si el servicio está disponible
+  /// Verificar si el servicio está disponible
   Future<bool> isAvailable() async {
     try {
       final key = await _apiKeysManager.getApiKey(ApiKeysManager.openaiApiKeyName);
@@ -71,7 +70,7 @@ class OpenAIService {
     int maxTokens = 4096,
   }) async {
     try {
-      // 🔐 MODIFICADO: Obtener la API key desde storage seguro
+      // Obtener la API key desde storage seguro
       final apiKey = await _getApiKey();
 
       debugPrint('🔵 [OpenAIService] === INICIANDO GENERACIÓN ===');
@@ -133,7 +132,7 @@ class OpenAIService {
         throw Exception('No se pudo obtener una respuesta válida de OpenAI');
       } else if (response.statusCode == 401) {
         debugPrint('   ❌ Error 401: API Key inválida');
-        // 🔐 NUEVO: Error de autenticación específico
+        // Error de autenticación específico
         throw Exception(
           'API Key de OpenAI inválida o expirada. '
           'Por favor, verifica tu clave en Ajustes.'
@@ -172,7 +171,7 @@ class OpenAIService {
     int maxTokens = 4096,
   }) async {
     try {
-      // 🔐 MODIFICADO: Obtener la API key desde storage seguro
+      // Obtener la API key desde storage seguro
       final apiKey = await _getApiKey();
 
       debugPrint('💬 [OpenAIService] === INICIANDO CHAT ===');
@@ -270,9 +269,7 @@ class OpenAIService {
     }
   }
 
-    /// ===========================================================================
-  /// 🔄 NUEVO: Historial persistente de conversación (similar a GeminiService)
-  /// ===========================================================================
+  /// Historial de conversación para mantener contexto
   final List<Map<String, String>> _conversationHistory = [];
 
   /// Genera contenido manteniendo el contexto conversacional.
@@ -285,13 +282,13 @@ class OpenAIService {
   }) async {
     debugPrint('💬 [OpenAIService] generateContentContext llamado');
 
-    // 1️⃣ Añadimos el turno del usuario al historial
+    // Añadimos el turno del usuario al historial
     _conversationHistory.add({
       'role': 'user',
       'content': prompt,
     });
 
-    // 2️⃣ Enviamos todo el historial acumulado
+    // Enviamos todo el historial acumulado
     final responseText = await chatWithHistory(
       messages: List<Map<String, String>>.from(_conversationHistory),
       model: model,
@@ -299,7 +296,7 @@ class OpenAIService {
       maxTokens: maxTokens,
     );
 
-    // 3️⃣ Guardamos la respuesta del asistente en el historial
+    // Guardamos la respuesta del asistente en el historial
     _conversationHistory.add({
       'role': 'assistant',
       'content': responseText,
@@ -308,7 +305,7 @@ class OpenAIService {
     return responseText;
   }
 
-  /// 🔄 Limpiar historial de conversación (como en Gemini)
+  /// Limpiar historial de conversación (como en Gemini)
   void clearConversation() {
     _conversationHistory.clear();
     debugPrint('🧹 [OpenAIService] Historial de conversación limpiado');

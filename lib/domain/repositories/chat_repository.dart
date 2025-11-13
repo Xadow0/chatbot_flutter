@@ -1,4 +1,3 @@
-// lib/domain/repositories/chat_repository.dart
 import '../entities/message_entity.dart';
 
 /// Interfaz del repositorio para manejar operaciones de chat.

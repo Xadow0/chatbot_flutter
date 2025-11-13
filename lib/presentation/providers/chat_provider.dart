@@ -95,24 +95,19 @@ class ChatProvider extends ChangeNotifier {
 
     _sendMessageUseCase = SendMessageUseCase(
       commandProcessor: _commandProcessor,
-      chatRepository: _chatRepository, // <- Inyectar aquí
+      chatRepository: _chatRepository,
     );
 
-    // Inicializar modelos y agregar mensaje de bienvenida
     _initializeModels();
   }
 
-  // ===================================================================
-  // ▼▼▼ MODIFICACIÓN 1: Cambiar la firma a 'async' ▼▼▼
-  // ===================================================================
   /// Escucha los cambios de AIServiceSelector y notifica a los listeners de ChatProvider
   Future<void> _onAiSelectorChanged() async {
     debugPrint('🔄 [ChatProvider] AIServiceSelector notificó cambios, actualizando UI...');
 
     // 1. Sincronizar la lista de modelos disponibles
     if (_aiSelector.ollamaAvailable) {
-      // Si el selector indica que Ollama está disponible, asegurarnos
-      // de que la UI pueda seleccionarlo (desbloquear selección).
+      // Si el selector indica que Ollama está disponible, desbloquear la selección
       if (!_ollamaSelectable) {
         _ollamaSelectable = true;
         debugPrint('   🔓 Ollama disponible: desbloqueando selección en la UI');
@@ -163,10 +158,6 @@ class ChatProvider extends ChangeNotifier {
         debugPrint('   🔒 Bloqueando selección de Ollama en la UI (desconectado)');
       }
 
-      // ===================================================================
-      // ▼▼▼ MODIFICACIÓN 2: Usar 'await' para el cambio de proveedor ▼▼▼
-      // ===================================================================
-
       // 5. VERIFICAR SI OLLAMA (Remoto) ERA EL PROVEEDOR ACTIVO
       if (_currentProvider == AIProvider.ollama) {
         debugPrint('   ⚠️ ¡Ollama (remoto) era el proveedor activo y se ha desconectado!');
@@ -183,20 +174,12 @@ class ChatProvider extends ChangeNotifier {
         // El notifyListeners() del final se encargará de actualizar la UI
         // con el proveedor ya cambiado y el mensaje nuevo.
       }
-      // ===================================================================
-      // ▲▲▲ FIN DE LA MODIFICACIÓN ▲▲▲
-      // ===================================================================
     }
 
     // Notificar a la UI (ModelSelectorBubble) para que se reconstruya
-    // Con la lógica 'await' de arriba, esta notificación es AHORA
-    // 100% segura y reflejará el estado correcto.
+    // Con la lógica 'await' de arriba
     notifyListeners();
   }
-
-  // ===================================================================
-  // ▼▼▼ NUEVO MÉTODO AÑADIDO (de la vez anterior, sin cambios) ▼▼▼
-  // ===================================================================
 
   /// Añade un mensaje de error al chat cuando Ollama (remoto) se desconecta
   void _addOllamaConnectionErrorMessage() {
@@ -413,10 +396,6 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> selectProvider(AIProvider provider) async {
     debugPrint('🔄 [ChatProvider] Cambiando proveedor a: $provider');
-
-    // ===================================================================
-    // ▼▼▼ LÓGICA DE SELECCIÓN MODIFICADA ▼▼▼
-    // ===================================================================
     
     // Si el proveedor es Ollama y no está disponible, NO cambiar a Gemini
     // automáticamente aquí. El usuario debe reintentar.
@@ -451,12 +430,8 @@ class ChatProvider extends ChangeNotifier {
       debugPrint('   ❌ Proveedor $provider no disponible');
       return;
     }
-    
-    // ===================================================================
-    // ▲▲▲ FIN DE LA MODIFICACIÓN ▲▲▲
-    // ===================================================================
 
-    // 🆕 Si hay historial pendiente de cargar, cargarlo en el nuevo proveedor
+    // Si hay historial pendiente de cargar, cargarlo en el nuevo proveedor
     if (_needsHistoryLoad && _currentProvider != provider) {
       debugPrint('   📚 Detectado cambio de proveedor con historial pendiente');
       debugPrint('   🔄 Cargando historial en el nuevo proveedor: $provider');
@@ -511,12 +486,7 @@ class ChatProvider extends ChangeNotifier {
       // El stream habrá notificado al AIServiceSelector,
       // y el AIServiceSelector habrá notificado a este ChatProvider
       // (via _onAiSelectorChanged).
-      
-      // Por lo tanto, _aiSelector.ollamaAvailable ya estará actualizado.
-      // Es posible que la actualización del AIServiceSelector sea asíncrona y
-      // aún no se haya reflejado inmediatamente tras el reconnect().
-      // Esperamos un breve periodo (poll) para que el selector procese el
-      // nuevo estado antes de considerar la reconexión fallida.
+
       const int maxAttempts = 10; // poll attempts
       const Duration interval = Duration(milliseconds: 300);
       int attempts = 0;
@@ -553,8 +523,7 @@ class ChatProvider extends ChangeNotifier {
     }
   }
   
-  // Este método es para el "pull-to-refresh" o similar,
-  // ahora solo redirige al nuevo.
+  // Redirige al nuevo metodo para probar la conexión
   Future<void> refreshConnection() async {
     await retryOllamaConnection();
   }
@@ -609,7 +578,7 @@ class ChatProvider extends ChangeNotifier {
         '   💬 Contenido: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
     debugPrint('   🤖 Proveedor actual: $_currentProvider');
 
-    // 🆕 CARGAR HISTORIAL SI ES NECESARIO (conversación cargada desde archivo)
+    // CARGAR HISTORIAL SI ES NECESARIO (conversación cargada desde archivo)
     if (_needsHistoryLoad) {
       debugPrint('   📚 Cargando historial en el proveedor actual antes de enviar...');
       _loadHistoryIntoAIService(_messages);
@@ -664,9 +633,6 @@ class ChatProvider extends ChangeNotifier {
 
       String errorMessage = '❌ Error: ${e.toString()}';
 
-      // ===================================================================
-      // ▼▼▼ LÓGICA DE ERROR DE ENVÍO MODIFICADA ▼▼▼
-      // ===================================================================
       if (_currentProvider == AIProvider.ollama) {
         errorMessage += '\n\n💡 El servidor Ollama remoto no está disponible.\n'
                        'Cambiando automáticamente a Gemini...';
@@ -719,11 +685,6 @@ class ChatProvider extends ChangeNotifier {
         );
         _messages.add(errorEntity);
       }
-      
-      // ===================================================================
-      // ▲▲▲ FIN DE LA SECCIÓN DE ERROR ▲▲▲
-      // ===================================================================
-
     } finally {
       _isProcessing = false;
       _updateQuickResponses();

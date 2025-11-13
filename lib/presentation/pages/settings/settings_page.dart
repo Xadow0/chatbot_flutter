@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// 🔐 NUEVO: Importar las rutas para navegación
 import '../../../config/routes.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -22,7 +21,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       body: ListView(
         children: [
-          // 🔐 NUEVO: Sección de API Keys
+          // Sección de API Keys
           _buildSection(
             title: 'API Keys',
             children: [

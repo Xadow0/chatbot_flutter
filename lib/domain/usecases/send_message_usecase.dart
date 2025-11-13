@@ -1,6 +1,5 @@
-// lib/domain/usecases/send_message_usecase.dart
 import '../../domain/entities/message_entity.dart';
-import '../../domain/repositories/chat_repository.dart'; // <- Importar la interfaz
+import '../../domain/repositories/chat_repository.dart'; 
 import 'command_processor.dart';
 
 /// Caso de uso que decide cómo procesar un mensaje:
@@ -8,11 +7,11 @@ import 'command_processor.dart';
 /// - Si NO contiene un comando, delega al ChatRepository para una respuesta (ej: eco local).
 class SendMessageUseCase {
   final CommandProcessor _commandProcessor;
-  final ChatRepository _chatRepository; // <- Añadir dependencia
+  final ChatRepository _chatRepository; 
 
   SendMessageUseCase({
     required CommandProcessor commandProcessor,
-    required ChatRepository chatRepository, // <- Añadir al constructor
+    required ChatRepository chatRepository, 
   })  : _commandProcessor = commandProcessor,
         _chatRepository = chatRepository;
 
@@ -48,5 +47,4 @@ class SendMessageUseCase {
     }
   }
 
-  // (El método _generateLocalResponse() se elimina de aquí)
 }

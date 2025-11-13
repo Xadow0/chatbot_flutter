@@ -68,7 +68,7 @@ class AIServiceSelector extends ChangeNotifier {
   List<String> get availableOpenAIModels => OpenAIService.availableModels;
   bool get ollamaAvailable => _ollamaAvailable;
   
-  // 🔐 CORREGIDO: Ahora devuelve el valor cacheado (bool) en lugar de Future<bool>
+  // Devuelve el valor cacheado (bool) en lugar de Future<bool>
   bool get openaiAvailable => _openaiAvailable;
   
   OllamaService get ollamaService => _ollamaService;
@@ -91,7 +91,7 @@ class AIServiceSelector extends ChangeNotifier {
     notifyListeners();
   }
   
-  // 🔐 NUEVO: Método para refrescar la disponibilidad de OpenAI
+  // Método para refrescar la disponibilidad de OpenAI
   Future<void> refreshOpenAIAvailability() async {
     try {
       debugPrint('🔄 [AIServiceSelector] Verificando disponibilidad de OpenAI...');
@@ -123,7 +123,7 @@ class AIServiceSelector extends ChangeNotifier {
     
     await _initializeOllama();
     
-    // 🔐 NUEVO: Inicializar disponibilidad de OpenAI
+    // Inicializar disponibilidad de OpenAI
     await _initializeOpenAI();
     
     debugPrint('✅ [AIServiceSelector] Servicios inicializados');
@@ -175,7 +175,7 @@ class AIServiceSelector extends ChangeNotifier {
     notifyListeners();
   }
   
-  // 🔐 NUEVO: Inicializar disponibilidad de OpenAI
+  // Inicializar disponibilidad de OpenAI
   Future<void> _initializeOpenAI() async {
     try {
       debugPrint('🔷 [AIServiceSelector] Inicializando OpenAI...');
@@ -238,9 +238,6 @@ class AIServiceSelector extends ChangeNotifier {
       debugPrint('📋 [AIServiceSelector] Cargando modelos de Ollama remoto...');
       _availableModels = await _ollamaService.getModels();
       
-      // =========================================================
-      // ✅ CORRECCIÓN N° 3: Lógica de selección de modelo
-      // =========================================================
       if (_availableModels.isNotEmpty) {
         final modelExists = _availableModels.any((m) => m.name == _currentOllamaModel);
         if (modelExists) {
@@ -269,7 +266,7 @@ class AIServiceSelector extends ChangeNotifier {
       throw Exception('Ollama remoto no está disponible');
     }
     
-    // 🔐 MODIFICADO: Ahora usa la variable cacheada
+    // Ahora usa la variable cacheada
     if (provider == AIProvider.openai && !_openaiAvailable) {
       debugPrint('   ⚠️ OpenAI no está disponible');
       throw Exception('OpenAI no está disponible. Configure su API Key en Ajustes');
@@ -520,7 +517,7 @@ class AIServiceSelector extends ChangeNotifier {
   @override
   void dispose() {
     debugPrint('🔴 [AIServiceSelector] Disposing...');
-    _ollamaConnectionSubscription?.cancel(); // AÑADIDO
+    _ollamaConnectionSubscription?.cancel();
     _localOllamaService.removeStatusListener(_onLocalOllamaStatusChanged);
     _localOllamaService.dispose();
     _ollamaService.dispose();

@@ -909,10 +909,6 @@ class ModelSelectorBubble extends StatelessWidget {
     }
   }
 
-  // ============================================================================
-  // MÉTODOS CORREGIDOS - Usar nombres correctos del ChatProvider actualizado
-  // ============================================================================
-
   /// Llama al método de reintento en el provider y muestra SnackBars
   Future<void> _retryOllamaConnection(BuildContext context, ChatProvider chatProvider) async {
     if (chatProvider.isRetryingOllama) return; // Evitar clics múltiples
@@ -949,7 +945,6 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _selectProvider(BuildContext context, ChatProvider chatProvider, AIProvider provider) async {
     try {
-      // ✅ CORRECCIÓN: El método correcto es selectProvider
       await chatProvider.selectProvider(provider);
     } catch (e) {
       _showError(context, 'Error cambiando proveedor: $e');
@@ -958,7 +953,6 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _selectModel(BuildContext context, ChatProvider chatProvider, String modelName) async {
     try {
-      // ✅ CORRECCIÓN: El método correcto es selectModel
       await chatProvider.selectModel(modelName);
     } catch (e) {
       _showError(context, 'Error cambiando modelo: $e');
@@ -967,7 +961,6 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _selectOpenAIModel(BuildContext context, ChatProvider chatProvider, String modelName) async {
     try {
-      // ✅ CORRECCIÓN: El método correcto es selectOpenAIModel
       await chatProvider.selectOpenAIModel(modelName);
     } catch (e) {
       _showError(context, 'Error cambiando modelo OpenAI: $e');
@@ -980,7 +973,7 @@ class ModelSelectorBubble extends StatelessWidget {
       return;
     }
     try {
-      // ✅ NOTA: Este método no existe en el provider actual
+      // NOTA: Este método no existe en el provider actual
       // Si necesitas cambiar modelos de Ollama local, deberás agregarlo al provider
       // Por ahora, lo dejamos comentado
       // await chatProvider.selectLocalOllamaModel(modelName);
@@ -992,7 +985,6 @@ class ModelSelectorBubble extends StatelessWidget {
 
   Future<void> _refreshOllama(BuildContext context, ChatProvider chatProvider) async {
     try {
-      // ✅ CORRECCIÓN: El método correcto es refreshConnection
       await chatProvider.refreshConnection();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

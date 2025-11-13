@@ -1,5 +1,3 @@
-// lib/data/services/local_ollama_service.dart
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -331,7 +329,6 @@ class OllamaManagedService {
     }
   }
 
-  // --- MÉTODO _downloadModel COMPLETAMENTE MODIFICADO ---
   /// Descargar un modelo usando stream: true
   Future<void> _downloadModel(String modelName) async {
     debugPrint('   📥 Iniciando descarga de modelo (stream): $modelName');
@@ -380,7 +377,6 @@ class OllamaManagedService {
           }
 
           if (data['status'] != null) {
-            // ... (lógica de progreso sin cambios) ...
             final status = data['status'] as String;
             
             if (status != lastStatus) {
@@ -425,7 +421,7 @@ class OllamaManagedService {
       ));
 
     } catch (e) {
-      // --- MODIFICADO: Capturar ClientException (cancelación) ---
+      // --- Capturar ClientException (cancelación) ---
       if (e is http.ClientException) {
         debugPrint('   🛑 Descarga cancelada (cliente cerrado).');
         // El estado ya fue (o será) actualizado por cancelModelDownload()
@@ -784,9 +780,6 @@ class OllamaManagedService {
     _installProgressListeners.clear();
   }
 
-    /// ===========================================================================
-  /// 🔄 NUEVO: Historial persistente de conversación (similar a Gemini/OpenAI)
-  /// ===========================================================================
   final List<Map<String, String>> _conversationHistory = [];
 
   /// Genera contenido manteniendo el contexto conversacional.
@@ -806,13 +799,13 @@ class OllamaManagedService {
     debugPrint('💬 [OllamaManaged] generateContentContext llamado');
     debugPrint('   🧠 Historial actual: ${_conversationHistory.length} mensajes');
 
-    // 1️⃣ Agregar el turno del usuario al historial
+    // Agregar el turno del usuario al historial
     _conversationHistory.add({
       'role': 'user',
       'content': prompt,
     });
 
-    // 2️⃣ Llamar al chat con todo el historial acumulado
+    // Llamar al chat con todo el historial acumulado
     final responseText = await chatWithHistory(
       prompt: prompt,
       history: List<Map<String, String>>.from(_conversationHistory),
@@ -820,7 +813,7 @@ class OllamaManagedService {
       maxTokens: maxTokens ?? _config.maxTokens,
     );
 
-    // 3️⃣ Guardar la respuesta del asistente en el historial
+    // Guardar la respuesta del asistente en el historial
     _conversationHistory.add({
       'role': 'assistant',
       'content': responseText,
@@ -830,7 +823,7 @@ class OllamaManagedService {
     return responseText;
   }
 
-  /// 🔄 Limpiar historial de conversación (como en Gemini/OpenAI)
+  // Limpiar historial de conversación (como en Gemini/OpenAI)
   void clearConversation() {
     _conversationHistory.clear();
     debugPrint('🧹 [OllamaManaged] Historial de conversación limpiado');

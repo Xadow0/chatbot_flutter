@@ -229,12 +229,8 @@ class OllamaService {
     try {
       debugPrint('📋 [OllamaService] Obteniendo lista de modelos...');
       
-      // =========================================================
-      // ✅ CORRECCIÓN: Revertido a /api/models, según
-      //    el error "availableEndpoints" de tu servidor
-      // =========================================================
       final response = await http.get(
-        Uri.parse('$_baseUrl/api/models'), // <-- REVERTIDO
+        Uri.parse('$_baseUrl/api/models'), 
         headers: _headers,
       ).timeout(_timeout);
       

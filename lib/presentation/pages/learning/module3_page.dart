@@ -74,7 +74,6 @@ class _Module3PageState extends State<Module3Page> {
         return Module3IntroPage(onStart: _nextPage);
       case 1:
         return Module3IterationPage(
-          // run the full iteration sequence in one chat interface
           iterationSequence: [
             IterationType.reformular,
             IterationType.aclarar,
