@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../../../lib/domain/entities/local_ollama_entity.dart';
+import 'package:chatbot_app/domain/entities/local_ollama_entity.dart';
 
 void main() {
   group('LocalOllamaStatusEntity', () {
