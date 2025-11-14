@@ -18,9 +18,10 @@ El objetivo **no es crear prompts perfectos**, sino **ayudar a comprender cómo 
 - **[Flutter](https://flutter.dev/)** — Framework multiplataforma desarrollado por Google.  
   - Lenguaje: **Dart**
   - Compilación nativa (AOT) para producción y **Hot Reload (JIT)** durante el desarrollo.
-- **API de Gemini (Google AI Studio)** — Para integración con modelos de IA generativa.
+- **API de Gemini (Google AI Studio)** — Para integración con modelos de IA generativa de Google.
+- **API de ChatGPT (OpenAI)** — Para integración con modelos de IA generativa de OpenAI.
 - **VSCode** + **Android Studio** — Entornos de desarrollo utilizados.
-- Compatibilidad: **Android**, **Windows**, **iOS** y **Web** (en desarrollo).
+- Compatibilidad: **Android**, **Windows**, **Linux**, **iOS** y **Web** (en desarrollo).
 
 ---
 
@@ -62,7 +63,7 @@ $ flutter build windows --release
 
 ### 💾 Gestión del Historial de Conversaciones
 
-Cada conversación se guarda automáticamente como un fichero .json en la siguiente ruta:
+Cada conversación se guarda automáticamente como un fichero .json de forma local, con la fecha y hora de la conversación, en la siguiente ruta:
 
 ```bash
 Application/Documents/conversations/
