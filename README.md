@@ -20,6 +20,8 @@ El objetivo **no es crear prompts perfectos**, sino **ayudar a comprender cómo 
   - Compilación nativa (AOT) para producción y **Hot Reload (JIT)** durante el desarrollo.
 - **API de Gemini (Google AI Studio)** — Para integración con modelos de IA generativa de Google.
 - **API de ChatGPT (OpenAI)** — Para integración con modelos de IA generativa de OpenAI.
+- **Ollama Local (phi3, mistral, etc.)** — Para ejecución de modelos de IA generativa en local, de forma transparente y automatizada para el usuario.
+- **Servidor de Ollama (UbuntuServer)** — Para integración con modelos de IA generativa Open Source, ejecutados en un dispositivo con potencia pero de forma totalmente privada. (Tailscale)
 - **VSCode** + **Android Studio** — Entornos de desarrollo utilizados.
 - Compatibilidad: **Android**, **Windows**, **Linux**, **iOS** y **Web** (en desarrollo).
 
