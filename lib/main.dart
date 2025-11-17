@@ -19,30 +19,62 @@ import 'data/services/openai_service.dart';
 import 'data/services/ollama_service.dart';
 import 'data/services/local_ollama_service.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await dotenv.load(fileName: ".env");
   
-  final initialRoute = await _determineInitialRoute();
-  
-  final geminiService = GeminiService();
-  final openaiService = OpenAIService();
-  final ollamaService = OllamaService();
-  final localOllamaService = OllamaManagedService();
-  
-  final aiServiceSelector = AIServiceSelector(
-    geminiService: geminiService,
-    openaiService: openaiService,
-    ollamaService: ollamaService,
-    localOllamaService: localOllamaService,
-  );
-  
-  runApp(
-    MultiProvider(
+  runApp(const AppInitializer());
+}
+
+class AppInitializer extends StatefulWidget {
+  const AppInitializer({super.key});
+
+  @override
+  State<AppInitializer> createState() => _AppInitializerState();
+}
+
+class _AppInitializerState extends State<AppInitializer> {
+  late Future<_InitializationResult> _initFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFuture = _initializeApp();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Chatbot Demo',
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      home: FutureBuilder<_InitializationResult>(
+        future: _initFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasError) {
+              return _ErrorScreen(error: snapshot.error.toString());
+            }
+            
+            if (snapshot.hasData) {
+              final result = snapshot.data!;
+              return _buildAppWithProviders(result);
+            }
+          }
+          
+          return const _LoadingScreen();
+        },
+      ),
+    );
+  }
+
+  Widget _buildAppWithProviders(_InitializationResult result) {
+    return MultiProvider(
       providers: [
         ChangeNotifierProvider<AIServiceSelector>.value(
-          value: aiServiceSelector,
+          value: result.aiServiceSelector,
         ),
         
         Provider<AIChatService>(
@@ -69,9 +101,103 @@ Future<void> main() async {
           ),
         ),
       ],
-      child: MyApp(initialRoute: initialRoute),
-    ),
-  );
+      child: MyApp(initialRoute: result.initialRoute),
+    );
+  }
+
+  Future<_InitializationResult> _initializeApp() async {
+    final initialRoute = await _determineInitialRoute();
+    
+    final geminiService = GeminiService();
+    final openaiService = OpenAIService();
+    final ollamaService = OllamaService();
+    final localOllamaService = OllamaManagedService();
+    
+    final aiServiceSelector = AIServiceSelector(
+      geminiService: geminiService,
+      openaiService: openaiService,
+      ollamaService: ollamaService,
+      localOllamaService: localOllamaService,
+    );
+    
+    return _InitializationResult(
+      initialRoute: initialRoute,
+      aiServiceSelector: aiServiceSelector,
+    );
+  }
+}
+
+class _InitializationResult {
+  final String initialRoute;
+  final AIServiceSelector aiServiceSelector;
+
+  _InitializationResult({
+    required this.initialRoute,
+    required this.aiServiceSelector,
+  });
+}
+
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Inicializando...',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorScreen extends StatelessWidget {
+  final String error;
+  
+  const _ErrorScreen({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Error al inicializar',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 Future<String> _determineInitialRoute() async {
@@ -80,7 +206,7 @@ Future<String> _determineInitialRoute() async {
   final hasKeys = await apiKeysManager.hasAnyApiKey();
   
   if (!hasKeys) {
-    debugPrint('🔒 [Main] No hay API keys guardadas');
+    debugPrint('🔐 [Main] No hay API keys guardadas');
     
     await _migrateFromEnvIfAvailable(apiKeysManager);
     
@@ -90,7 +216,7 @@ Future<String> _determineInitialRoute() async {
       debugPrint('✅ [Main] Keys migradas correctamente → Ir al menú principal');
       return AppRoutes.startMenu;
     } else {
-      debugPrint('🔒 [Main] Sin keys → Ir a onboarding');
+      debugPrint('🔐 [Main] Sin keys → Ir a onboarding');
       return AppRoutes.apiKeysOnboarding;
     }
   } else {

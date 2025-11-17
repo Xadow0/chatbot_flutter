@@ -38,7 +38,7 @@ class OllamaService {
     debugPrint('   📍 Tailscale: $_tailscaleUrl');
     debugPrint('   📍 Fallback: $_fallbackUrl');
     
-    _initializeConnection();
+    _initializeConnectionAsync();
   }
   
   // Getters
@@ -46,10 +46,11 @@ class OllamaService {
   Stream<ConnectionInfo> get connectionStream => _connectionController.stream;
   String get baseUrl => _baseUrl;
   
-  // Inicializar conexión
-  Future<void> _initializeConnection() async {
+  // Inicializar conexión de forma asíncrona sin bloquear
+  void _initializeConnectionAsync() {
     debugPrint('🔷 [OllamaService] Iniciando conexión...');
-    await _detectBestConnection();
+    // Ejecutar en el próximo tick del event loop
+    Future.microtask(() => _detectBestConnection());
   }
   
   // Auto-detectar mejor conexión
@@ -121,7 +122,7 @@ class OllamaService {
       final response = await http.get(
         Uri.parse('$url/api/health'),
         headers: _headers,
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 3));
       
       final success = response.statusCode == 200;
       debugPrint('   ${success ? "✓" : "✗"} Estado: ${response.statusCode}');
@@ -138,7 +139,7 @@ class OllamaService {
       final response = await http.get(
         Uri.parse('$url/api/health'),
         headers: _headers,
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 3));
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
