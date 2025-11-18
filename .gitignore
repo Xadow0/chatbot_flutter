@@ -104,3 +104,4 @@ app.*.map.json
 *.lock
 pubspec.lock
 .env
+lib/firebase_options.dart

@@ -6,6 +6,9 @@ import 'config/routes.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/providers/chat_provider.dart';
 import 'presentation/providers/theme_provider.dart';
+import 'presentation/providers/auth_provider.dart';
+import 'firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'domain/repositories/chat_repository.dart';
 import 'domain/repositories/conversation_repository.dart';
@@ -19,12 +22,25 @@ import 'data/services/gemini_service.dart';
 import 'data/services/openai_service.dart';
 import 'data/services/ollama_service.dart';
 import 'data/services/local_ollama_service.dart';
+import 'data/services/auth_service.dart'; 
+import 'data/services/preferences_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await dotenv.load(fileName: ".env");
   
+  // Inicializar Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform, 
+    );
+  } catch (e) {
+    debugPrint("⚠️ Error inicializando Firebase (o ya inicializado): $e");
+    // Fallback si no hay firebase_options.dart aun, intenta init básico
+    // await Firebase.initializeApp(); 
+  }
+
   runApp(const AppInitializer());
 }
 
@@ -74,11 +90,16 @@ class _AppInitializerState extends State<AppInitializer> {
   Widget _buildAppWithProviders(_InitializationResult result) {
     return MultiProvider(
       providers: [
-        // Provider de tema (debe ser el primero para que esté disponible en toda la app)
-        ChangeNotifierProvider(
-          create: (_) => ThemeProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         
+        // NUEVO: AuthProvider
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(
+            authService: AuthService(),
+            preferencesService: PreferencesService(),
+          ),
+        ),
+
         ChangeNotifierProvider<AIServiceSelector>.value(
           value: result.aiServiceSelector,
         ),
