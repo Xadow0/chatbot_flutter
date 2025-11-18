@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../../config/routes.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -10,11 +12,12 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _notificationsEnabled = true;
-  bool _darkModeEnabled = false;
   double _fontSize = 16.0;
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ajustes'),
@@ -41,7 +44,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: const Text('Configurar claves de Gemini y OpenAI'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  // Navegar a la página de gestión de API keys
                   Navigator.pushNamed(context, AppRoutes.apiKeysSettings);
                 },
               ),
@@ -61,21 +63,29 @@ class _SettingsPageState extends State<SettingsPage> {
                   });
                 },
               ),
-              SwitchListTile(
-                title: const Text('Modo oscuro'),
-                subtitle: const Text('Usar tema oscuro'),
-                value: _darkModeEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _darkModeEnabled = value;
-                  });
-                },
-              ),
             ],
           ),
+          
           _buildSection(
             title: 'Apariencia',
             children: [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    _getThemeIcon(themeProvider.themeMode),
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                title: const Text('Tema'),
+                subtitle: Text(_getThemeLabel(themeProvider.themeMode)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showThemeDialog(context, themeProvider),
+              ),
               ListTile(
                 title: const Text('Tamaño de fuente'),
                 subtitle: Text('${_fontSize.toStringAsFixed(0)}px'),
@@ -97,6 +107,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
+          
           _buildSection(
             title: 'Chat',
             children: [
@@ -105,7 +116,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: const Text('Configurar respuestas predeterminadas'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  // TODO: Navegar a configuración de respuestas rápidas
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Funcionalidad próximamente'),
@@ -124,6 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
+          
           _buildSection(
             title: 'Avanzado',
             children: [
@@ -160,6 +171,87 @@ class _SettingsPageState extends State<SettingsPage> {
         ...children,
         const Divider(),
       ],
+    );
+  }
+
+  IconData _getThemeIcon(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return Icons.light_mode;
+      case ThemeMode.dark:
+        return Icons.dark_mode;
+      case ThemeMode.system:
+        return Icons.brightness_auto;
+    }
+  }
+
+  String _getThemeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Modo claro';
+      case ThemeMode.dark:
+        return 'Modo oscuro';
+      case ThemeMode.system:
+        return 'Automático (sistema)';
+    }
+  }
+
+  void _showThemeDialog(BuildContext context, ThemeProvider themeProvider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Seleccionar tema'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeMode>(
+              title: const Text('Modo claro'),
+              subtitle: const Text('Tema claro siempre activo'),
+              secondary: const Icon(Icons.light_mode),
+              value: ThemeMode.light,
+              groupValue: themeProvider.themeMode,
+              onChanged: (ThemeMode? value) {
+                if (value != null) {
+                  themeProvider.setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Modo oscuro'),
+              subtitle: const Text('Tema oscuro siempre activo'),
+              secondary: const Icon(Icons.dark_mode),
+              value: ThemeMode.dark,
+              groupValue: themeProvider.themeMode,
+              onChanged: (ThemeMode? value) {
+                if (value != null) {
+                  themeProvider.setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Automático'),
+              subtitle: const Text('Sigue la configuración del sistema'),
+              secondary: const Icon(Icons.brightness_auto),
+              value: ThemeMode.system,
+              groupValue: themeProvider.themeMode,
+              onChanged: (ThemeMode? value) {
+                if (value != null) {
+                  themeProvider.setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
     );
   }
 

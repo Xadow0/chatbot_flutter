@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'config/routes.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/providers/chat_provider.dart';
+import 'presentation/providers/theme_provider.dart';
 
 import 'domain/repositories/chat_repository.dart';
 import 'domain/repositories/conversation_repository.dart';
@@ -73,6 +74,11 @@ class _AppInitializerState extends State<AppInitializer> {
   Widget _buildAppWithProviders(_InitializationResult result) {
     return MultiProvider(
       providers: [
+        // Provider de tema (debe ser el primero para que esté disponible en toda la app)
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider(),
+        ),
+        
         ChangeNotifierProvider<AIServiceSelector>.value(
           value: result.aiServiceSelector,
         ),
@@ -206,7 +212,7 @@ Future<String> _determineInitialRoute() async {
   final hasKeys = await apiKeysManager.hasAnyApiKey();
   
   if (!hasKeys) {
-    debugPrint('🔐 [Main] No hay API keys guardadas');
+    debugPrint('🔍 [Main] No hay API keys guardadas');
     
     await _migrateFromEnvIfAvailable(apiKeysManager);
     
@@ -216,7 +222,7 @@ Future<String> _determineInitialRoute() async {
       debugPrint('✅ [Main] Keys migradas correctamente → Ir al menú principal');
       return AppRoutes.startMenu;
     } else {
-      debugPrint('🔐 [Main] Sin keys → Ir a onboarding');
+      debugPrint('🔍 [Main] Sin keys → Ir a onboarding');
       return AppRoutes.apiKeysOnboarding;
     }
   } else {
@@ -273,13 +279,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Chatbot Demo',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      routes: AppRoutes.routes,
-      initialRoute: initialRoute,
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'Chatbot Demo',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
+          routes: AppRoutes.routes,
+          initialRoute: initialRoute,
+        );
+      },
     );
   }
 }
