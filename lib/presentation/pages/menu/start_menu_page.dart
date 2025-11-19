@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../config/routes.dart';
+import '../../providers/auth_provider.dart';
+import '../auth/auth_page.dart';
 
 class StartMenuPage extends StatefulWidget {
   const StartMenuPage({super.key});
@@ -52,136 +55,295 @@ class _StartMenuPageState extends State<StartMenuPage>
     final theme = Theme.of(context);
 
     return Scaffold(
-  // Quitamos el AppBar
-  body: SafeArea(
-    child: FadeTransition(
-      opacity: _fadeAnimation,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                children: [
+      // Scaffold simple sin fondo específico para respetar el tema
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // -------------------------------------------
+            // CAPA 1: CONTENIDO PRINCIPAL (CENTRADO)
+            // -------------------------------------------
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: Center(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        children: [
+                          // Espacio superior para el header
+                          const SizedBox(height: 70),
 
-                  // ---- TÍTULO CENTRADO VERTICALMENTE ----
-                  const SizedBox(height: 40), // Ajusta a tu gusto
-                  const Text(
-                    'TRAINING.IA',
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
-                      color: Colors.lightBlue,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Icono decorativo
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black12,
-                    ),
-                    child: const Icon(
-                      Icons.psychology_outlined,
-                      size: 80,
-                      color: Colors.lightBlue,
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-                    
-                    Text(
-                      'Bienvenido a la estación de entrenamiento IA',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 50),
-
-                    // Botón Chat Libre
-                    _buildMenuButton(
-                      context: context,
-                      icon: Icons.chat_bubble_outline,
-                      label: 'Chat Libre',
-                      color: Colors.blue,
-                      onPressed: () {
-                        Navigator.pushNamed(
-                          context,
-                          AppRoutes.chat,
-                          arguments: {'newConversation': true},
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Botón Aprendizaje
-                    _buildMenuButton(
-                      context: context,
-                      icon: Icons.school_outlined,
-                      label: 'Aprendizaje',
-                      color: Colors.green,
-                      onPressed: () {
-                        Navigator.pushNamed(context, AppRoutes.learning);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Botón Historial
-                    _buildMenuButton(
-                      context: context,
-                      icon: Icons.history,
-                      label: 'Historial',
-                      color: Colors.orange,
-                      onPressed: () {
-                        Navigator.pushNamed(context, AppRoutes.history);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Botón Ajustes
-                    _buildMenuButton(
-                      context: context,
-                      icon: Icons.settings,
-                      label: 'Ajustes',
-                      color: Colors.grey,
-                      onPressed: () {
-                        Navigator.pushNamed(context, AppRoutes.settings);
-                      },
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Botón Créditos
-                    TextButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Créditos próximamente'),
-                            duration: Duration(seconds: 2),
+                          // TÍTULO
+                          const Text(
+                            'TRAINING.IA',
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2,
+                              color: Colors.lightBlue,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.info_outline, size: 20),
-                      label: const Text(
-                        'Créditos',
-                        style: TextStyle(fontSize: 16),
+                          const SizedBox(height: 40),
+
+                          // ICONO PRINCIPAL
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.black12,
+                            ),
+                            child: const Icon(
+                              Icons.psychology_outlined,
+                              size: 80,
+                              color: Colors.lightBlue,
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          Text(
+                            'Bienvenido a la estación de entrenamiento IA',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 50),
+
+                          // --- BOTONES DEL MENÚ ---
+                          _buildMenuButton(
+                            context: context,
+                            icon: Icons.chat_bubble_outline,
+                            label: 'Chat Libre',
+                            color: Colors.blue,
+                            onPressed: () {
+                              Navigator.pushNamed(
+                                context,
+                                AppRoutes.chat,
+                                arguments: {'newConversation': true},
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          _buildMenuButton(
+                            context: context,
+                            icon: Icons.school_outlined,
+                            label: 'Aprendizaje',
+                            color: Colors.green,
+                            onPressed: () {
+                              Navigator.pushNamed(context, AppRoutes.learning);
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          _buildMenuButton(
+                            context: context,
+                            icon: Icons.history,
+                            label: 'Historial',
+                            color: Colors.orange,
+                            onPressed: () {
+                              Navigator.pushNamed(context, AppRoutes.history);
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          _buildMenuButton(
+                            context: context,
+                            icon: Icons.settings,
+                            label: 'Ajustes',
+                            color: Colors.grey,
+                            onPressed: () {
+                              Navigator.pushNamed(context, AppRoutes.settings);
+                            },
+                          ),
+                          const SizedBox(height: 30),
+
+                          // CRÉDITOS
+                          TextButton.icon(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Créditos próximamente'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.info_outline, size: 20),
+                            label: const Text(
+                              'Créditos',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
+              ),
+            ),
+
+            // -------------------------------------------
+            // CAPA 2: HEADER DE SESIÓN (FLOTANTE)
+            // -------------------------------------------
+            Positioned(
+              top: 12,
+              left: 16,
+              right: 16, 
+              child: _buildAuthHeader(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGET HEADER DE AUTENTICACIÓN ---
+  Widget _buildAuthHeader(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Colores base de alta visibilidad
+    final backgroundColor = isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.1);
+    final borderColor = isDark ? Colors.white24 : Colors.black12;
+    final primaryColor = theme.colorScheme.primary; // Usamos el color primario del sistema actual
+
+    // 1. ESTADO: NO AUTENTICADO
+    if (!authProvider.isAuthenticated) {
+      return Align(
+        alignment: Alignment.centerLeft, // Alineamos a la izquierda
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AuthPage()),
+              );
+            },
+            borderRadius: BorderRadius.circular(30),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: backgroundColor, // Usamos el mismo fondo visible que el estado conectado
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: primaryColor.withOpacity(0.5), // Borde coloreado para destacar acción
+                  width: 1.5
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min, // Se ajusta al contenido
+                children: [
+                  Icon(
+                    Icons.login_rounded, 
+                    size: 20, 
+                    color: primaryColor
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Iniciar Sesión',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
+      );
+    }
+
+    // 2. ESTADO: AUTENTICADO
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: borderColor),
       ),
-    ));
+      child: Row(
+        children: [
+          // Avatar
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: primaryColor,
+            child: Text(
+              authProvider.user?.email?.substring(0, 1).toUpperCase() ?? 'U',
+              style: const TextStyle(
+                color: Colors.white, 
+                fontSize: 14, 
+                fontWeight: FontWeight.bold
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Información de usuario
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Sesión iniciada como:',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                  ),
+                ),
+                Text(
+                  authProvider.user?.email ?? 'Usuario',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          
+          // Switch de Sincronización
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 24,
+                child: Switch(
+                  value: authProvider.isCloudSyncEnabled,
+                  onChanged: authProvider.isSyncing 
+                    ? null 
+                    : (val) => authProvider.toggleCloudSync(val),
+                  activeColor: Colors.green,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                authProvider.isCloudSyncEnabled ? 'Sync ON' : 'Sync OFF',
+                style: TextStyle(
+                  fontSize: 8,
+                  color: authProvider.isCloudSyncEnabled ? Colors.green : Colors.grey,
+                  fontWeight: FontWeight.bold
+                ),
+              )
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
+  // --- WIDGET AUXILIAR PARA LOS BOTONES DEL MENÚ PRINCIPAL ---
   Widget _buildMenuButton({
     required BuildContext context,
     required IconData icon,
