@@ -14,7 +14,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _notificationsEnabled = true;
-  double _fontSize = 16.0;
+  final double _fontSize = 16.0;
 
   @override
   Widget build(BuildContext context) {
