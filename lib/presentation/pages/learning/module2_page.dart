@@ -6,6 +6,7 @@ import 'package:markdown_widget/markdown_widget.dart';
 import '../../../data/repositories/conversation_repository.dart';
 import '../../../domain/entities/message_entity.dart';
 import '../../../domain/repositories/conversation_repository.dart';
+import 'package:provider/provider.dart';
 
 
 class Module2Page extends StatefulWidget {
@@ -17,7 +18,14 @@ class Module2Page extends StatefulWidget {
 
 class _Module2PageState extends State<Module2Page> {
   int _currentPage = 0;
-  final ConversationRepository _conversationRepository = ConversationRepositoryImpl();
+  late final ConversationRepository _conversationRepository;
+
+  @override
+  void initState() {
+    super.initState();
+    // Obtener el repositorio del Provider (ya está configurado en main.dart)
+    _conversationRepository = Provider.of<ConversationRepository>(context, listen: false);
+  }
 
   void _nextPage() {
     setState(() {

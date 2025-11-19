@@ -373,8 +373,8 @@ class LocalOllamaConfig {
     this.baseUrl = 'http://localhost',
     this.port = 11434,
     this.temperature = 0.7,
-    this.maxTokens = 2048,
-    this.timeout = const Duration(seconds: 60),
+    this.maxTokens = 4096,
+    this.timeout = const Duration(seconds: 240),
   });
 
   String get fullBaseUrl => '$baseUrl:$port';

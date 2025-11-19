@@ -1,9 +1,10 @@
+// lib/presentation/pages/settings/settings_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
-import '../../providers/auth_provider.dart'; // NUEVO
+import '../../providers/auth_provider.dart';
 import '../../../config/routes.dart';
-import '../auth/auth_page.dart'; // NUEVO
+import '../auth/auth_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -19,7 +20,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final authProvider = Provider.of<AuthProvider>(context); // Listener del auth
+    final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -27,7 +28,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       body: ListView(
         children: [
-          // NUEVA SECCIÓN: CUENTA Y SINCRONIZACIÓN
+          // SECCIÓN: CUENTA Y SINCRONIZACIÓN
           _buildSection(
             title: 'Cuenta y Sincronización',
             children: [
@@ -63,22 +64,126 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: Text(authProvider.user?.email ?? 'Usuario'),
                   subtitle: const Text('Sesión iniciada'),
                 ),
+                
+                // SWITCH DE SINCRONIZACIÓN
                 SwitchListTile(
                   title: const Text('Guardar conversaciones en la nube'),
-                  subtitle: const Text('Copia de seguridad y sincronización'),
+                  subtitle: Text(
+                    authProvider.isCloudSyncEnabled
+                        ? 'Copia de seguridad activa'
+                        : 'Solo se guardan localmente',
+                  ),
                   secondary: Icon(
-                    Icons.cloud_upload, 
-                    color: authProvider.isCloudSyncEnabled ? Colors.green : Colors.grey
+                    Icons.cloud_upload,
+                    color: authProvider.isCloudSyncEnabled ? Colors.green : Colors.grey,
                   ),
                   value: authProvider.isCloudSyncEnabled,
-                  onChanged: (bool value) {
-                    authProvider.toggleCloudSync(value);
-                  },
+                  onChanged: authProvider.isSyncing 
+                      ? null 
+                      : (bool value) {
+                          authProvider.toggleCloudSync(value);
+                        },
                 ),
+
+                // MENSAJE DE ESTADO DE SINCRONIZACIÓN
+                if (authProvider.syncMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: authProvider.syncMessage!.contains('✅')
+                            ? Colors.green.withOpacity(0.1)
+                            : authProvider.syncMessage!.contains('❌')
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: authProvider.syncMessage!.contains('✅')
+                              ? Colors.green
+                              : authProvider.syncMessage!.contains('❌')
+                                  ? Colors.red
+                                  : Colors.blue,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          if (authProvider.isSyncing)
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            Icon(
+                              authProvider.syncMessage!.contains('✅')
+                                  ? Icons.check_circle
+                                  : authProvider.syncMessage!.contains('❌')
+                                      ? Icons.error
+                                      : Icons.info,
+                              size: 20,
+                              color: authProvider.syncMessage!.contains('✅')
+                                  ? Colors.green
+                                  : authProvider.syncMessage!.contains('❌')
+                                      ? Colors.red
+                                      : Colors.blue,
+                            ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              authProvider.syncMessage!,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // BOTÓN DE SINCRONIZACIÓN MANUAL
+                if (authProvider.isCloudSyncEnabled && !authProvider.isSyncing)
+                  ListTile(
+                    leading: const Icon(Icons.sync, color: Colors.blue),
+                    title: const Text('Sincronizar ahora'),
+                    subtitle: const Text('Actualizar con la nube manualmente'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () async {
+                      await authProvider.manualSync();
+                    },
+                  ),
+
+                // INFORMACIÓN SOBRE SYNC DESACTIVADO
+                if (!authProvider.isCloudSyncEnabled)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Con la sincronización desactivada, las conversaciones eliminadas permanecerán en la nube si fueron sincronizadas previamente.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                const Divider(),
+
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.red),
                   title: const Text(
-                    'Cerrar Sesión', 
+                    'Cerrar Sesión',
                     style: TextStyle(color: Colors.red),
                   ),
                   onTap: () async {
@@ -86,7 +191,10 @@ class _SettingsPageState extends State<SettingsPage> {
                       context: context,
                       builder: (ctx) => AlertDialog(
                         title: const Text('Cerrar sesión'),
-                        content: const Text('Se detendrá la sincronización con la nube.'),
+                        content: const Text(
+                          'Se detendrá la sincronización con la nube. '
+                          'Tus conversaciones locales no se eliminarán.',
+                        ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
@@ -99,7 +207,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         ],
                       ),
                     );
-                    
+
                     if (confirm == true) {
                       await authProvider.signOut();
                     }
@@ -134,7 +242,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          
+
           _buildSection(
             title: 'General',
             children: [
@@ -150,7 +258,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          
+
           _buildSection(
             title: 'Apariencia',
             children: [
@@ -171,14 +279,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showThemeDialog(context, themeProvider),
               ),
-              // Slider de tamaño de fuente... (igual que antes)
             ],
           ),
-          
+
           _buildSection(
             title: 'Chat',
             children: [
-               ListTile(
+              ListTile(
                 title: const Text('Historial'),
                 subtitle: const Text('Gestionar conversaciones anteriores'),
                 trailing: const Icon(Icons.chevron_right),
@@ -188,7 +295,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          
+
           _buildSection(
             title: 'Avanzado',
             children: [
@@ -205,7 +312,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // Métodos auxiliares (_buildSection, _getThemeIcon, etc.) se mantienen igual...
   Widget _buildSection({
     required String title,
     required List<Widget> children,
@@ -231,23 +337,28 @@ class _SettingsPageState extends State<SettingsPage> {
 
   IconData _getThemeIcon(ThemeMode mode) {
     switch (mode) {
-      case ThemeMode.light: return Icons.light_mode;
-      case ThemeMode.dark: return Icons.dark_mode;
-      case ThemeMode.system: return Icons.brightness_auto;
+      case ThemeMode.light:
+        return Icons.light_mode;
+      case ThemeMode.dark:
+        return Icons.dark_mode;
+      case ThemeMode.system:
+        return Icons.brightness_auto;
     }
   }
 
   String _getThemeLabel(ThemeMode mode) {
     switch (mode) {
-      case ThemeMode.light: return 'Modo claro';
-      case ThemeMode.dark: return 'Modo oscuro';
-      case ThemeMode.system: return 'Automático (sistema)';
+      case ThemeMode.light:
+        return 'Modo claro';
+      case ThemeMode.dark:
+        return 'Modo oscuro';
+      case ThemeMode.system:
+        return 'Automático (sistema)';
     }
   }
 
   void _showThemeDialog(BuildContext context, ThemeProvider themeProvider) {
-     // (Código igual al original...)
-     showDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Seleccionar tema'),
@@ -258,19 +369,34 @@ class _SettingsPageState extends State<SettingsPage> {
               title: const Text('Modo claro'),
               value: ThemeMode.light,
               groupValue: themeProvider.themeMode,
-              onChanged: (val) { if(val!=null){themeProvider.setThemeMode(val); Navigator.pop(context);} },
+              onChanged: (val) {
+                if (val != null) {
+                  themeProvider.setThemeMode(val);
+                  Navigator.pop(context);
+                }
+              },
             ),
             RadioListTile<ThemeMode>(
               title: const Text('Modo oscuro'),
               value: ThemeMode.dark,
               groupValue: themeProvider.themeMode,
-              onChanged: (val) { if(val!=null){themeProvider.setThemeMode(val); Navigator.pop(context);} },
+              onChanged: (val) {
+                if (val != null) {
+                  themeProvider.setThemeMode(val);
+                  Navigator.pop(context);
+                }
+              },
             ),
             RadioListTile<ThemeMode>(
               title: const Text('Automático'),
               value: ThemeMode.system,
               groupValue: themeProvider.themeMode,
-              onChanged: (val) { if(val!=null){themeProvider.setThemeMode(val); Navigator.pop(context);} },
+              onChanged: (val) {
+                if (val != null) {
+                  themeProvider.setThemeMode(val);
+                  Navigator.pop(context);
+                }
+              },
             ),
           ],
         ),
@@ -279,16 +405,23 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showDeleteConfirmation(BuildContext context) {
-    // (Código igual al original...)
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('¿Borrar todos los datos?'),
         content: const Text('Esta acción eliminará las conversaciones locales.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
           TextButton(
-            onPressed: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos eliminados'))); },
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Datos eliminados')),
+              );
+            },
             child: const Text('Borrar', style: TextStyle(color: Colors.red)),
           ),
         ],

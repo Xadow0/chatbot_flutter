@@ -46,6 +46,7 @@ class ChatProvider extends ChangeNotifier {
   // INTERFACES DE REPOSITORIO
   final ChatRepository _chatRepository;
   final ConversationRepository _conversationRepository;
+  bool Function()? _getSyncStatus;
 
   // Referencias a los servicios
   late final GeminiService _geminiService;
@@ -99,6 +100,11 @@ class ChatProvider extends ChangeNotifier {
     );
 
     _initializeModels();
+  }
+
+  /// Vincula el estado de sincronización desde AuthProvider
+  void setSyncStatusChecker(bool Function() checker) {
+    _getSyncStatus = checker;
   }
 
   /// Escucha los cambios de AIServiceSelector y notifica a los listeners de ChatProvider
@@ -273,17 +279,6 @@ class ChatProvider extends ChangeNotifier {
   /// Expone el método listConversations del repositorio a la UI
   Future<List<FileSystemEntity>> listConversations() {
     return _conversationRepository.listConversations();
-  }
-
-  /// Expone el método deleteAllConversations del repositorio a la UI
-  Future<void> deleteAllConversations() async {
-    await _conversationRepository.deleteAllConversations();
-    notifyListeners(); // Notificar si la UI debe reaccionar
-  }
-
-  Future<void> deleteConversations(List<File> files) async {
-    await _conversationRepository.deleteConversations(files);
-    notifyListeners();
   }
 
   Future<void> _initializeModels() async {
@@ -707,9 +702,15 @@ class ChatProvider extends ChangeNotifier {
     try {
       // ConversationRepository trabaja con entidades
       await _conversationRepository.saveConversation(_messages);
+      
+      // Mostrar mensaje informativo si sync está activo
+      final isSyncEnabled = _getSyncStatus?.call() ?? false;
       if (kDebugMode) {
         debugPrint(
             "💾 [ChatProvider] Conversación guardada automáticamente (${_messages.length} mensajes)");
+        if (isSyncEnabled) {
+          debugPrint("☁️ [ChatProvider] Conversación sincronizada con la nube");
+        }
       }
     } catch (e) {
       debugPrint('❌ [ChatProvider] Error al guardar conversación: $e');
@@ -895,4 +896,65 @@ void _loadLocalOllamaHistory(List<MessageEntity> messages) {
     debugPrint('   ⚠️ Error cargando historial en Ollama Local: $e');
   }
 }
+/// Elimina todas las conversaciones
+  /// Muestra advertencia si sync no está activo
+  Future<DeleteResult> deleteAllConversations() async {
+    try {
+      final isSyncEnabled = _getSyncStatus?.call() ?? false;
+      
+      await _conversationRepository.deleteAllConversations();
+      
+      return DeleteResult(
+        success: true,
+        syncWasEnabled: isSyncEnabled,
+        message: isSyncEnabled 
+            ? 'Todas las conversaciones eliminadas (local y nube)'
+            : 'Conversaciones eliminadas localmente. Si sincronizaste previamente, permanecen en la nube.',
+      );
+    } catch (e) {
+      return DeleteResult(
+        success: false,
+        syncWasEnabled: false,
+        message: 'Error eliminando conversaciones: $e',
+      );
+    }
+  }
+
+  /// Elimina conversaciones seleccionadas
+  /// Muestra advertencia si sync no está activo
+  Future<DeleteResult> deleteConversations(List<File> files) async {
+    try {
+      final isSyncEnabled = _getSyncStatus?.call() ?? false;
+      
+      await _conversationRepository.deleteConversations(files);
+      
+      final count = files.length;
+      return DeleteResult(
+        success: true,
+        syncWasEnabled: isSyncEnabled,
+        message: isSyncEnabled 
+            ? '$count conversación(es) eliminada(s) (local y nube)'
+            : '$count conversación(es) eliminada(s) localmente. Si sincronizaste previamente, permanecen en la nube.',
+      );
+    } catch (e) {
+      return DeleteResult(
+        success: false,
+        syncWasEnabled: false,
+        message: 'Error eliminando conversaciones: $e',
+      );
+    }
+  }
+}
+
+/// Resultado de una operación de eliminación
+class DeleteResult {
+  final bool success;
+  final bool syncWasEnabled;
+  final String message;
+
+  DeleteResult({
+    required this.success,
+    required this.syncWasEnabled,
+    required this.message,
+  });
 }

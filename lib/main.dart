@@ -22,8 +22,9 @@ import 'data/services/gemini_service.dart';
 import 'data/services/openai_service.dart';
 import 'data/services/ollama_service.dart';
 import 'data/services/local_ollama_service.dart';
-import 'data/services/auth_service.dart'; 
+import 'data/services/auth_service.dart';
 import 'data/services/preferences_service.dart';
+import 'data/services/firebase_sync_service.dart'; // NUEVO
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,8 +38,6 @@ void main() async {
     );
   } catch (e) {
     debugPrint("⚠️ Error inicializando Firebase (o ya inicializado): $e");
-    // Fallback si no hay firebase_options.dart aun, intenta init básico
-    // await Firebase.initializeApp(); 
   }
 
   runApp(const AppInitializer());
@@ -92,11 +91,21 @@ class _AppInitializerState extends State<AppInitializer> {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         
-        // NUEVO: AuthProvider
+        // Providers de servicios (no ChangeNotifier)
+        Provider<FirebaseSyncService>(
+          create: (_) => FirebaseSyncService(),
+        ),
+        
+        Provider<PreferencesService>(
+          create: (_) => PreferencesService(),
+        ),
+
+        // AuthProvider con dependencias
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(
+          create: (context) => AuthProvider(
             authService: AuthService(),
-            preferencesService: PreferencesService(),
+            preferencesService: context.read<PreferencesService>(),
+            syncService: context.read<FirebaseSyncService>(),
           ),
         ),
 
@@ -116,16 +125,34 @@ class _AppInitializerState extends State<AppInitializer> {
           ),
         ),
         
+        // ConversationRepository con sincronización
         Provider<ConversationRepository>(
-          create: (_) => ConversationRepositoryImpl(),
+          create: (context) {
+            final authProvider = context.read<AuthProvider>();
+            return ConversationRepositoryImpl(
+              syncService: context.read<FirebaseSyncService>(),
+              isSyncEnabled: () => authProvider.isCloudSyncEnabled,
+            );
+          },
         ),
         
+        // ChatProvider con vinculación al estado de sync
         ChangeNotifierProvider(
-          create: (context) => ChatProvider(
-            chatRepository: context.read<ChatRepository>(),
-            conversationRepository: context.read<ConversationRepository>(),
-            aiServiceSelector: context.read<AIServiceSelector>(),
-          ),
+          create: (context) {
+            final authProvider = context.read<AuthProvider>();
+            final chatProvider = ChatProvider(
+              chatRepository: context.read<ChatRepository>(),
+              conversationRepository: context.read<ConversationRepository>(),
+              aiServiceSelector: context.read<AIServiceSelector>(),
+            );
+            
+            // Vincular el checker de sincronización
+            chatProvider.setSyncStatusChecker(
+              () => authProvider.isCloudSyncEnabled,
+            );
+            
+            return chatProvider;
+          },
         ),
       ],
       child: MyApp(initialRoute: result.initialRoute),
@@ -233,7 +260,7 @@ Future<String> _determineInitialRoute() async {
   final hasKeys = await apiKeysManager.hasAnyApiKey();
   
   if (!hasKeys) {
-    debugPrint('🔍 [Main] No hay API keys guardadas');
+    debugPrint('🔐 [Main] No hay API keys guardadas');
     
     await _migrateFromEnvIfAvailable(apiKeysManager);
     
@@ -243,7 +270,7 @@ Future<String> _determineInitialRoute() async {
       debugPrint('✅ [Main] Keys migradas correctamente → Ir al menú principal');
       return AppRoutes.startMenu;
     } else {
-      debugPrint('🔍 [Main] Sin keys → Ir a onboarding');
+      debugPrint('🔐 [Main] Sin keys → Ir a onboarding');
       return AppRoutes.apiKeysOnboarding;
     }
   } else {
