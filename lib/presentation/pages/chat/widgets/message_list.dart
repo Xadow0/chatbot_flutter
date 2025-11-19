@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Necesario para el portapapeles
 import 'package:markdown_widget/markdown_widget.dart';
 import '../../../../data/models/message_model.dart';
 
@@ -37,13 +38,17 @@ class MessageList extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final message = messages[index];
-        return _MessageBubble(message: message);
-      },
+    // SOLUCIÓN PRINCIPAL: SelectionArea
+    // Envuelve la lista completa para permitir selección continua y auto-scroll
+    return SelectionArea(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(8),
+        itemCount: messages.length,
+        itemBuilder: (context, index) {
+          final message = messages[index];
+          return _MessageBubble(message: message);
+        },
+      ),
     );
   }
 }
@@ -54,13 +59,22 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message});
 
   String _cleanMarkdownText(String text) {
-    // Eliminar múltiples saltos de línea consecutivos (más de uno)
     String cleaned = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
-    
-    // Limpiar espacios en blanco al inicio y final
     cleaned = cleaned.trim();
-    
     return cleaned;
+  }
+
+  // Lógica para copiar al portapapeles
+  void _copyToClipboard(BuildContext context, String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Mensaje copiado al portapapeles'),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
@@ -82,107 +96,142 @@ class _MessageBubble extends StatelessWidget {
               : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                message.displayPrefix,
-                style: const TextStyle(fontSize: 16),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: isUser
-                  ? Text(
-                      message.content,
-                      style: TextStyle(
-                        color: colorScheme.onPrimary,
-                        fontSize: 15,
-                      ),
-                    )
-                  : MarkdownWidget(
-                      data: _cleanMarkdownText(message.content),
-                      shrinkWrap: true,
-                      selectable: true,
-                      config: MarkdownConfig(
-                        configs: [
-                          PConfig(
-                            textStyle: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: 15,
-                              height: 1.4,
-                            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Prefijo (Icono/Nombre)
+                // SelectionContainer.disabled evita que al "Seleccionar todo" se copien los iconos/nombres
+                SelectionContainer.disabled(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      message.displayPrefix,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                
+                // Contenido del Mensaje
+                Flexible(
+                  child: isUser
+                      ? Text( // Usamos Text normal porque SelectionArea maneja la selección ahora
+                          message.content,
+                          style: TextStyle(
+                            color: colorScheme.onPrimary,
+                            fontSize: 15,
                           ),
-                          H1Config(
-                            style: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              height: 1.3,
-                            ),
-                          ),
-                          H2Config(
-                            style: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              height: 1.3,
-                            ),
-                          ),
-                          H3Config(
-                            style: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              height: 1.3,
-                            ),
-                          ),
-                          CodeConfig(
-                            style: TextStyle(
-                              backgroundColor: colorScheme.surfaceContainer,
-                              color: colorScheme.primary,
-                              fontFamily: 'monospace',
-                              fontSize: 14,
-                            ),
-                          ),
-                          PreConfig(
-                            textStyle: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontFamily: 'monospace',
-                              fontSize: 14,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.all(12),
-                          ),
-                          ListConfig(
-                            marker: (bool isOrdered, int depth, int index) {
-                              if (isOrdered) {
-                                return Text(
-                                  '${index + 1}. ',
-                                  style: TextStyle(
-                                    color: colorScheme.onSurface,
-                                    fontSize: 15,
-                                  ),
-                                );
-                              }
-                              return Text(
-                                '• ',
-                                style: TextStyle(
+                          selectionColor: colorScheme.onPrimary.withOpacity(0.4),
+                        )
+                      : MarkdownWidget(
+                          data: _cleanMarkdownText(message.content),
+                          shrinkWrap: true,
+                          // IMPORTANTE: Desactivamos la selección interna del Markdown
+                          // para que no pelee con el SelectionArea global.
+                          selectable: false, 
+                          config: MarkdownConfig(
+                            configs: [
+                              PConfig(
+                                textStyle: TextStyle(
                                   color: colorScheme.onSurface,
                                   fontSize: 15,
+                                  height: 1.4,
                                 ),
-                              );
-                            },
+                              ),
+                              H1Config(
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.3,
+                                ),
+                              ),
+                              H2Config(
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.3,
+                                ),
+                              ),
+                              H3Config(
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.3,
+                                ),
+                              ),
+                              CodeConfig(
+                                style: TextStyle(
+                                  backgroundColor: colorScheme.surfaceContainer,
+                                  color: colorScheme.primary,
+                                  fontFamily: 'monospace',
+                                  fontSize: 14,
+                                ),
+                              ),
+                              PreConfig(
+                                textStyle: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontFamily: 'monospace',
+                                  fontSize: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceContainer,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.all(12),
+                              ),
+                              ListConfig(
+                                marker: (bool isOrdered, int depth, int index) {
+                                  if (isOrdered) {
+                                    return Text(
+                                      '${index + 1}. ',
+                                      style: TextStyle(
+                                        color: colorScheme.onSurface,
+                                        fontSize: 15,
+                                      ),
+                                    );
+                                  }
+                                  return Text(
+                                    '• ',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontSize: 15,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                ),
+              ],
+            ),
+            // Botón de Copiar
+            // Usamos SelectionContainer.disabled para que el texto del icono no sea seleccionable accidentalmente
+            SelectionContainer.disabled(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: InkWell(
+                  onTap: () => _copyToClipboard(context, message.content),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6.0),
+                    child: Icon(
+                      Icons.copy_rounded,
+                      size: 14,
+                      color: isUser 
+                          ? colorScheme.onPrimary.withOpacity(0.7) 
+                          : colorScheme.onSurface.withOpacity(0.5),
                     ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
