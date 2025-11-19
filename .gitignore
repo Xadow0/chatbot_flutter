@@ -78,6 +78,7 @@ ios/Flutter/Generated.xcconfig
 ios/Flutter/ephemeral/
 ios/ServiceDefinitions.json
 ios/Runner/GeneratedPluginRegistrant.*
+macos/Flutter/GeneratedPluginRegistrant.*
 
 # Compilation Files
 *.xcworkspace
@@ -105,3 +106,24 @@ app.*.map.json
 pubspec.lock
 .env
 lib/firebase_options.dart
+firebase.json
+pubspec.lock
+
+# --------------------------
+# Firebase Auto Configure
+# --------------------------
+android/settings.gradle.kts
+android/app/build.gradle.kts
+android/app/google-services.json
+
+# --------------------------
+# Linux
+# --------------------------
+linux/flutter/generated_plugin_registrant.*
+linux/flutter/generated_plugins.cmake
+
+# --------------------------
+# Windows
+# --------------------------
+windows/flutter/generated_plugin_registrant.*
+windows/flutter/generated_plugins.cmake
