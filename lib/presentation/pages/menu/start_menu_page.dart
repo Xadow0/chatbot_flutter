@@ -50,144 +50,163 @@ class _StartMenuPageState extends State<StartMenuPage>
     super.dispose();
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
-      // Scaffold simple sin fondo específico para respetar el tema
       body: SafeArea(
         child: Stack(
           children: [
             // -------------------------------------------
-            // CAPA 1: CONTENIDO PRINCIPAL (CENTRADO)
+            // CAPA 1: CONTENIDO PRINCIPAL
             // -------------------------------------------
             FadeTransition(
               opacity: _fadeAnimation,
               child: ScaleTransition(
                 scale: _scaleAnimation,
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        children: [
-                          // Espacio superior para el header
-                          const SizedBox(height: 70),
-
-                          // TÍTULO
-                          const Text(
-                            'TRAINING.IA',
-                            style: TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 2,
-                              color: Colors.lightBlue,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 40),
-
-                          // ICONO PRINCIPAL
-                          Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.black12,
-                            ),
-                            child: const Icon(
-                              Icons.psychology_outlined,
-                              size: 80,
-                              color: Colors.lightBlue,
-                            ),
-                          ),
-
-                          const SizedBox(height: 30),
-
-                          Text(
-                            'Bienvenido a la estación de entrenamiento IA',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 50),
-
-                          // --- BOTONES DEL MENÚ ---
-                          _buildMenuButton(
-                            context: context,
-                            icon: Icons.chat_bubble_outline,
-                            label: 'Chat Libre',
-                            color: Colors.blue,
-                            onPressed: () {
-                              Navigator.pushNamed(
-                                context,
-                                AppRoutes.chat,
-                                arguments: {'newConversation': true},
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildMenuButton(
-                            context: context,
-                            icon: Icons.school_outlined,
-                            label: 'Aprendizaje',
-                            color: Colors.green,
-                            onPressed: () {
-                              Navigator.pushNamed(context, AppRoutes.learning);
-                            },
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildMenuButton(
-                            context: context,
-                            icon: Icons.history,
-                            label: 'Historial',
-                            color: Colors.orange,
-                            onPressed: () {
-                              Navigator.pushNamed(context, AppRoutes.history);
-                            },
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildMenuButton(
-                            context: context,
-                            icon: Icons.settings,
-                            label: 'Ajustes',
-                            color: Colors.grey,
-                            onPressed: () {
-                              Navigator.pushNamed(context, AppRoutes.settings);
-                            },
-                          ),
-                          const SizedBox(height: 30),
-
-                          // CRÉDITOS
-                          TextButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Créditos próximamente'),
-                                  duration: Duration(seconds: 2),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                            child: Column(
+                              children: [
+                                // 1. AUMENTO ESPACIO SUPERIOR
+                                // Subimos de 30 a 85 para librar totalmente el Header de sesión
+                                const SizedBox(height: 85), 
+                                
+                                // TÍTULO
+                                const Text(
+                                  'TRAINING.IA',
+                                  style: TextStyle(
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 2,
+                                    color: Colors.lightBlue,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                              );
-                            },
-                            icon: const Icon(Icons.info_outline, size: 20),
-                            label: const Text(
-                              'Créditos',
-                              style: TextStyle(fontSize: 16),
+                                
+                                // 2. COMPACTACIÓN DE ESPACIOS INTERMEDIOS
+                                // Reducimos espacios y tamaños para compensar la bajada del título
+                                // y que los botones no se muevan de su sitio original.
+                                const SizedBox(height: 10), // Antes 20
+
+                                // ICONO PRINCIPAL (Más compacto)
+                                Container(
+                                  padding: const EdgeInsets.all(16), // Antes 20
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.black12,
+                                  ),
+                                  child: const Icon(
+                                    Icons.psychology_outlined,
+                                    size: 60, // Antes 70 (y mucho antes 80)
+                                    color: Colors.lightBlue,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 10), // Antes 20
+
+                                Text(
+                                  'Bienvenido a la estación de entrenamiento IA',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                
+                                // ESPACIO FLEXIBLE
+                                // Absorbe cualquier pequeña diferencia restante
+                                const Spacer(), 
+
+                                // --- BOTONES DEL MENÚ ---
+                                _buildMenuButton(
+                                  context: context,
+                                  icon: Icons.chat_bubble_outline,
+                                  label: 'Chat Libre',
+                                  color: Colors.blue,
+                                  onPressed: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.chat,
+                                      arguments: {'newConversation': true},
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+
+                                _buildMenuButton(
+                                  context: context,
+                                  icon: Icons.school_outlined,
+                                  label: 'Aprendizaje',
+                                  color: Colors.green,
+                                  onPressed: () {
+                                    Navigator.pushNamed(context, AppRoutes.learning);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+
+                                _buildMenuButton(
+                                  context: context,
+                                  icon: Icons.history,
+                                  label: 'Historial',
+                                  color: Colors.orange,
+                                  onPressed: () {
+                                    Navigator.pushNamed(context, AppRoutes.history);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+
+                                _buildMenuButton(
+                                  context: context,
+                                  icon: Icons.settings,
+                                  label: 'Ajustes',
+                                  color: Colors.grey,
+                                  onPressed: () {
+                                    Navigator.pushNamed(context, AppRoutes.settings);
+                                  },
+                                ),
+                                
+                                const Spacer(), 
+
+                                // CRÉDITOS
+                                TextButton.icon(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Créditos próximamente'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.info_outline, size: 20),
+                                  label: const Text(
+                                    'Créditos',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                ),
+                                
+                                const SizedBox(height: 10),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ),
             ),
 
             // -------------------------------------------
-            // CAPA 2: HEADER DE SESIÓN (FLOTANTE)
+            // CAPA 2: HEADER DE SESIÓN (SIN CAMBIOS)
             // -------------------------------------------
             Positioned(
               top: 12,

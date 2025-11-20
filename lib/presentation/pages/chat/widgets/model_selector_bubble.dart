@@ -1015,6 +1015,24 @@ class ModelSelectorBubble extends StatelessWidget {
         return;
       }
 
+      if (result == true) {
+        // Opcional: Verificar que el estado sea 'ready' para mayor seguridad
+        if (chatProvider.localOllamaStatus == LocalOllamaStatus.ready) {
+           await _selectProvider(context, chatProvider, AIProvider.localOllama);
+           
+           // Feedback visual opcional
+           if (context.mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               const SnackBar(
+                 content: Text('IA Local lista y seleccionada'),
+                 backgroundColor: Colors.green,
+                 duration: Duration(seconds: 2),
+               ),
+             );
+           }
+        }
+      }
+
     } catch (e) {
       _showError(context, 'Error iniciando Ollama Local: $e');
     }
