@@ -323,7 +323,7 @@ class _StartMenuPageState extends State<StartMenuPage>
                   onChanged: authProvider.isSyncing 
                     ? null 
                     : (val) => authProvider.toggleCloudSync(val),
-                  activeColor: Colors.green,
+                  activeThumbColor: Colors.green,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
