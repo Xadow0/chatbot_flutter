@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'api_keys_manager.dart';
 
 class GeminiService {
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1';
+  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
   static const String _model = 'gemini-2.5-flash';
   
   final ApiKeysManager _apiKeysManager = ApiKeysManager();
@@ -95,6 +95,12 @@ class GeminiService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'contents': contents,
+          // Buscar en google si es necesario
+          'tools': [
+            {
+              'googleSearch': {} 
+            }
+          ],
           'generationConfig': {
             'temperature': 0.7,
             'topK': 40,
@@ -151,20 +157,20 @@ class GeminiService {
   }
 
   /// Añadir mensaje del usuario al historial (sin enviar request)
-void addUserMessage(String content) {
-  _conversationHistory.add({
-    'role': 'user',
-    'parts': [{'text': content}],
-  });
-  debugPrint('📝 [GeminiService] Mensaje de usuario añadido al historial');
-}
+  void addUserMessage(String content) {
+    _conversationHistory.add({
+      'role': 'user',
+      'parts': [{'text': content}],
+    });
+    debugPrint('📝 [GeminiService] Mensaje de usuario añadido al historial');
+  }
 
-/// Añadir mensaje del bot al historial (sin enviar request)
-void addBotMessage(String content) {
-  _conversationHistory.add({
-    'role': 'model',
-    'parts': [{'text': content}],
-  });
-  debugPrint('📝 [GeminiService] Mensaje del bot añadido al historial');
-}
+  /// Añadir mensaje del bot al historial (sin enviar request)
+  void addBotMessage(String content) {
+    _conversationHistory.add({
+      'role': 'model',
+      'parts': [{'text': content}],
+    });
+    debugPrint('📝 [GeminiService] Mensaje del bot añadido al historial');
+  }
 }
