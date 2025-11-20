@@ -28,6 +28,7 @@ class AIServiceSelector extends ChangeNotifier {
   String _currentOpenAIModel = 'gpt-4o-mini';
   List<OllamaModel> _availableModels = [];
   bool _ollamaAvailable = false;
+  bool get isLocalOllamaSupported => _localOllamaService.isPlatformSupported;
   
   // 🔐 NUEVO: Cache para disponibilidad de OpenAI
   bool _openaiAvailable = false;
@@ -272,9 +273,15 @@ class AIServiceSelector extends ChangeNotifier {
       throw Exception('OpenAI no está disponible. Configure su API Key en Ajustes');
     }
     
-    if (provider == AIProvider.localOllama && !localOllamaAvailable) {
-      debugPrint('   ⚠️ Ollama Local no está listo');
-      throw Exception('Ollama Local no está listo. Inicialízalo primero.');
+    if (provider == AIProvider.localOllama) {
+      if (!isLocalOllamaSupported) {
+        debugPrint('   ⚠️ Ollama Local no soportado en esta plataforma');
+        throw Exception('Ollama Local no está disponible en este dispositivo.');
+      }
+      if (!localOllamaAvailable) {
+        debugPrint('   ⚠️ Ollama Local no está listo');
+        throw Exception('Ollama Local no está listo. Inicialízalo primero.');
+      }
     }
     
     _currentProvider = provider;

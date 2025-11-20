@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/local_ollama_models.dart';
@@ -47,6 +48,11 @@ class OllamaManagedService {
   String? get currentModel => _currentModel;
   String get baseUrl => _config.fullBaseUrl;
   Stream<LocalOllamaInstallProgress>? get installProgressStream => _currentInstallStream;
+  /// Verifica si el sistema operativo actual soporta Ollama Local
+  bool get isPlatformSupported {
+    // Ollama server oficial solo corre nativamente en estos tres SO de escritorio
+    return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+  }
 
   // Listeners
   void addStatusListener(ValueChanged<LocalOllamaStatus> listener) {
@@ -102,6 +108,15 @@ class OllamaManagedService {
   /// 4. Descarga modelo por defecto
   /// 5. Verifica funcionamiento
   Future<LocalOllamaInitResult> initialize({String? modelName}) async {
+    // AGREGA ESTA VERIFICACIÓN AL PRINCIPIO
+    if (!isPlatformSupported) {
+      debugPrint('❌ [OllamaManaged] Plataforma no soportada: ${Platform.operatingSystem}');
+      return LocalOllamaInitResult(
+        success: false,
+        error: 'Ollama Local no está disponible en ${Platform.operatingSystem}',
+      );
+    }
+
     final startTime = DateTime.now();
     debugPrint('🚀 [OllamaManaged] ========================================');
     debugPrint('🚀 [OllamaManaged] INICIALIZANDO SERVICIO');

@@ -635,22 +635,30 @@ class ModelSelectorBubble extends StatelessWidget {
     final isAvailable = chatProvider.localOllamaAvailable;
     final isSelected = chatProvider.currentProvider == AIProvider.localOllama;
     final isLoading = chatProvider.localOllamaLoading;
+    
+    // VERIFICAR SOPORTE DE PLATAFORMA
+    // Usamos el getter que creamos en el paso 2
+    final isPlatformSupported = chatProvider.aiSelector.isLocalOllamaSupported;
 
     return Column(
       children: [
         InkWell(
-          onTap: () {
-            if (status == LocalOllamaStatus.notInitialized) {
-              _startLocalLLM(context, chatProvider);
-            } else if (status == LocalOllamaStatus.error) {
-              _retryLocalLLM(context, chatProvider);
-            } else if (isAvailable) {
-              _selectProvider(context, chatProvider, AIProvider.localOllama);
-            }
-          },
+          // Si no es soportado, onTap es null (deshabilita el clic)
+          onTap: !isPlatformSupported 
+            ? null 
+            : () {
+              if (status == LocalOllamaStatus.notInitialized) {
+                _startLocalLLM(context, chatProvider);
+              } else if (status == LocalOllamaStatus.error) {
+                _retryLocalLLM(context, chatProvider);
+              } else if (isAvailable) {
+                _selectProvider(context, chatProvider, AIProvider.localOllama);
+              }
+            },
           borderRadius: BorderRadius.circular(12),
           child: Opacity(
-            opacity: isLoading ? 0.7 : 1.0,
+            // Reducimos opacidad si no es soportado o está cargando
+            opacity: (!isPlatformSupported || isLoading) ? 0.6 : 1.0,
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -668,7 +676,10 @@ class ModelSelectorBubble extends StatelessWidget {
                     Icons.computer,
                     color: isSelected 
                         ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                        // Si no es soportado, icono gris
+                        : (!isPlatformSupported 
+                            ? Theme.of(context).disabledColor 
+                            : Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -677,22 +688,44 @@ class ModelSelectorBubble extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'Ollama Local (Embebido)',
-                              style: TextStyle(fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                // Texto tachado o gris si no es soportado (opcional)
+                                color: !isPlatformSupported 
+                                  ? Theme.of(context).disabledColor 
+                                  : null,
+                              ),
                             ),
                             const SizedBox(width: 4),
-                            _buildLocalLLMIndicator(context, status),
+                            // Solo mostramos el indicador de estado si es soportado
+                            if (isPlatformSupported)
+                              _buildLocalLLMIndicator(context, status),
                           ],
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          _getLocalLLMSubtitle(status),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        // LÓGICA DEL SUBTÍTULO
+                        if (!isPlatformSupported)
+                           Container(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              'NO DISPONIBLE EN ESTE DISPOSITIVO',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.error, // Color rojo/error
+                              ),
+                            ),
+                          )
+                        else
+                          Text(
+                            _getLocalLLMSubtitle(status),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -707,6 +740,13 @@ class ModelSelectorBubble extends StatelessWidget {
                       Icons.check_circle,
                       color: Theme.of(context).colorScheme.primary,
                       size: 20,
+                    )
+                  else if (!isPlatformSupported)
+                    // Icono de bloqueo o prohibido para móviles
+                    Icon(
+                      Icons.block,
+                      color: Theme.of(context).disabledColor,
+                      size: 18,
                     ),
                 ],
               ),
