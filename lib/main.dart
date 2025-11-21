@@ -7,17 +7,20 @@ import 'core/theme/app_theme.dart';
 import 'presentation/providers/chat_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/providers/auth_provider.dart';
+// --- NUEVA IMPORTACIÓN DEL PROVIDER ---
+import 'presentation/providers/command_management_provider.dart';
+
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'domain/repositories/chat_repository.dart';
 import 'domain/repositories/conversation_repository.dart';
-import 'domain/repositories/command_repository.dart'; // [NUEVO]
+import 'domain/repositories/command_repository.dart'; 
 
 import 'data/services/ai_chat_service.dart';
 import 'data/repositories/chat_repository.dart';
 import 'data/repositories/conversation_repository.dart';
-import 'data/repositories/command_repository.dart'; // [NUEVO]
+import 'data/repositories/command_repository.dart'; 
 
 import 'data/services/api_keys_manager.dart';
 import 'data/services/ai_service_selector.dart';
@@ -28,15 +31,14 @@ import 'data/services/local_ollama_service.dart';
 import 'data/services/auth_service.dart';
 import 'data/services/preferences_service.dart';
 import 'data/services/firebase_sync_service.dart';
-import 'data/services/secure_storage_service.dart'; // [NUEVO]
-import 'data/services/local_command_service.dart'; // [NUEVO]
+import 'data/services/secure_storage_service.dart'; 
+import 'data/services/local_command_service.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await dotenv.load(fileName: ".env");
   
-  // Inicializar Firebase
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform, 
@@ -108,14 +110,10 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
 
         // 2. --- Core Providers (Services & Auth) ---
-        // IMPORTANTE: Estos deben ir ANTES que los repositorios que los usan.
-
-        // AIServiceSelector debe estar disponible antes que AIChatService y ChatProvider
         ChangeNotifierProvider<AIServiceSelector>.value(
           value: result.aiServiceSelector,
         ),
 
-        // AuthProvider debe estar antes que ConversationRepository
         ChangeNotifierProvider(
           create: (context) => AuthProvider(
             authService: AuthService(),
@@ -131,7 +129,6 @@ class _AppInitializerState extends State<AppInitializer> {
           ),
         ),
         
-        // AIChatService (Ahora sí encontrará a AIServiceSelector porque está definido arriba en el paso 2)
         Provider<AIChatService>(
           create: (context) => AIChatService(
             context.read<AIServiceSelector>(),
@@ -139,7 +136,6 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
 
         // 4. --- Repositorios (Dependen de Services) ---
-
         Provider<CommandRepository>(
           create: (context) => CommandRepositoryImpl(
             context.read<LocalCommandService>(),
@@ -152,10 +148,8 @@ class _AppInitializerState extends State<AppInitializer> {
           ),
         ),
         
-        // ConversationRepository (Ahora encontrará a AuthProvider definido en el paso 2)
         Provider<ConversationRepository>(
           create: (context) {
-            // Nota: Usamos listen: false porque estamos dentro de un create
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             
             return ConversationRepositoryImpl(
@@ -166,6 +160,14 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
 
         // 5. --- Providers de Estado / UI (Consumidores Finales) ---
+        
+        // [NUEVO] Provider para la gestión de comandos (UI)
+        // Depende de CommandRepository, que ya fue creado arriba.
+        ChangeNotifierProvider(
+          create: (context) => CommandManagementProvider(
+            context.read<CommandRepository>(),
+          ),
+        ),
         
         // ChatProvider consume TODO lo anterior, por eso va al final.
         ChangeNotifierProvider(

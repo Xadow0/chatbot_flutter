@@ -255,7 +255,6 @@ class _AuthPageState extends State<AuthPage>
     Color primaryColor = Colors.blue,
     bool obscureText = false,
     TextInputType? keyboardType,
-    // Nuevos parámetros para controlar el teclado
     TextInputAction? textInputAction,
     void Function(String)? onSubmitted,
     String? Function(String?)? validator,

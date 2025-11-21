@@ -86,23 +86,19 @@ class _QuickResponseChip extends StatelessWidget {
       // TOOLTIP: Muestra el texto al dejar el ratón encima
       tooltip: tooltipText,
       
-      // VISUAL: Compacto
       visualDensity: VisualDensity.compact,
       
       // PADDING: Control estricto del espacio interno del botón
       padding: EdgeInsets.zero,
       labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-      
-      // CONTENT: Usamos un Row en lugar de 'avatar' para controlar el espacio exacto
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.bolt, 
-            size: 14, // Icono ligeramente más pequeño
+            size: 14, 
             color: Theme.of(context).colorScheme.onSecondaryContainer,
           ),
-          // EL ESPACIO EXACTO: 4 píxeles de separación
           const SizedBox(width: 4), 
           Text(
             response.text,

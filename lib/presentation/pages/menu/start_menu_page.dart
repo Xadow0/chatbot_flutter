@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../config/routes.dart';
 import '../../providers/auth_provider.dart';
 import '../auth/auth_page.dart';
+import '../commands/user_commands_page.dart'; 
 
 class StartMenuPage extends StatefulWidget {
   const StartMenuPage({super.key});
@@ -78,7 +79,6 @@ class _StartMenuPageState extends State<StartMenuPage>
                             child: Column(
                               children: [
                                 // 1. AUMENTO ESPACIO SUPERIOR
-                                // Subimos de 30 a 85 para librar totalmente el Header de sesión
                                 const SizedBox(height: 85), 
                                 
                                 // TÍTULO
@@ -93,26 +93,23 @@ class _StartMenuPageState extends State<StartMenuPage>
                                   textAlign: TextAlign.center,
                                 ),
                                 
-                                // 2. COMPACTACIÓN DE ESPACIOS INTERMEDIOS
-                                // Reducimos espacios y tamaños para compensar la bajada del título
-                                // y que los botones no se muevan de su sitio original.
-                                const SizedBox(height: 10), // Antes 20
+                                const SizedBox(height: 10), 
 
-                                // ICONO PRINCIPAL (Más compacto)
+                                // ICONO PRINCIPAL
                                 Container(
-                                  padding: const EdgeInsets.all(16), // Antes 20
+                                  padding: const EdgeInsets.all(16), 
                                   decoration: const BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: Colors.black12,
                                   ),
                                   child: const Icon(
                                     Icons.psychology_outlined,
-                                    size: 60, // Antes 70 (y mucho antes 80)
+                                    size: 60, 
                                     color: Colors.lightBlue,
                                   ),
                                 ),
 
-                                const SizedBox(height: 10), // Antes 20
+                                const SizedBox(height: 10), 
 
                                 Text(
                                   'Bienvenido a la estación de entrenamiento IA',
@@ -123,7 +120,6 @@ class _StartMenuPageState extends State<StartMenuPage>
                                 ),
                                 
                                 // ESPACIO FLEXIBLE
-                                // Absorbe cualquier pequeña diferencia restante
                                 const Spacer(), 
 
                                 // --- BOTONES DEL MENÚ ---
@@ -164,6 +160,18 @@ class _StartMenuPageState extends State<StartMenuPage>
                                 ),
                                 const SizedBox(height: 16),
 
+                                // --- GESTIÓN DE COMANDOS ---
+                                _buildMenuButton(
+                                  context: context,
+                                  icon: Icons.terminal_rounded, 
+                                  label: 'Comandos',
+                                  color: Colors.purple, 
+                                  onPressed: () {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const UserCommandsPage()));
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                
                                 _buildMenuButton(
                                   context: context,
                                   icon: Icons.settings,
@@ -206,7 +214,7 @@ class _StartMenuPageState extends State<StartMenuPage>
             ),
 
             // -------------------------------------------
-            // CAPA 2: HEADER DE SESIÓN (SIN CAMBIOS)
+            // CAPA 2: HEADER DE SESIÓN
             // -------------------------------------------
             Positioned(
               top: 12,
@@ -226,15 +234,14 @@ class _StartMenuPageState extends State<StartMenuPage>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Colores base de alta visibilidad
     final backgroundColor = isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.1);
     final borderColor = isDark ? Colors.white24 : Colors.black12;
-    final primaryColor = theme.colorScheme.primary; // Usamos el color primario del sistema actual
+    final primaryColor = theme.colorScheme.primary;
 
     // 1. ESTADO: NO AUTENTICADO
     if (!authProvider.isAuthenticated) {
       return Align(
-        alignment: Alignment.centerLeft, // Alineamos a la izquierda
+        alignment: Alignment.centerLeft, 
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -248,15 +255,15 @@ class _StartMenuPageState extends State<StartMenuPage>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: backgroundColor, // Usamos el mismo fondo visible que el estado conectado
+                color: backgroundColor, 
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                  color: primaryColor.withOpacity(0.5), // Borde coloreado para destacar acción
+                  color: primaryColor.withOpacity(0.5), 
                   width: 1.5
                 ),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min, // Se ajusta al contenido
+                mainAxisSize: MainAxisSize.min, 
                 children: [
                   Icon(
                     Icons.login_rounded, 

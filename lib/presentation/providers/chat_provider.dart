@@ -17,13 +17,9 @@ import '../../domain/usecases/command_processor.dart';
 import '../../domain/usecases/send_message_usecase.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../domain/repositories/conversation_repository.dart';
-import '../../domain/repositories/command_repository.dart'; // [NUEVO] Importar repositorio de comandos
+import '../../domain/repositories/command_repository.dart'; 
 import '../../core/constants/commands_help.dart';
 
-/// Provider principal del chat
-///
-/// IMPORTANTE: Este provider trabaja INTERNAMENTE con ENTIDADES (domain layer).
-/// Solo convierte a modelos cuando necesita interactuar con servicios de persistencia.
 class ChatProvider extends ChangeNotifier {
   // ============================================================================
   // ESTADO INTERNO: ENTIDADES (Domain Layer)
@@ -45,7 +41,7 @@ class ChatProvider extends ChangeNotifier {
   // INTERFACES DE REPOSITORIO
   final ChatRepository _chatRepository;
   final ConversationRepository _conversationRepository;
-  final CommandRepository _commandRepository; // [NUEVO] Repositorio de comandos
+  final CommandRepository _commandRepository; 
 
   bool Function()? _getSyncStatus;
 
@@ -61,7 +57,6 @@ class ChatProvider extends ChangeNotifier {
   late final OpenAIServiceAdapter _openaiAdapter;
   late final LocalOllamaServiceAdapter _localOllamaAdapter;
 
-  // CommandProcessor que se actualizará
   late CommandProcessor _commandProcessor; // No final - se actualiza al cambiar proveedor
 
   bool _showModelSelector = false;
@@ -72,11 +67,11 @@ class ChatProvider extends ChangeNotifier {
   ChatProvider({
     required ChatRepository chatRepository,
     required ConversationRepository conversationRepository,
-    required CommandRepository commandRepository, // [NUEVO] Inyección en constructor
+    required CommandRepository commandRepository, 
     required AIServiceSelector aiServiceSelector,
   })  : _chatRepository = chatRepository,
         _conversationRepository = conversationRepository,
-        _commandRepository = commandRepository, // [NUEVO] Asignación
+        _commandRepository = commandRepository,
         _aiSelector = aiServiceSelector,
         _geminiService = aiServiceSelector.geminiService,
         _ollamaService = aiServiceSelector.ollamaService,
@@ -95,7 +90,6 @@ class ChatProvider extends ChangeNotifier {
     _aiSelector.addListener(_onAiSelectorChanged);
 
     // Inicializar CommandProcessor con Gemini por defecto
-    // [ACTUALIZADO] Ahora recibe el _commandRepository
     _commandProcessor = CommandProcessor(_geminiAdapter, _commandRepository);
 
     _sendMessageUseCase = SendMessageUseCase(
@@ -213,7 +207,7 @@ class ChatProvider extends ChangeNotifier {
         break;
     }
 
-    // [ACTUALIZADO] Crear nuevo CommandProcessor pasando el Repositorio
+    // Crear nuevo CommandProcessor pasando el Repositorio
     _commandProcessor = CommandProcessor(currentAdapter, _commandRepository);
 
     _sendMessageUseCase = SendMessageUseCase(

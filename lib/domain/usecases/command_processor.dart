@@ -6,7 +6,7 @@ import '../../core/utils/laguande_detector.dart';
 /// Resultado del procesamiento de un comando
 class CommandResult {
   final bool isCommand;
-  final CommandEntity? command; // Referencia a la entidad del comando ejecutado
+  final CommandEntity? command;
   final String? processedMessage;
   final String? error;
 
