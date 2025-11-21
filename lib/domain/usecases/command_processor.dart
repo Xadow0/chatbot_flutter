@@ -1,90 +1,52 @@
 import 'package:flutter/foundation.dart';
-
-/// Tipos de comandos disponibles en el sistema
-enum CommandType {
-  evaluarPrompt, // Comando /evaluarprompt para evaluar y mejorar prompts
-  traducir,      // Comando /traducir para traducir texto a otro idioma
-  resumir,       // Comando /resumir para resumir textos largos
-  codigo,        // Comando /codigo para generar código
-  corregir,      // Comando /corregir para corregir texto
-  explicar,      // Comando /explicar para explicar conceptos
-  comparar,      // Comando /comparar para comparar dos opciones
-  none,          // No es un comando
-}
+import '../../domain/entities/command_entity.dart';
+import '../../domain/repositories/command_repository.dart'; // Asegúrate de importar tu repositorio
 
 /// Resultado del procesamiento de un comando
 class CommandResult {
   final bool isCommand;
-  final CommandType type;
+  final CommandEntity? command; // Referencia a la entidad del comando ejecutado
   final String? processedMessage;
   final String? error;
 
   CommandResult({
     required this.isCommand,
-    required this.type,
+    this.command,
     this.processedMessage,
     this.error,
   });
 
-  /// Constructor para cuando el mensaje NO es un comando
   factory CommandResult.notCommand() {
-    return CommandResult(
-      isCommand: false,
-      type: CommandType.none,
-    );
+    return CommandResult(isCommand: false);
   }
 
-  /// Constructor para cuando el comando se procesó exitosamente
-  factory CommandResult.success(CommandType type, String message) {
+  factory CommandResult.success(CommandEntity command, String message) {
     return CommandResult(
       isCommand: true,
-      type: type,
+      command: command,
       processedMessage: message,
     );
   }
 
-  /// Constructor para cuando hubo un error al procesar el comando
-  factory CommandResult.error(CommandType type, String error) {
+  factory CommandResult.error(CommandEntity? command, String error) {
     return CommandResult(
       isCommand: true,
-      type: type,
+      command: command,
       error: error,
     );
   }
 }
 
-/// Interfaz base que todos los servicios de IA deben implementar
-/// Esto permite que CommandProcessor funcione con cualquier servicio:
-/// - GeminiService (a través de GeminiServiceAdapter)
-/// - OpenAIService (a través de OpenAIServiceAdapter)
-/// - OllamaService (a través de OllamaServiceAdapter)
-/// - LocalOllamaService (a través de LocalOllamaServiceAdapter)
 abstract class AIServiceBase {
-  /// Genera contenido CON historial de conversación (usado para chat normal)
   Future<String> generateContent(String prompt);
-  
-  /// Genera contenido SIN historial (usado para comandos como /evaluarprompt y /traducir)
-  /// Este método debe enviar SOLO el prompt sin contexto adicional
   Future<String> generateContentWithoutHistory(String prompt);
 }
 
-/// Procesador de comandos que utiliza el servicio de IA actualmente seleccionado
-/// 
-/// Este procesador detecta y ejecuta comandos especiales que comienzan con '/'.
-/// Cada comando utiliza la IA seleccionada por el usuario (Gemini, OpenAI, Ollama, etc.)
-/// para generar respuestas especializadas.
-/// 
-/// **Flujo de trabajo:**
-/// 1. El usuario escribe un mensaje
-/// 2. ChatProvider -> SendMessageUseCase -> CommandProcessor
-/// 3. Si es un comando, se procesa con la IA activa SIN HISTORIAL
-/// 4. Si NO es un comando, se devuelve un eco local (sin IA)
-/// 
-/// **IMPORTANTE:** Los comandos como /evaluarprompt y /traducir usan `generateContentWithoutHistory`
-/// para evitar que el historial de la conversación interfiera con el análisis/traducción.
 class CommandProcessor {
   final AIServiceBase _aiService;
+  final CommandRepository _commandRepository;
 
+  // Lista de idiomas para la lógica de detección (Hardcoded porque es lógica de negocio)
   final languages = [
     // --- Idiomas de la lista original ---
     { 'spanish': 'Inglés', 'english': 'English', 'native': 'English', 'iso639_1': 'en', 'iso639_3': 'eng' },
@@ -176,726 +138,172 @@ class CommandProcessor {
     { 'spanish': 'Esperanto', 'english': 'Esperanto', 'native': 'Esperanto', 'iso639_1': 'eo', 'iso639_3': 'epo' },
   ];
 
-  CommandProcessor(this._aiService);
+  CommandProcessor(this._aiService, this._commandRepository);
 
-  /// Detecta si el mensaje es un comando y lo procesa
-  /// 
-  /// Retorna:
-  /// - [CommandResult.notCommand()] si no es un comando
-  /// - [CommandResult.success()] si el comando se procesó correctamente
-  /// 
-  /// Lanza:
-  /// - [Exception] si hubo un error al procesar el comando (ej. error de red)
+  /// Detecta si el mensaje es un comando buscando en la base de datos/repositorio
   Future<CommandResult> processMessage(String message) async {
-    final normalizedMessage = message.trim().toLowerCase();
-
-    debugPrint('🔍 [CommandProcessor] Analizando mensaje...');
-    debugPrint('   📝 Contenido: ${message.length > 50 ? "${message.substring(0, 50)}..." : message}');
-
-    // Detectar comando "/evaluarprompt"
-    if (normalizedMessage.startsWith('/evaluarprompt')) {
-      debugPrint('   ✅ Comando detectado: /evaluarprompt');
-      return await _processEvaluarPrompt(message);
+    final normalizedMessage = message.trim();
+    if (!normalizedMessage.startsWith('/')) {
+      return CommandResult.notCommand();
     }
 
-    // Detectar comando "/traducir"
-    if (normalizedMessage.startsWith('/traducir')) {
-      debugPrint('   ✅ Comando detectado: /traducir');
-      return await _processTraducir(message);
-    }
+    debugPrint('🔍 [CommandProcessor] Analizando mensaje: $normalizedMessage');
 
-    // Detectar comando "/resumir"
-    if (normalizedMessage.startsWith('/resumir')) {
-      debugPrint('   ✅ Comando detectado: /resumir');
-      return await _processResumir(message);
-    }
-
-    // Detectar comando "/codigo"
-    if (normalizedMessage.startsWith('/codigo')) {
-      debugPrint('   ✅ Comando detectado: /codigo');
-      return await _processCodigo(message);
-    }
-
-    // Detectar comando "/corregir"
-    if (normalizedMessage.startsWith('/corregir')) {
-      debugPrint('   ✅ Comando detectado: /corregir');
-      return await _processCorregir(message);
-    }
-
-    // Detectar comando "/explicar"
-    if (normalizedMessage.startsWith('/explicar')) {
-      debugPrint('   ✅ Comando detectado: /explicar');
-      return await _processExplicar(message);
-    }
-
-    // Detectar comando "/comparar"
-    if (normalizedMessage.startsWith('/comparar')) {
-      debugPrint('   ✅ Comando detectado: /comparar');
-      return await _processComparar(message);
-    }
-
-    // No es un comando
-    debugPrint('   ℹ️ No es un comando, retornando como mensaje normal');
-    return CommandResult.notCommand();
-  }
-
-
-  
-  /// Procesa el comando "/evaluarprompt" usando la IA seleccionada SIN HISTORIAL
-  /// 
-  /// Este comando evalúa y mejora el prompt proporcionado por el usuario,
-  /// utilizando la IA actualmente seleccionada (Gemini, OpenAI, Ollama, etc.)
-  /// 
-  /// **IMPORTANTE:** Usa `generateContentWithoutHistory` para evitar que mensajes
-  /// anteriores interfieran con el análisis del prompt.
-  Future<CommandResult> _processEvaluarPrompt(String message) async {
     try {
-      debugPrint('🔧 [CommandProcessor] Procesando comando /evaluarprompt...');
+      // 1. Obtener todos los comandos disponibles (Sistema + Usuario)
+      final commands = await _commandRepository.getAllCommands();
       
-      // Extraer el contenido después del comando
-      final content = _extractContentAfterCommand(message, '/evaluarprompt');
+      // 2. Buscar coincidencia con el trigger
+      // Ordenamos por longitud desc (para que /traduciringles no coincida con /traducir por error si existieran ambos)
+      commands.sort((a, b) => b.trigger.length.compareTo(a.trigger.length));
       
-      if (content.isEmpty) {
-        debugPrint('   ⚠️ Comando sin contenido');
-        return CommandResult.error(
-          CommandType.evaluarPrompt,
-          'Por favor, escribe algo después de "/evaluarprompt".\nEjemplo: /evaluarprompt ¿Qué es Flutter?',
-        );
-      }
-
-      debugPrint('   📄 Contenido extraído: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
-      
-      // Construir el prompt especializado para evaluación
-      final enhancedPrompt = _buildEvaluarPromptPrompt(content);
-      debugPrint('   🎯 Prompt especializado creado (${enhancedPrompt.length} caracteres)');
-
-      // Normalizar espacios antes de enviar a la IA
-      final trimmedPrompt = enhancedPrompt.trim();
-      
-      debugPrint('   🤖 Enviando a la IA seleccionada SIN HISTORIAL...');
-      debugPrint('   ⚡ Usando generateContentWithoutHistory para evitar interferencia del historial');
-      
-      // CRÍTICO: Usar generateContentWithoutHistory para que solo se envíe el prompt
-      // especializado sin ningún mensaje anterior de la conversación
-      final response = await _aiService.generateContentWithoutHistory(trimmedPrompt);
-      
-      debugPrint('   ✅ Respuesta recibida de la IA (${response.length} caracteres)');
-
-      return CommandResult.success(CommandType.evaluarPrompt, response);
-    } catch (e) {
-      debugPrint('   ❌ Error procesando comando: $e');
-
-      rethrow;
-      
-    }
-  }
-
-  /// Procesa el comando "/traducir" usando la IA seleccionada SIN HISTORIAL
-  /// 
-  /// Este comando traduce el texto proporcionado al idioma especificado manteniendo
-  /// la intención, tono y significado original.
-  /// 
-  /// **IMPORTANTE:** Usa `generateContentWithoutHistory` para evitar que mensajes
-  /// anteriores interfieran con la traducción.
-  Future<CommandResult> _processTraducir(String message) async {
-    try {
-      debugPrint('🔧 [CommandProcessor] Procesando comando /traducir...');
-      
-      // Extraer el contenido después del comando
-      final content = _extractContentAfterCommand(message, '/traducir');
-      
-      if (content.isEmpty) {
-        debugPrint('   ⚠️ Comando sin contenido');
-        return CommandResult.error(
-          CommandType.traducir,
-          'Por favor, escribe algo después de "/traducir".\nEjemplo: /traducir inglés Hola, ¿cómo estás?',
-        );
-      }
-
-      debugPrint('   📄 Contenido extraído: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
-      
-      // Construir el prompt especializado para traducción
-      final translatePrompt = _buildTraducirPrompt(content);
-      debugPrint('   🎯 Prompt de traducción creado (${translatePrompt.length} caracteres)');
-
-      // Normalizar espacios antes de enviar a la IA
-      final trimmedPrompt = translatePrompt.trim();
-      
-      debugPrint('   🤖 Enviando a la IA seleccionada SIN HISTORIAL...');
-      debugPrint('   ⚡ Usando generateContentWithoutHistory para evitar interferencia del historial');
-      
-      // CRÍTICO: Usar generateContentWithoutHistory para que solo se envíe el prompt
-      // de traducción sin ningún mensaje anterior de la conversación
-      final response = await _aiService.generateContentWithoutHistory(trimmedPrompt);
-      
-      debugPrint('   ✅ Traducción recibida de la IA (${response.length} caracteres)');
-
-      return CommandResult.success(CommandType.traducir, response);
-    } catch (e) {
-      debugPrint('   ❌ Error procesando comando: $e');
-      
-      rethrow;
-    }
-  }
-    /// Procesa el comando "/resumir" usando la IA seleccionada SIN HISTORIAL
-  /// 
-  /// Este comando resume textos largos extrayendo las ideas principales
-  /// y presentándolas de forma clara y concisa.
-  /// 
-  /// **IMPORTANTE:** Usa `generateContentWithoutHistory` para evitar que mensajes
-  /// anteriores interfieran con el resumen.
-  Future<CommandResult> _processResumir(String message) async {
-    try {
-      debugPrint('🔧 [CommandProcessor] Procesando comando /resumir...');
-      
-      // Extraer el contenido después del comando
-      final content = _extractContentAfterCommand(message, '/resumir');
-      
-      if (content.isEmpty) {
-        debugPrint('   ⚠️ Comando sin contenido');
-        return CommandResult.error(
-          CommandType.resumir,
-          'Por favor, proporciona un texto para resumir después de "/resumir".\nEjemplo: /resumir [pegar artículo o texto largo]',
-        );
-      }
-
-      debugPrint('   📄 Contenido extraído: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
-      
-      // Construir el prompt especializado para resumen
-      final resumirPrompt = _buildResumirPrompt(content);
-      debugPrint('   🎯 Prompt de resumen creado (${resumirPrompt.length} caracteres)');
-
-      // Normalizar espacios antes de enviar a la IA
-      final trimmedPrompt = resumirPrompt.trim();
-      
-      debugPrint('   🤖 Enviando a la IA seleccionada SIN HISTORIAL...');
-      debugPrint('   ⚡ Usando generateContentWithoutHistory para evitar interferencia del historial');
-      
-      // CRÍTICO: Usar generateContentWithoutHistory para que solo se envíe el prompt
-      // de resumen sin ningún mensaje anterior de la conversación
-      final response = await _aiService.generateContentWithoutHistory(trimmedPrompt);
-      
-      debugPrint('   ✅ Resumen recibido de la IA (${response.length} caracteres)');
-
-      return CommandResult.success(CommandType.resumir, response);
-    } catch (e) {
-      debugPrint('   ❌ Error procesando comando: $e');
-      return CommandResult.error(
-        CommandType.resumir,
-        'Error al procesar el comando: ${e.toString()}',
+      final matchingCommand = commands.firstWhere(
+        (cmd) => normalizedMessage.toLowerCase().startsWith(cmd.trigger.toLowerCase()),
+        orElse: () => throw Exception('No match'), // Usamos try/catch para el flujo
       );
-    }
-  }
 
-  /// Procesa el comando "/codigo" usando la IA seleccionada SIN HISTORIAL
-  /// 
-  /// Este comando genera código basado en la descripción proporcionada,
-  /// incluyendo explicaciones y buenas prácticas.
-  /// 
-  /// **IMPORTANTE:** Usa `generateContentWithoutHistory` para evitar que mensajes
-  /// anteriores interfieran con la generación de código.
-  Future<CommandResult> _processCodigo(String message) async {
-    try {
-      debugPrint('🔧 [CommandProcessor] Procesando comando /codigo...');
-      
-      // Extraer el contenido después del comando
-      final content = _extractContentAfterCommand(message, '/codigo');
-      
-      if (content.isEmpty) {
-        debugPrint('   ⚠️ Comando sin contenido');
-        return CommandResult.error(
-          CommandType.codigo,
-          'Por favor, describe el código que necesitas después de "/codigo".\nEjemplo: /codigo función para ordenar lista de números',
-        );
-      }
+      debugPrint('   ✅ Comando detectado: ${matchingCommand.trigger} (${matchingCommand.title})');
 
-      debugPrint('   📄 Contenido extraído: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
-      
-      // Construir el prompt especializado para generación de código
-      final codigoPrompt = _buildCodigoPrompt(content);
-      debugPrint('   🎯 Prompt de código creado (${codigoPrompt.length} caracteres)');
-
-      // Normalizar espacios antes de enviar a la IA
-      final trimmedPrompt = codigoPrompt.trim();
-      
-      debugPrint('   🤖 Enviando a la IA seleccionada SIN HISTORIAL...');
-      debugPrint('   ⚡ Usando generateContentWithoutHistory para evitar interferencia del historial');
-      
-      // CRÍTICO: Usar generateContentWithoutHistory para que solo se envíe el prompt
-      // de código sin ningún mensaje anterior de la conversación
-      final response = await _aiService.generateContentWithoutHistory(trimmedPrompt);
-      
-      debugPrint('   ✅ Código recibido de la IA (${response.length} caracteres)');
-
-      return CommandResult.success(CommandType.codigo, response);
-    } catch (e) {
-      debugPrint('   ❌ Error procesando comando: $e');
-      return CommandResult.error(
-        CommandType.codigo,
-        'Error al procesar el comando: ${e.toString()}',
-      );
-    }
-  }
-
-  /// Procesa el comando "/corregir" usando la IA seleccionada SIN HISTORIAL
-  /// 
-  /// Este comando corrige errores ortográficos, gramaticales y de estilo
-  /// en el texto proporcionado, explicando las correcciones realizadas.
-  /// 
-  /// **IMPORTANTE:** Usa `generateContentWithoutHistory` para evitar que mensajes
-  /// anteriores interfieran con la corrección.
-  Future<CommandResult> _processCorregir(String message) async {
-    try {
-      debugPrint('🔧 [CommandProcessor] Procesando comando /corregir...');
-      
-      // Extraer el contenido después del comando
-      final content = _extractContentAfterCommand(message, '/corregir');
-      
-      if (content.isEmpty) {
-        debugPrint('   ⚠️ Comando sin contenido');
-        return CommandResult.error(
-          CommandType.corregir,
-          'Por favor, escribe el texto a corregir después de "/corregir".\nEjemplo: /corregir Este es un teksto con herrores',
-        );
-      }
-
-      debugPrint('   📄 Contenido extraído: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
-      
-      // Construir el prompt especializado para corrección
-      final corregirPrompt = _buildCorregirPrompt(content);
-      debugPrint('   🎯 Prompt de corrección creado (${corregirPrompt.length} caracteres)');
-
-      // Normalizar espacios antes de enviar a la IA
-      final trimmedPrompt = corregirPrompt.trim();
-      
-      debugPrint('   🤖 Enviando a la IA seleccionada SIN HISTORIAL...');
-      debugPrint('   ⚡ Usando generateContentWithoutHistory para evitar interferencia del historial');
-      
-      // CRÍTICO: Usar generateContentWithoutHistory para que solo se envíe el prompt
-      // de corrección sin ningún mensaje anterior de la conversación
-      final response = await _aiService.generateContentWithoutHistory(trimmedPrompt);
-      
-      debugPrint('   ✅ Corrección recibida de la IA (${response.length} caracteres)');
-
-      return CommandResult.success(CommandType.corregir, response);
-    } catch (e) {
-      debugPrint('   ❌ Error procesando comando: $e');
-      return CommandResult.error(
-        CommandType.corregir,
-        'Error al procesar el comando: ${e.toString()}',
-      );
-    }
-  }
-
-  /// Procesa el comando "/explicar" usando la IA seleccionada SIN HISTORIAL
-  /// 
-  /// Este comando explica conceptos de forma clara y didáctica,
-  /// adaptándose al nivel de conocimiento del usuario.
-  /// 
-  /// **IMPORTANTE:** Usa `generateContentWithoutHistory` para evitar que mensajes
-  /// anteriores interfieran con la explicación.
-  Future<CommandResult> _processExplicar(String message) async {
-    try {
-      debugPrint('🔧 [CommandProcessor] Procesando comando /explicar...');
-      
-      // Extraer el contenido después del comando
-      final content = _extractContentAfterCommand(message, '/explicar');
-      
-      if (content.isEmpty) {
-        debugPrint('   ⚠️ Comando sin contenido');
-        return CommandResult.error(
-          CommandType.explicar,
-          'Por favor, indica qué concepto quieres que explique después de "/explicar".\nEjemplo: /explicar ¿Qué es async/await?',
-        );
-      }
-
-      debugPrint('   📄 Contenido extraído: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
-      
-      // Construir el prompt especializado para explicación
-      final explicarPrompt = _buildExplicarPrompt(content);
-      debugPrint('   🎯 Prompt de explicación creado (${explicarPrompt.length} caracteres)');
-
-      // Normalizar espacios antes de enviar a la IA
-      final trimmedPrompt = explicarPrompt.trim();
-      
-      debugPrint('   🤖 Enviando a la IA seleccionada SIN HISTORIAL...');
-      debugPrint('   ⚡ Usando generateContentWithoutHistory para evitar interferencia del historial');
-      
-      // CRÍTICO: Usar generateContentWithoutHistory para que solo se envíe el prompt
-      // de explicación sin ningún mensaje anterior de la conversación
-      final response = await _aiService.generateContentWithoutHistory(trimmedPrompt);
-      
-      debugPrint('   ✅ Explicación recibida de la IA (${response.length} caracteres)');
-
-      return CommandResult.success(CommandType.explicar, response);
-    } catch (e) {
-      debugPrint('   ❌ Error procesando comando: $e');
-      return CommandResult.error(
-        CommandType.explicar,
-        'Error al procesar el comando: ${e.toString()}',
-      );
-    }
-  }
-
-  /// Procesa el comando "/comparar" usando la IA seleccionada SIN HISTORIAL
-  /// 
-  /// Este comando compara dos opciones o conceptos de forma objetiva,
-  /// destacando ventajas, desventajas y casos de uso.
-  /// 
-  /// **IMPORTANTE:** Usa `generateContentWithoutHistory` para evitar que mensajes
-  /// anteriores interfieran con la comparación.
-  Future<CommandResult> _processComparar(String message) async {
-    try {
-      debugPrint('🔧 [CommandProcessor] Procesando comando /comparar...');
-      
-      // Extraer el contenido después del comando
-      final content = _extractContentAfterCommand(message, '/comparar');
-      
-      if (content.isEmpty) {
-        debugPrint('   ⚠️ Comando sin contenido');
-        return CommandResult.error(
-          CommandType.comparar,
-          'Por favor, indica qué opciones quieres comparar después de "/comparar".\nEjemplo: /comparar Flutter vs React Native',
-        );
-      }
-
-      debugPrint('   📄 Contenido extraído: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
-      
-      // Construir el prompt especializado para comparación
-      final compararPrompt = _buildCompararPrompt(content);
-      debugPrint('   🎯 Prompt de comparación creado (${compararPrompt.length} caracteres)');
-
-      // Normalizar espacios antes de enviar a la IA
-      final trimmedPrompt = compararPrompt.trim();
-      
-      debugPrint('   🤖 Enviando a la IA seleccionada SIN HISTORIAL...');
-      debugPrint('   ⚡ Usando generateContentWithoutHistory para evitar interferencia del historial');
-      
-      // CRÍTICO: Usar generateContentWithoutHistory para que solo se envíe el prompt
-      // de comparación sin ningún mensaje anterior de la conversación
-      final response = await _aiService.generateContentWithoutHistory(trimmedPrompt);
-      
-      debugPrint('   ✅ Comparación recibida de la IA (${response.length} caracteres)');
-
-      return CommandResult.success(CommandType.comparar, response);
-    } catch (e) {
-      debugPrint('   ❌ Error procesando comando: $e');
-      return CommandResult.error(
-        CommandType.comparar,
-        'Error al procesar el comando: ${e.toString()}',
-      );
-    }
-  }
-
-  /// Extrae el contenido después del comando
-  String _extractContentAfterCommand(String message, String command) {
-    final startIndex = message.toLowerCase().indexOf(command.toLowerCase());
-    if (startIndex == -1) return '';
-    
-    final contentStart = startIndex + command.length;
-    return message.substring(contentStart).trim();
-  }
-
-  /// Construye el prompt especializado para evaluación y mejora de prompts
-  /// 
-  /// Este prompt instruye a la IA para que analice y mejore el prompt del usuario,
-  /// identificando los tres componentes clave: Task, Context y Referencias
-  String _buildEvaluarPromptPrompt(String userContent) {
-    return '''
-Actúa como un evaluador y mejorador de prompts para el prompt que adjunto como "Mensaje del usuario". No repitas tu función ni el mensaje del usuario, céntrate en mejorar el prompt. 
-El usuario mandará un prompt para que lo evalúes y mejores, para cada caso, debes identificar los tres pasos que cualquier prompt debería tener:
-1. Task 
-2. Context
-3. Referencias
-
-Si cualquiera de las tres partes es faltante o deficiente, debes indicar al usuario como mejorarlo, haciendo las preguntas generales para que el usuario las conteste en el tema en específico del que trate el prompt.
-
-Estos son los pasos que debes cumplir para evaluar y mejorar el prompt:
-
-**Instrucciones:**
-1. **Identifica el objetivo principal** cuál es el objetivo que este prompt busca que tú (la IA) cumplas.
-2. **Tamaño y complejidad del objetivo:** ¿Es el objetivo que el prompt propone grande y complicado para la IA?  Si es así, ¿como desglosarlo en objetivos mas pequeños?
-3. **Estructura y expresión del prompt:** ¿Está este prompt bien estructurado y expresado para lograr su objetivo de manera efectiva?    
-4. **Necesidades de un prompt complejo:** Si el objetivo es grande y/o complicado, ¿incluye este prompt un contexto completo, instrucciones claras y por pasos, ejemplos relevantes y un formato de respuesta adecuado para la IA?
-5. **Añade una referencias adecuadas para el resultado:** ¿Que tipo de estructura quieres que tenga la respuesta (lista, tabla, párrafos)? ¿Que tono, longitud y estilo? Es necesario un ejemplo claro de respuesta?
-6. **Reescribe el prompt mejorado** incorporando todas las mejoras que hayas señalado. Asegúrate de que el prompt resultante sea claro y completo. Proporciona este prompt mejorado en un formato markdown. Todas las partes que deban ser reemplazadas o completadas por el usuario estaran entre corchetes [].
-
-**Restricciones:**
-* Tu respuesta no debe superar los 4000 tokens.
-* Céntrate en la explicación de las mejoras y en la generación del prompt mejorado, sin dar rodeos o información superflua en el formato de la explicación.
-
-**Mensaje del usuario:**
-$userContent
-
-**Fin del mensaje del usuario.**
-''';
-  }
-
-  /// Construye el prompt especializado para traducción
-  /// 
-  /// Este prompt instruye a la IA para que traduzca manteniendo la intención,
-  /// tono, registro y significado original del texto. Detecta automáticamente
-  /// el idioma de destino o usa inglés por defecto.
-  String _buildTraducirPrompt(String userContent) {
-  final lowerContent = userContent.toLowerCase();
-  
-  // Valores por defecto
-  String targetLanguage = 'inglés'; // Idioma por defecto (ya en español)
-  String textToTranslate = userContent;
-  bool languageFound = false;
-
-  // Iterar sobre la lista estructurada de idiomas
-  for (final langData in languages) {
-    
-    // 1. Crear una lista de todas las posibles variaciones para este idioma
-    final variations = [
-      langData['spanish'],
-      langData['english'],
-      langData['native'],
-      langData['iso639_1'],
-      langData['iso639_3'],
-    ]
-        .whereType<String>() // Filtrar nulos (si alguna clave no existe)
-        .where((s) => s.isNotEmpty) // Filtrar vacíos
-        .map((s) => s.toLowerCase()) // Convertir a minúsculas
-        .toList();
-
-    // 2. Ordenar las variaciones por longitud, de mayor a menor
-    //    Esto es CRUCIAL para que "español" se detecte antes que "es"
-    variations.sort((a, b) => b.length.compareTo(a.length));
-
-    // 3. Comprobar cada variación
-    for (final variation in variations) {
-      if (lowerContent.startsWith(variation)) {
-        // 4. Comprobar límite de palabra:
-        //    Debe ser seguido por un espacio o ser el final del texto.
-        //    Esto evita que "en" (inglés) coincida con "entiendo que..."
-        final isWordBoundary = lowerContent.length == variation.length || 
-                              lowerContent[variation.length] == ' ';
+      // 3. Enrutar según el tipo de sistema
+      switch (matchingCommand.systemType) {
+        case SystemCommandType.none:
+          return await _processUserCommand(matchingCommand, message);
         
-        if (isWordBoundary) {
-          // ¡Coincidencia encontrada!
-          
-          // REQUISITO CUMPLIDO:
-          // Asignar la versión en ESPAÑOL del idioma al prompt
-          targetLanguage = langData['spanish']!; // Usamos '!' porque sabemos que 'spanish' existe
+        case SystemCommandType.traducir:
+          return await _processTraducir(matchingCommand, message);
 
-          // Extraer el texto después del idioma
-          textToTranslate = userContent.substring(variation.length).trim();
-          
-          languageFound = true;
-          break; // Salir del bucle de variaciones
-        }
+        // Los siguientes comparten lógica simple (Template + Contenido),
+        // pero mantenemos el switch por si quieres añadir lógica específica a futuro.
+        case SystemCommandType.evaluarPrompt:
+        case SystemCommandType.resumir:
+        case SystemCommandType.codigo:
+        case SystemCommandType.corregir:
+        case SystemCommandType.explicar:
+        case SystemCommandType.comparar:
+          return await _processStandardSystemCommand(matchingCommand, message);
       }
-    }
 
-    if (languageFound) {
-      break; // Salir del bucle principal de idiomas
+    } catch (e) {
+      // Si no se encontró comando o hubo error en repositorio
+      if (e.toString().contains('No match')) {
+         debugPrint('   ℹ️ No es un comando registrado.');
+         return CommandResult.notCommand();
+      }
+      debugPrint('   ❌ Error recuperando comandos: $e');
+      return CommandResult.notCommand();
     }
   }
+
+  /// Procesa comandos personalizados del usuario (Simples)
+  /// Concatena el Prompt del usuario + el Input actual
+  Future<CommandResult> _processUserCommand(CommandEntity command, String message) async {
+    try {
+      final content = _extractContentAfterCommand(message, command.trigger);
+      
+      // Si el usuario definió un placeholder {{content}}, lo usamos. Si no, concatenamos.
+      String finalPrompt;
+      if (command.promptTemplate.contains('{{content}}')) {
+        finalPrompt = command.promptTemplate.replaceAll('{{content}}', content);
+      } else {
+        finalPrompt = '${command.promptTemplate}\n\n$content';
+      }
+
+      debugPrint('   🤖 Enviando Prompt Usuario a IA...');
+      final response = await _aiService.generateContentWithoutHistory(finalPrompt);
+      return CommandResult.success(command, response);
+    } catch (e) {
+      return CommandResult.error(command, 'Error ejecutando comando: $e');
+    }
+  }
+
+  /// Procesa comandos estándar del sistema que solo requieren inyección de contenido
+  /// (Evaluar, Resumir, Código, Corregir, Explicar, Comparar)
+  Future<CommandResult> _processStandardSystemCommand(CommandEntity command, String message) async {
+    try {
+      final content = _extractContentAfterCommand(message, command.trigger);
+      
+      if (content.isEmpty) {
+        return CommandResult.error(command, 'Por favor, añade el contenido después del comando.');
+      }
+
+      // Inyectamos el contenido en el template que viene del Modelo/Firebase
+      final finalPrompt = command.promptTemplate.replaceAll('{{content}}', content);
+
+      debugPrint('   🤖 Enviando Prompt Sistema (${command.title}) a IA...');
+      final response = await _aiService.generateContentWithoutHistory(finalPrompt);
+      return CommandResult.success(command, response);
+    } catch (e) {
+      return CommandResult.error(command, 'Error: $e');
+    }
+  }
+
+  /// Lógica avanzada específica para TRADUCIR (Mantiene tu algoritmo original)
+  Future<CommandResult> _processTraducir(CommandEntity command, String message) async {
+    try {
+      final contentRaw = _extractContentAfterCommand(message, command.trigger);
+      if (contentRaw.isEmpty) {
+        return CommandResult.error(command, 'Uso: ${command.trigger} [idioma opcional] [texto]');
+      }
+
+      final lowerContent = contentRaw.toLowerCase();
+      String targetLanguage = 'inglés'; // Default
+      String textToTranslate = contentRaw;
+      bool languageFound = false;
+
+      // --- TU LÓGICA DE DETECCIÓN DE IDIOMA ORIGINAL ---
+      for (final langData in languages) {
+        final variations = [
+          langData['spanish'], langData['english'], langData['native'],
+          langData['iso639_1'], langData['iso639_3'],
+        ].whereType<String>().where((s) => s.isNotEmpty).map((s) => s.toLowerCase()).toList();
+
+        variations.sort((a, b) => b.length.compareTo(a.length));
+
+        for (final variation in variations) {
+          if (lowerContent.startsWith(variation)) {
+            final isWordBoundary = lowerContent.length == variation.length || 
+                                  lowerContent[variation.length] == ' ';
+            if (isWordBoundary) {
+              targetLanguage = langData['spanish']!; 
+              textToTranslate = contentRaw.substring(variation.length).trim();
+              languageFound = true;
+              break;
+            }
+          }
+        }
+        if (languageFound) break;
+      }
+      // ---------------------------------------------------
+
+      if (textToTranslate.isEmpty) {
+         return CommandResult.error(command, 'Falta el texto a traducir.');
+      }
+
+      // Usamos el template del Modelo (entity) y reemplazamos las DOS variables
+      final finalPrompt = command.promptTemplate
+          .replaceAll('{{targetLanguage}}', targetLanguage)
+          .replaceAll('{{content}}', textToTranslate);
+
+      debugPrint('   🌍 Traduciendo a: $targetLanguage');
+      final response = await _aiService.generateContentWithoutHistory(finalPrompt);
+      return CommandResult.success(command, response);
+
+    } catch (e) {
+      return CommandResult.error(command, 'Error de traducción: $e');
+    }
+  }
+
+  String _extractContentAfterCommand(String message, String trigger) {
+    // Aseguramos case-insensitive matching para el trigger
+    final msgLower = message.toLowerCase();
+    final trigLower = trigger.toLowerCase();
     
-    return '''
-Actúa como un traductor experto especializado en lenguaje natural y contexto conversacional.  
-Tu tarea es traducir el texto proporcionado por el usuario al **$targetLanguage**, manteniendo **la intención, el tono, el registro, y el significado original**.  
-Evita traducciones literales o robóticas: prioriza la **fidelidad semántica y expresiva**.  
-
-**Instrucciones específicas:**
-1. Si el texto incluye expresiones idiomáticas, regionalismos o metáforas, tradúcelas a equivalentes naturales en $targetLanguage.
-2. Si hay ambigüedad, conserva el sentido más probable según el contexto.
-3. Mantén el formato del texto original (listas, negritas, comillas, etc.).
-4. No expliques tu traducción, simplemente ofrece la versión traducida.
-5. Si el texto incluye partes que no deberían traducirse (por ejemplo, nombres propios, comandos o código), déjalos tal cual.
-6. Si el texto ya está en $targetLanguage, indícalo al usuario brevemente y devuelve el texto sin cambios.
-
-**Texto a traducir:**
-$textToTranslate
-
-**Fin del texto a traducir.**
-''';
-  }
-
-  /// Construye el prompt especializado para resumir textos
-  /// 
-  /// Este prompt instruye a la IA para que extraiga las ideas principales
-  /// y las presente de forma clara, concisa y estructurada.
-  String _buildResumirPrompt(String userContent) {
-    return '''
-Actúa como un experto en síntesis y análisis de textos.  
-Tu tarea es crear un **resumen claro y conciso** del texto proporcionado, extrayendo las ideas principales y eliminando información redundante o poco relevante.
-
-**Instrucciones específicas:**
-1. **Identifica las ideas principales:** Extrae los conceptos clave, argumentos centrales y conclusiones importantes.
-2. **Mantén la objetividad:** No agregues opiniones personales ni interpretaciones que no estén en el texto original.
-3. **Estructura clara:** Organiza el resumen de forma lógica con párrafos cortos o puntos clave según la longitud del texto.
-4. **Longitud del resumen:** 
-   - Para textos cortos (< 500 palabras): 3-5 líneas
-   - Para textos medianos (500-2000 palabras): 1-2 párrafos
-   - Para textos largos (> 2000 palabras): 3-4 párrafos con ideas principales
-5. **Conserva términos técnicos:** Si el texto incluye terminología especializada importante, mantenla en el resumen.
-6. **Claridad:** El resumen debe ser comprensible para alguien que no haya leído el texto original.
-
-**Restricciones:**
-* No incluyas frases como "el texto habla de" o "el autor menciona"
-* Ve directo al contenido
-* Mantén el tono profesional y objetivo
-
-**Texto a resumir:**
-$userContent
-
-**Fin del texto a resumir.**
-''';
-  }
-
-  /// Construye el prompt especializado para generar código
-  /// 
-  /// Este prompt instruye a la IA para que genere código limpio, bien documentado
-  /// y siguiendo las mejores prácticas del lenguaje o tecnología solicitada.
-  String _buildCodigoPrompt(String userContent) {
-    return '''
-Actúa como un desarrollador experto y mentor de programación.  
-Tu tarea es generar código de alta calidad basado en la descripción proporcionada por el usuario.
-
-**Instrucciones específicas:**
-1. **Detecta el lenguaje/tecnología:** Si el usuario no especifica, infiere el lenguaje más apropiado según la descripción e indícalo al usuario.
-2. **Código limpio y legible:** 
-   - Usa nombres descriptivos para variables y funciones
-   - Aplica las convenciones del lenguaje
-   - Mantén la consistencia en el estilo
-3. **Documentación:**
-   - Incluye comentarios explicativos en partes complejas
-   - Agrega docstrings o documentación según el lenguaje
-4. **Buenas prácticas:**
-   - Manejo de errores apropiado
-   - Código modular y reutilizable
-   - Eficiencia y optimización cuando sea relevante
-5. **Explicación breve:** Después del código, incluye una breve explicación de cómo funciona y cómo usarlo.
-6. **Ejemplos de uso:** Si es apropiado, incluye ejemplos de cómo ejecutar o usar el código.
-
-**Restricciones:**
-* El código debe ser funcional y estar probado conceptualmente
-* Evita soluciones excesivamente complejas
-* Si falta información crítica, indica qué necesitas saber
-
-**Descripción del código solicitado:**
-$userContent
-
-**Fin de la descripción.**
-''';
-  }
-
-  /// Construye el prompt especializado para corregir textos
-  /// 
-  /// Este prompt instruye a la IA para que identifique y corrija errores
-  /// ortográficos, gramaticales y de estilo, explicando las correcciones.
-  String _buildCorregirPrompt(String userContent) {
-    return '''
-Actúa como un corrector profesional de textos y experto en gramática y ortografía.  
-Tu tarea es corregir todos los errores del texto proporcionado y mejorar su claridad y fluidez.
-
-**Instrucciones específicas:**
-1. **Tipos de correcciones:**
-   - Ortografía: tildes, letras incorrectas, mayúsculas
-   - Gramática: concordancia, tiempos verbales, estructura sintáctica
-   - Puntuación: comas, puntos, signos de interrogación/exclamación
-   - Estilo: repeticiones innecesarias, ambigüedades, claridad
-2. **Formato de respuesta:**
-   - **Texto corregido:** Presenta primero el texto completamente corregido
-   - **Explicación de cambios:** Después, enumera los principales errores encontrados y por qué se corrigieron
-3. **Mantén el sentido original:** No cambies el mensaje o intención del autor
-4. **Respeta el tono:** Si el texto es formal, mantén la formalidad; si es informal, mantenlo así
-5. **Mejoras de estilo:** Solo si es necesario, sugiere mejoras opcionales para mayor claridad
-
-**Restricciones:**
-* No reescribas completamente el texto, solo corrige errores
-* Si el texto está perfecto, indícalo claramente
-* Sé constructivo en las explicaciones
-
-**Texto a corregir:**
-$userContent
-
-**Fin del texto a corregir.**
-''';
-  }
-
-  /// Construye el prompt especializado para explicar conceptos
-  /// 
-  /// Este prompt instruye a la IA para que explique conceptos de forma
-  /// didáctica, clara y adaptada al nivel del usuario.
-  String _buildExplicarPrompt(String userContent) {
-    return '''
-Actúa como un profesor experto y comunicador claro.  
-Tu tarea es explicar el concepto solicitado de forma didáctica, comprensible y completa.
-
-**Instrucciones específicas:**
-1. **Estructura de la explicación:**
-   - **Definición simple:** Comienza con una explicación básica en 1-2 frases
-   - **Desarrollo:** Profundiza en el concepto con más detalles
-   - **Ejemplos prácticos:** Incluye ejemplos concretos y relatable
-   - **Analogías:** Si ayuda, usa analogías con situaciones cotidianas
-2. **Adaptación del nivel:**
-   - Comienza con lo básico
-   - Aumenta gradualmente la complejidad
-   - Evita jerga innecesaria (o explícala si es importante)
-3. **Claridad:**
-   - Usa párrafos cortos
-   - Enumera puntos importantes cuando sea útil
-   - Destaca conceptos clave
-4. **Contexto:** Si es relevante, menciona por qué este concepto es importante o dónde se aplica
-5. **Verificación de comprensión:** Al final, puedes incluir una pregunta o ejercicio simple para reforzar el aprendizaje
-
-**Restricciones:**
-* No asumas conocimientos previos avanzados
-* Sé preciso pero accesible
-* Si el concepto es muy amplio, enfócate en lo esencial primero
-
-**Concepto a explicar:**
-$userContent
-
-**Fin del concepto solicitado.**
-''';
-  }
-
-  /// Construye el prompt especializado para comparar opciones
-  /// 
-  /// Este prompt instruye a la IA para que compare dos o más opciones
-  /// de forma objetiva, equilibrada y estructurada.
-  String _buildCompararPrompt(String userContent) {
-    return '''
-Actúa como un analista objetivo y experto en comparaciones.  
-Tu tarea es comparar las opciones proporcionadas de forma equilibrada, destacando ventajas, desventajas y casos de uso apropiados.
-
-**Instrucciones específicas:**
-1. **Estructura de la comparación:**
-   - **Introducción breve:** Presenta las opciones a comparar
-   - **Tabla comparativa (si aplica):** Para características clave
-   - **Análisis detallado:** Desarrolla ventajas y desventajas de cada opción
-   - **Casos de uso:** Indica cuándo elegir cada opción
-   - **Conclusión:** Resume la comparación sin imponer una elección
-2. **Criterios de comparación:**
-   - Funcionalidad
-   - Facilidad de uso
-   - Rendimiento
-   - Costo (si es relevante)
-   - Comunidad y soporte
-   - Casos de uso ideales
-3. **Objetividad:**
-   - Presenta ambos lados de forma equilibrada
-   - Evita sesgos personales
-   - Reconoce que diferentes opciones son mejores en diferentes contextos
-4. **Claridad:**
-   - Usa viñetas o tablas para facilitar la lectura
-   - Destaca diferencias clave
-   - Sé específico con ejemplos concretos
-
-**Restricciones:**
-* No declares un "ganador" absoluto a menos que una opción sea claramente superior en todos los aspectos
-* Basa las afirmaciones en hechos verificables
-* Si falta información para comparar adecuadamente, indícalo
-
-**Opciones a comparar:**
-$userContent
-
-**Fin de las opciones.**
-''';
+    final index = msgLower.indexOf(trigLower);
+    if (index == -1) return message; // Fallback raro
+    
+    final contentStart = index + trigger.length;
+    if (contentStart >= message.length) return '';
+    
+    return message.substring(contentStart).trim();
   }
 }

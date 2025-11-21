@@ -17,6 +17,7 @@ import '../../domain/usecases/command_processor.dart';
 import '../../domain/usecases/send_message_usecase.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../domain/repositories/conversation_repository.dart';
+import '../../domain/repositories/command_repository.dart'; // [NUEVO] Importar repositorio de comandos
 import '../../core/constants/commands_help.dart';
 
 /// Provider principal del chat
@@ -34,8 +35,6 @@ class ChatProvider extends ChangeNotifier {
   bool _isNewConversation = true;
   bool _isRetryingOllama = false;
   // Controla si el usuario puede seleccionar Ollama remoto desde la UI.
-  // Esto se usa para bloquear la selección temporalmente cuando el servidor
-  // remoto se desconecta y la app cambia automáticamente a Gemini.
   bool _ollamaSelectable = true;
   bool _needsHistoryLoad = false;
 
@@ -46,6 +45,8 @@ class ChatProvider extends ChangeNotifier {
   // INTERFACES DE REPOSITORIO
   final ChatRepository _chatRepository;
   final ConversationRepository _conversationRepository;
+  final CommandRepository _commandRepository; // [NUEVO] Repositorio de comandos
+
   bool Function()? _getSyncStatus;
 
   // Referencias a los servicios
@@ -71,15 +72,17 @@ class ChatProvider extends ChangeNotifier {
   ChatProvider({
     required ChatRepository chatRepository,
     required ConversationRepository conversationRepository,
+    required CommandRepository commandRepository, // [NUEVO] Inyección en constructor
     required AIServiceSelector aiServiceSelector,
-  })  :  _chatRepository = chatRepository,
-      _conversationRepository = conversationRepository,
-      _aiSelector = aiServiceSelector,
-      _geminiService = aiServiceSelector.geminiService,
-      _ollamaService = aiServiceSelector.ollamaService,
-      _openaiService = aiServiceSelector.openaiService,
-      _localOllamaService = aiServiceSelector.localOllamaService {
-
+  })  : _chatRepository = chatRepository,
+        _conversationRepository = conversationRepository,
+        _commandRepository = commandRepository, // [NUEVO] Asignación
+        _aiSelector = aiServiceSelector,
+        _geminiService = aiServiceSelector.geminiService,
+        _ollamaService = aiServiceSelector.ollamaService,
+        _openaiService = aiServiceSelector.openaiService,
+        _localOllamaService = aiServiceSelector.localOllamaService {
+    
     // Crear adaptadores
     _geminiAdapter = GeminiServiceAdapter(_geminiService);
     _ollamaAdapter = OllamaServiceAdapter(_ollamaService, _currentModel);
@@ -92,7 +95,8 @@ class ChatProvider extends ChangeNotifier {
     _aiSelector.addListener(_onAiSelectorChanged);
 
     // Inicializar CommandProcessor con Gemini por defecto
-    _commandProcessor = CommandProcessor(_geminiAdapter);
+    // [ACTUALIZADO] Ahora recibe el _commandRepository
+    _commandProcessor = CommandProcessor(_geminiAdapter, _commandRepository);
 
     _sendMessageUseCase = SendMessageUseCase(
       commandProcessor: _commandProcessor,
@@ -113,25 +117,20 @@ class ChatProvider extends ChangeNotifier {
 
     // 1. Sincronizar la lista de modelos disponibles
     if (_aiSelector.ollamaAvailable) {
-      // Si el selector indica que Ollama está disponible, desbloquear la selección
       if (!_ollamaSelectable) {
         _ollamaSelectable = true;
         debugPrint('   🔓 Ollama disponible: desbloqueando selección en la UI');
       }
-      // Comprobar si la lista de modelos ha cambiado realmente (optimización)
-      // usará 'listEquals' de foundation.dart (que ya está importado)
+      
       if (!listEquals(_availableModels, _aiSelector.availableModels)) {
         _availableModels = _aiSelector.availableModels;
         debugPrint(
             '   ✅ Lista de modelos Ollama (remoto) actualizada: ${_availableModels.length} modelos');
 
-        // 2. Si la lista se actualizó, asegurarse de que haya un modelo seleccionado
         if (_availableModels.isNotEmpty) {
           final currentModelExists =
               _availableModels.any((m) => m.name == _currentModel);
 
-          // Si el modelo actual no existe (o no había ninguno),
-          // seleccionar el primero de la lista.
           if (!currentModelExists || _currentModel.isEmpty) {
             _currentModel = _availableModels.first.name;
             _ollamaAdapter.updateModel(_currentModel);
@@ -141,49 +140,33 @@ class ChatProvider extends ChangeNotifier {
         }
       }
 
-      // 3. Sincronizar el modelo actual
       if (_currentProvider == AIProvider.ollama &&
           _currentModel != _aiSelector.currentOllamaModel) {
         _currentModel = _aiSelector.currentOllamaModel;
         _ollamaAdapter.updateModel(_currentModel);
       }
     } else {
-      // Ollama (remoto) NO está disponible
-
-      // 4. Si Ollama se desconecta, vaciar la lista
       if (_availableModels.isNotEmpty) {
         _availableModels = [];
         debugPrint('   ❌ Ollama (remoto) desconectado. Vaciando lista de modelos.');
       }
 
-      // Bloquear la posibilidad de seleccionar Ollama desde la UI hasta
-      // que el usuario vuelva a reconectar manualmente o el servicio
-      // sea detectado como disponible de nuevo.
       if (_ollamaSelectable) {
         _ollamaSelectable = false;
         debugPrint('   🔒 Bloqueando selección de Ollama en la UI (desconectado)');
       }
 
-      // 5. VERIFICAR SI OLLAMA (Remoto) ERA EL PROVEEDOR ACTIVO
       if (_currentProvider == AIProvider.ollama) {
         debugPrint('   ⚠️ ¡Ollama (remoto) era el proveedor activo y se ha desconectado!');
         debugPrint('   🔄 Cambiando automáticamente a Gemini por defecto...');
 
-        // 6. Esperar a que el cambio de proveedor se complete
         await selectProvider(AIProvider.gemini);
 
         debugPrint('   ✅ [AIServiceSelector change] Cambio a Gemini completado.');
         
-        // 7. Añadir un mensaje al chat DESPUÉS de que el cambio se haya hecho
         _addOllamaConnectionErrorMessage();
-        
-        // El notifyListeners() del final se encargará de actualizar la UI
-        // con el proveedor ya cambiado y el mensaje nuevo.
       }
     }
-
-    // Notificar a la UI (ModelSelectorBubble) para que se reconstruya
-    // Con la lógica 'await' de arriba
     notifyListeners();
   }
 
@@ -198,7 +181,6 @@ class ChatProvider extends ChangeNotifier {
       timestamp: DateTime.now(),
     );
 
-    // Añadir solo si no es el último mensaje (evitar duplicados)
     if (_messages.isEmpty ||
         (_messages.last.type != MessageTypeEntity.bot) ||
         (_messages.last.content != errorMessage.content)) {
@@ -216,7 +198,6 @@ class ChatProvider extends ChangeNotifier {
         debugPrint('   🔵 Usando GeminiAdapter');
         break;
       case AIProvider.ollama:
-        // Actualizar el modelo en el adaptador existente
         _ollamaAdapter.updateModel(_currentModel);
         currentAdapter = _ollamaAdapter;
         debugPrint(
@@ -232,8 +213,8 @@ class ChatProvider extends ChangeNotifier {
         break;
     }
 
-    // Crear nuevo CommandProcessor
-    _commandProcessor = CommandProcessor(currentAdapter);
+    // [ACTUALIZADO] Crear nuevo CommandProcessor pasando el Repositorio
+    _commandProcessor = CommandProcessor(currentAdapter, _commandRepository);
 
     _sendMessageUseCase = SendMessageUseCase(
       commandProcessor: _commandProcessor,
@@ -255,8 +236,6 @@ class ChatProvider extends ChangeNotifier {
   String get currentModel => _currentModel;
   AIProvider get currentProvider => _currentProvider;
   ConnectionInfo get connectionInfo => _aiSelector.connectionInfo;
-  // Exponer a la UI sólo si el service selector reporta disponibilidad
-  // y no hemos bloqueado la selección tras un cambio automático.
   bool get ollamaAvailable => _aiSelector.ollamaAvailable && _ollamaSelectable;
   bool get isRetryingOllama => _isRetryingOllama;
 
@@ -265,7 +244,6 @@ class ChatProvider extends ChangeNotifier {
   String get currentOpenAIModel => _aiSelector.currentOpenAIModel;
   List<String> get availableOpenAIModels => _aiSelector.availableOpenAIModels;
 
-  // Getters para Ollama Local
   LocalOllamaStatus get localOllamaStatus => _aiSelector.localOllamaStatus;
   bool get localOllamaAvailable => _aiSelector.localOllamaAvailable;
   bool get localOllamaLoading => _aiSelector.localOllamaLoading;
@@ -276,7 +254,6 @@ class ChatProvider extends ChangeNotifier {
   // MÉTODOS PARA GESTIÓN DE HISTORIAL (para HistoryPage)
   // ============================================================================
 
-  /// Expone el método listConversations del repositorio a la UI
   Future<List<FileSystemEntity>> listConversations() {
     return _conversationRepository.listConversations();
   }
@@ -285,8 +262,6 @@ class ChatProvider extends ChangeNotifier {
     try {
       debugPrint('🎬 [ChatProvider] Inicializando modelos...');
 
-      // Los modelos de Ollama ya se inicializan automáticamente en AIServiceSelector
-      // Solo necesitamos obtenerlos
       if (_aiSelector.ollamaAvailable) {
         _availableModels = _aiSelector.availableModels;
         if (_availableModels.isNotEmpty) {
@@ -295,11 +270,9 @@ class ChatProvider extends ChangeNotifier {
         }
       }
 
-      // Restaurar preferencias del usuario
       await _restoreUserPreferences();
 
-  // Asegurar el estado inicial de selección de Ollama
-  _ollamaSelectable = _aiSelector.ollamaAvailable;
+      _ollamaSelectable = _aiSelector.ollamaAvailable;
 
       notifyListeners();
     } catch (e) {
@@ -320,7 +293,6 @@ class ChatProvider extends ChangeNotifier {
           case AIProvider.gemini:
             canRestore = true;
             break;
-
           case AIProvider.ollama:
             canRestore = _aiSelector.ollamaAvailable;
             if (!canRestore) {
@@ -328,14 +300,12 @@ class ChatProvider extends ChangeNotifier {
                   '   ⚠️ Ollama (remoto) no disponible, usando Gemini por defecto');
             }
             break;
-
           case AIProvider.openai:
             canRestore = _aiSelector.openaiAvailable;
             if (!canRestore) {
               debugPrint('   ⚠️ OpenAI no disponible, usando Gemini por defecto');
             }
             break;
-
           case AIProvider.localOllama:
             canRestore = _aiSelector.localOllamaAvailable;
             if (!canRestore) {
@@ -383,7 +353,6 @@ class ChatProvider extends ChangeNotifier {
       debugPrint('   ✅ Modelo cambiado a: $modelName');
     } catch (e) {
       debugPrint('   ❌ Error al cambiar modelo: $e');
-      // Revertir el cambio local
       _currentModel = _aiSelector.currentOllamaModel;
       notifyListeners();
     }
@@ -392,25 +361,17 @@ class ChatProvider extends ChangeNotifier {
   Future<void> selectProvider(AIProvider provider) async {
     debugPrint('🔄 [ChatProvider] Cambiando proveedor a: $provider');
     
-    // Si el proveedor es Ollama y no está disponible, NO cambiar a Gemini
-    // automáticamente aquí. El usuario debe reintentar.
-    // El cambio automático a Gemini SÓLO ocurre pasivamente 
-    // (en _onAiSelectorChanged) o activamente (en sendMessage).
     if (provider == AIProvider.ollama && !_aiSelector.ollamaAvailable) {
       debugPrint('   ❌ Ollama (remoto) no disponible. No se puede seleccionar por ahora.');
-      // No cambiamos el proveedor ni marcamos la tarjeta como seleccionada.
-      // En su lugar devolvemos el control para que el UI muestre el estado
-      // como no disponible (igual que al iniciar la app sin conexión).
       return;
     }
     
-    // Verificar disponibilidad de otros proveedores
     bool isAvailable = false;
     switch (provider) {
       case AIProvider.gemini:
         isAvailable = true;
         break;
-      case AIProvider.ollama: // Ya sabemos que está disponible por el check de arriba
+      case AIProvider.ollama:
         isAvailable = true;
         break;
       case AIProvider.openai:
@@ -426,12 +387,10 @@ class ChatProvider extends ChangeNotifier {
       return;
     }
 
-    // Si hay historial pendiente de cargar, cargarlo en el nuevo proveedor
     if (_needsHistoryLoad && _currentProvider != provider) {
       debugPrint('   📚 Detectado cambio de proveedor con historial pendiente');
       debugPrint('   🔄 Cargando historial en el nuevo proveedor: $provider');
       
-      // Cambiar temporalmente el proveedor para cargar el historial
       final oldProvider = _currentProvider;
       _currentProvider = provider;
       
@@ -445,7 +404,6 @@ class ChatProvider extends ChangeNotifier {
     await _aiSelector.setProvider(provider);
     _updateCommandProcessor();
     
-    // Guardar preferencia
     await _preferencesService.saveLastProvider(provider);
     
     hideModelSelector();
@@ -473,16 +431,9 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Llama al 'reconnect' del servicio.
-      // Este método (en OllamaService) llama a _detectBestConnection()
-      // lo cual actualiza el stream _connectionController.
       await _ollamaService.reconnect();
       
-      // El stream habrá notificado al AIServiceSelector,
-      // y el AIServiceSelector habrá notificado a este ChatProvider
-      // (via _onAiSelectorChanged).
-
-      const int maxAttempts = 10; // poll attempts
+      const int maxAttempts = 10;
       const Duration interval = Duration(milliseconds: 300);
       int attempts = 0;
       while (!_aiSelector.ollamaAvailable && attempts < maxAttempts) {
@@ -493,17 +444,13 @@ class ChatProvider extends ChangeNotifier {
       final bool isSuccess = _aiSelector.ollamaAvailable;
 
       if (isSuccess) {
-        // Permitir seleccionar Ollama ahora que está disponible
         _ollamaSelectable = true;
         debugPrint('   🔓 Selección de Ollama desbloqueada (reconectado)');
         debugPrint('   ✅ [ChatProvider] Reconexión exitosa. Seleccionando Ollama.');
-        // Si tiene éxito, seleccionar activamente Ollama
         await selectProvider(AIProvider.ollama); 
       } else {
-        // Mantener bloqueada la selección si la reconexión no tuvo éxito
         _ollamaSelectable = false;
         debugPrint('   ❌ [ChatProvider] La reconexión falló.');
-        // Si falla, asegurarse de que estamos en Gemini
         if (_currentProvider != AIProvider.gemini) {
           await selectProvider(AIProvider.gemini);
         }
@@ -518,7 +465,6 @@ class ChatProvider extends ChangeNotifier {
     }
   }
   
-  // Redirige al nuevo metodo para probar la conexión
   Future<void> refreshConnection() async {
     await retryOllamaConnection();
   }
@@ -532,12 +478,9 @@ class ChatProvider extends ChangeNotifier {
 
       if (result.success) {
         debugPrint('   ✅ Ollama Embebido inicializado correctamente');
-
-        // Auto-cambiar a Local Ollama si tuvo éxito
         if (_aiSelector.localOllamaAvailable) {
           await selectProvider(AIProvider.localOllama);
         }
-
         notifyListeners();
       } else {
         debugPrint('   ❌ Error en inicialización: ${result.error}');
@@ -551,7 +494,6 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _addWelcomeMessage() {
-    // Obtener el mensaje de bienvenida completo desde CommandsHelp
     final welcomeMessage = CommandsHelp.getWelcomeMessage();
 
     final welcomeEntity = MessageEntity(
@@ -573,14 +515,13 @@ class ChatProvider extends ChangeNotifier {
         '   💬 Contenido: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
     debugPrint('   🤖 Proveedor actual: $_currentProvider');
 
-    // CARGAR HISTORIAL SI ES NECESARIO (conversación cargada desde archivo)
     if (_needsHistoryLoad) {
       debugPrint('   📚 Cargando historial en el proveedor actual antes de enviar...');
       _loadHistoryIntoAIService(_messages);
       _needsHistoryLoad = false;
     }
 
-    // Log del modelo según el proveedor
+    // Logs simplificados
     switch (_currentProvider) {
       case AIProvider.ollama:
         debugPrint('   📝 Modelo Ollama (remoto): $_currentModel');
@@ -602,7 +543,6 @@ class ChatProvider extends ChangeNotifier {
 
     hideModelSelector();
 
-    // Crear entidad de mensaje del usuario
     final userMessageEntity = MessageEntity(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       content: content,
@@ -615,8 +555,8 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // SendMessageUseCase trabaja con entidades y retorna una entidad
       debugPrint('   🔸 Procesando mensaje a través de SendMessageUseCase...');
+      // SendMessageUseCase usará el CommandProcessor que ya tiene el repositorio inyectado
       final botResponseEntity = await _sendMessageUseCase.execute(content);
 
       _messages.add(botResponseEntity);
@@ -640,12 +580,8 @@ class ChatProvider extends ChangeNotifier {
         );
         _messages.add(errorEntity);
 
-        // Forzar el cambio de proveedor a Gemini
-        // NO llamamos a selectProvider, sino que cambiamos el estado
-        // internamente para que la UI se actualice.
         _currentProvider = AIProvider.gemini;
-  // Marcar Ollama como no seleccionable tras el fallo/auto-cambio
-  _ollamaSelectable = false;
+        _ollamaSelectable = false;
         _updateCommandProcessor();
         await _preferencesService.saveLastProvider(AIProvider.gemini);
         debugPrint('   ✅ [sendMessage catch] CAMBIO AUTOMÁTICO a Gemini exitoso');
@@ -671,7 +607,6 @@ class ChatProvider extends ChangeNotifier {
         );
         _messages.add(errorEntity);
       } else {
-        // Error genérico o de Gemini
         final errorEntity = MessageEntity(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           content: errorMessage,
@@ -690,7 +625,6 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _updateQuickResponses() {
-    // Convertir entidades a modelos solo para obtener respuestas contextuales
     final messageModels =
         _messages.map((entity) => Message.fromEntity(entity)).toList();
     _quickResponses =
@@ -700,10 +634,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> _autoSaveConversation() async {
     if (_messages.isEmpty) return;
     try {
-      // ConversationRepository trabaja con entidades
       await _conversationRepository.saveConversation(_messages);
-      
-      // Mostrar mensaje informativo si sync está activo
       final isSyncEnabled = _getSyncStatus?.call() ?? false;
       if (kDebugMode) {
         debugPrint(
@@ -735,43 +666,17 @@ class ChatProvider extends ChangeNotifier {
     debugPrint('   ✅ Mensajes limpiados');
   }
 
-  /// Limpia el historial de conversación en todos los servicios de IA
-void _clearAIServiceHistory() {
-  debugPrint('🧹 [ChatProvider] Limpiando historial de servicios de IA...');
-  
-  try {
-    _geminiService.clearConversation();
-    debugPrint('   ✅ Historial de Gemini limpiado');
-  } catch (e) {
-    debugPrint('   ⚠️ Error limpiando Gemini: $e');
+  void _clearAIServiceHistory() {
+    debugPrint('🧹 [ChatProvider] Limpiando historial de servicios de IA...');
+    try { _geminiService.clearConversation(); } catch (e) { debugPrint('   ⚠️ Error limpiando Gemini: $e'); }
+    try { _openaiService.clearConversation(); } catch (e) { debugPrint('   ⚠️ Error limpiando OpenAI: $e'); }
+    try { _ollamaService.clearConversation(); } catch (e) { debugPrint('   ⚠️ Error limpiando Ollama: $e'); }
+    try { _localOllamaService.clearConversation(); } catch (e) { debugPrint('   ⚠️ Error limpiando Ollama Local: $e'); }
   }
-  
-  try {
-    _openaiService.clearConversation();
-    debugPrint('   ✅ Historial de OpenAI limpiado');
-  } catch (e) {
-    debugPrint('   ⚠️ Error limpiando OpenAI: $e');
-  }
-  
-  try {
-    _ollamaService.clearConversation();
-    debugPrint('   ✅ Historial de Ollama (remoto) limpiado');
-  } catch (e) {
-    debugPrint('   ⚠️ Error limpiando Ollama: $e');
-  }
-  
-  try {
-    _localOllamaService.clearConversation();
-    debugPrint('   ✅ Historial de Ollama Local limpiado');
-  } catch (e) {
-    debugPrint('   ⚠️ Error limpiando Ollama Local: $e');
-  }
-}
 
   Future<void> loadConversation(File file) async {
     debugPrint('📂 [ChatProvider] Cargando conversación desde archivo...');
 
-    // ConversationRepository retorna entidades
     final loadedMessages =
         await _conversationRepository.loadConversation(file);
     _messages
@@ -779,7 +684,6 @@ void _clearAIServiceHistory() {
       ..addAll(loadedMessages);
 
     _isNewConversation = false;
-
     _needsHistoryLoad = true;
 
     _updateQuickResponses();
@@ -792,118 +696,98 @@ void _clearAIServiceHistory() {
   void dispose() {
     debugPrint('🔴 [ChatProvider] Disposing...');
     _aiSelector.removeListener(_onAiSelectorChanged);
-
     _aiSelector.dispose();
     super.dispose();
   }
 
-  /// Carga el historial de mensajes en el servicio de IA actual
-void _loadHistoryIntoAIService(List<MessageEntity> messages) {
-  debugPrint('📚 [ChatProvider] Cargando historial en servicio de IA...');
-  debugPrint('   🎯 Proveedor actual: $_currentProvider');
-  debugPrint('   📝 Mensajes a cargar: ${messages.length}');
-  
-  switch (_currentProvider) {
-    case AIProvider.gemini:
-      _loadGeminiHistory(messages);
-      break;
-    case AIProvider.openai:
-      _loadOpenAIHistory(messages);
-      break;
-    case AIProvider.ollama:
-      _loadOllamaHistory(messages);
-      break;
-    case AIProvider.localOllama:
-      _loadLocalOllamaHistory(messages);
-      break;
-  }
-}
-
-/// Carga historial en Gemini
-void _loadGeminiHistory(List<MessageEntity> messages) {
-  try {
-    // Primero limpiar historial existente
-    _geminiService.clearConversation();
+  void _loadHistoryIntoAIService(List<MessageEntity> messages) {
+    debugPrint('📚 [ChatProvider] Cargando historial en servicio de IA...');
+    debugPrint('   🎯 Proveedor actual: $_currentProvider');
     
-    // Reconstruir historial mensaje por mensaje
-    for (final message in messages) {
-      if (message.type == MessageTypeEntity.user) {
-        _geminiService.addUserMessage(message.content);
-      } else if (message.type == MessageTypeEntity.bot) {
-        _geminiService.addBotMessage(message.content);
-      }
+    switch (_currentProvider) {
+      case AIProvider.gemini:
+        _loadGeminiHistory(messages);
+        break;
+      case AIProvider.openai:
+        _loadOpenAIHistory(messages);
+        break;
+      case AIProvider.ollama:
+        _loadOllamaHistory(messages);
+        break;
+      case AIProvider.localOllama:
+        _loadLocalOllamaHistory(messages);
+        break;
     }
-    
-    debugPrint('   ✅ Historial de Gemini cargado: ${messages.length} mensajes');
-  } catch (e) {
-    debugPrint('   ⚠️ Error cargando historial en Gemini: $e');
   }
-}
 
-/// Carga historial en OpenAI
-void _loadOpenAIHistory(List<MessageEntity> messages) {
-  try {
-    _openaiService.clearConversation();
-    
-    for (final message in messages) {
-      if (message.type == MessageTypeEntity.user) {
-        _openaiService.addUserMessage(message.content);
-      } else if (message.type == MessageTypeEntity.bot) {
-        _openaiService.addBotMessage(message.content);
+  void _loadGeminiHistory(List<MessageEntity> messages) {
+    try {
+      _geminiService.clearConversation();
+      for (final message in messages) {
+        if (message.type == MessageTypeEntity.user) {
+          _geminiService.addUserMessage(message.content);
+        } else if (message.type == MessageTypeEntity.bot) {
+          _geminiService.addBotMessage(message.content);
+        }
       }
+      debugPrint('   ✅ Historial de Gemini cargado: ${messages.length} mensajes');
+    } catch (e) {
+      debugPrint('   ⚠️ Error cargando historial en Gemini: $e');
     }
-    
-    debugPrint('   ✅ Historial de OpenAI cargado: ${messages.length} mensajes');
-  } catch (e) {
-    debugPrint('   ⚠️ Error cargando historial en OpenAI: $e');
   }
-}
 
-/// Carga historial en Ollama (remoto)
-void _loadOllamaHistory(List<MessageEntity> messages) {
-  try {
-    _ollamaService.clearConversation();
-    
-    for (final message in messages) {
-      if (message.type == MessageTypeEntity.user) {
-        _ollamaService.addUserMessage(message.content);
-      } else if (message.type == MessageTypeEntity.bot) {
-        _ollamaService.addBotMessage(message.content);
+  void _loadOpenAIHistory(List<MessageEntity> messages) {
+    try {
+      _openaiService.clearConversation();
+      for (final message in messages) {
+        if (message.type == MessageTypeEntity.user) {
+          _openaiService.addUserMessage(message.content);
+        } else if (message.type == MessageTypeEntity.bot) {
+          _openaiService.addBotMessage(message.content);
+        }
       }
+      debugPrint('   ✅ Historial de OpenAI cargado: ${messages.length} mensajes');
+    } catch (e) {
+      debugPrint('   ⚠️ Error cargando historial en OpenAI: $e');
     }
-    
-    debugPrint('   ✅ Historial de Ollama cargado: ${messages.length} mensajes');
-  } catch (e) {
-    debugPrint('   ⚠️ Error cargando historial en Ollama: $e');
   }
-}
 
-/// Carga historial en Ollama Local
-void _loadLocalOllamaHistory(List<MessageEntity> messages) {
-  try {
-    _localOllamaService.clearConversation();
-    
-    for (final message in messages) {
-      if (message.type == MessageTypeEntity.user) {
-        _localOllamaService.addUserMessage(message.content);
-      } else if (message.type == MessageTypeEntity.bot) {
-        _localOllamaService.addBotMessage(message.content);
+  void _loadOllamaHistory(List<MessageEntity> messages) {
+    try {
+      _ollamaService.clearConversation();
+      for (final message in messages) {
+        if (message.type == MessageTypeEntity.user) {
+          _ollamaService.addUserMessage(message.content);
+        } else if (message.type == MessageTypeEntity.bot) {
+          _ollamaService.addBotMessage(message.content);
+        }
       }
+      debugPrint('   ✅ Historial de Ollama cargado: ${messages.length} mensajes');
+    } catch (e) {
+      debugPrint('   ⚠️ Error cargando historial en Ollama: $e');
     }
-    
-    debugPrint('   ✅ Historial de Ollama Local cargado: ${messages.length} mensajes');
-  } catch (e) {
-    debugPrint('   ⚠️ Error cargando historial en Ollama Local: $e');
   }
-}
-/// Elimina todas las conversaciones
-  /// Muestra advertencia si sync no está activo
+
+  void _loadLocalOllamaHistory(List<MessageEntity> messages) {
+    try {
+      _localOllamaService.clearConversation();
+      for (final message in messages) {
+        if (message.type == MessageTypeEntity.user) {
+          _localOllamaService.addUserMessage(message.content);
+        } else if (message.type == MessageTypeEntity.bot) {
+          _localOllamaService.addBotMessage(message.content);
+        }
+      }
+      debugPrint('   ✅ Historial de Ollama Local cargado: ${messages.length} mensajes');
+    } catch (e) {
+      debugPrint('   ⚠️ Error cargando historial en Ollama Local: $e');
+    }
+  }
+
   Future<DeleteResult> deleteAllConversations() async {
     try {
       final isSyncEnabled = _getSyncStatus?.call() ?? false;
-      
       await _conversationRepository.deleteAllConversations();
-      
       return DeleteResult(
         success: true,
         syncWasEnabled: isSyncEnabled,
@@ -920,14 +804,10 @@ void _loadLocalOllamaHistory(List<MessageEntity> messages) {
     }
   }
 
-  /// Elimina conversaciones seleccionadas
-  /// Muestra advertencia si sync no está activo
   Future<DeleteResult> deleteConversations(List<File> files) async {
     try {
       final isSyncEnabled = _getSyncStatus?.call() ?? false;
-      
       await _conversationRepository.deleteConversations(files);
-      
       final count = files.length;
       return DeleteResult(
         success: true,

@@ -12,10 +12,13 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'domain/repositories/chat_repository.dart';
 import 'domain/repositories/conversation_repository.dart';
-import 'data/services/ai_chat_service.dart';
+import 'domain/repositories/command_repository.dart'; // [NUEVO]
 
+import 'data/services/ai_chat_service.dart';
 import 'data/repositories/chat_repository.dart';
 import 'data/repositories/conversation_repository.dart';
+import 'data/repositories/command_repository.dart'; // [NUEVO]
+
 import 'data/services/api_keys_manager.dart';
 import 'data/services/ai_service_selector.dart';
 import 'data/services/gemini_service.dart';
@@ -24,7 +27,9 @@ import 'data/services/ollama_service.dart';
 import 'data/services/local_ollama_service.dart';
 import 'data/services/auth_service.dart';
 import 'data/services/preferences_service.dart';
-import 'data/services/firebase_sync_service.dart'; // NUEVO
+import 'data/services/firebase_sync_service.dart';
+import 'data/services/secure_storage_service.dart'; // [NUEVO]
+import 'data/services/local_command_service.dart'; // [NUEVO]
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -91,16 +96,26 @@ class _AppInitializerState extends State<AppInitializer> {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         
-        // Providers de servicios (no ChangeNotifier)
+        // 1. --- Servicios Base (Independientes) ---
+        Provider<SecureStorageService>(
+          create: (_) => SecureStorageService(),
+        ),
         Provider<FirebaseSyncService>(
           create: (_) => FirebaseSyncService(),
         ),
-        
         Provider<PreferencesService>(
           create: (_) => PreferencesService(),
         ),
 
-        // AuthProvider con dependencias
+        // 2. --- Core Providers (Services & Auth) ---
+        // IMPORTANTE: Estos deben ir ANTES que los repositorios que los usan.
+
+        // AIServiceSelector debe estar disponible antes que AIChatService y ChatProvider
+        ChangeNotifierProvider<AIServiceSelector>.value(
+          value: result.aiServiceSelector,
+        ),
+
+        // AuthProvider debe estar antes que ConversationRepository
         ChangeNotifierProvider(
           create: (context) => AuthProvider(
             authService: AuthService(),
@@ -109,13 +124,25 @@ class _AppInitializerState extends State<AppInitializer> {
           ),
         ),
 
-        ChangeNotifierProvider<AIServiceSelector>.value(
-          value: result.aiServiceSelector,
+        // 3. --- Servicios de Datos (Dependen de Base) ---
+        Provider<LocalCommandService>(
+          create: (context) => LocalCommandService(
+            context.read<SecureStorageService>(),
+          ),
         ),
         
+        // AIChatService (Ahora sí encontrará a AIServiceSelector porque está definido arriba en el paso 2)
         Provider<AIChatService>(
           create: (context) => AIChatService(
             context.read<AIServiceSelector>(),
+          ),
+        ),
+
+        // 4. --- Repositorios (Dependen de Services) ---
+
+        Provider<CommandRepository>(
+          create: (context) => CommandRepositoryImpl(
+            context.read<LocalCommandService>(),
           ),
         ),
         
@@ -125,28 +152,33 @@ class _AppInitializerState extends State<AppInitializer> {
           ),
         ),
         
-        // ConversationRepository con sincronización
+        // ConversationRepository (Ahora encontrará a AuthProvider definido en el paso 2)
         Provider<ConversationRepository>(
           create: (context) {
-            final authProvider = context.read<AuthProvider>();
+            // Nota: Usamos listen: false porque estamos dentro de un create
+            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            
             return ConversationRepositoryImpl(
               syncService: context.read<FirebaseSyncService>(),
               isSyncEnabled: () => authProvider.isCloudSyncEnabled,
             );
           },
         ),
+
+        // 5. --- Providers de Estado / UI (Consumidores Finales) ---
         
-        // ChatProvider con vinculación al estado de sync
+        // ChatProvider consume TODO lo anterior, por eso va al final.
         ChangeNotifierProvider(
           create: (context) {
-            final authProvider = context.read<AuthProvider>();
+            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            
             final chatProvider = ChatProvider(
               chatRepository: context.read<ChatRepository>(),
               conversationRepository: context.read<ConversationRepository>(),
+              commandRepository: context.read<CommandRepository>(),
               aiServiceSelector: context.read<AIServiceSelector>(),
             );
             
-            // Vincular el checker de sincronización
             chatProvider.setSyncStatusChecker(
               () => authProvider.isCloudSyncEnabled,
             );
