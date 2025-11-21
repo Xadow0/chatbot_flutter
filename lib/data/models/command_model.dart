@@ -2,22 +2,14 @@ import '../../domain/entities/command_entity.dart';
 
 class CommandModel extends CommandEntity {
   const CommandModel({
-    required String id,
-    required String trigger,
-    required String title,
-    required String description,
-    required String promptTemplate,
-    bool isSystem = false,
-    SystemCommandType systemType = SystemCommandType.none,
-  }) : super(
-          id: id,
-          trigger: trigger,
-          title: title,
-          description: description,
-          promptTemplate: promptTemplate,
-          isSystem: isSystem,
-          systemType: systemType,
-        );
+    required super.id,
+    required super.trigger,
+    required super.title,
+    required super.description,
+    required super.promptTemplate,
+    super.isSystem,
+    super.systemType,
+  });
 
   factory CommandModel.fromJson(Map<String, dynamic> json) {
     return CommandModel(
