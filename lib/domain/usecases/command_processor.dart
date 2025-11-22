@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/command_entity.dart';
 import '../../domain/repositories/command_repository.dart';
-import '../../core/utils/laguande_detector.dart';
+import '../../core/utils/language_detector.dart';
 
 /// Resultado del procesamiento de un comando
 class CommandResult {
