@@ -34,6 +34,10 @@ class ChatProvider extends ChangeNotifier {
   bool _ollamaSelectable = true;
   bool _needsHistoryLoad = false;
 
+  bool _hasUnsavedChanges = false; // Para saber si hay algo que guardar
+  File? _currentConversationFile; // Para saber qué archivo sobrescribir/borrar
+  bool _isSaving = false;
+
   late SendMessageUseCase _sendMessageUseCase; // No final - se actualiza al cambiar proveedor
   late final AIServiceSelector _aiSelector;
   late final PreferencesService _preferencesService;
@@ -232,6 +236,7 @@ class ChatProvider extends ChangeNotifier {
   ConnectionInfo get connectionInfo => _aiSelector.connectionInfo;
   bool get ollamaAvailable => _aiSelector.ollamaAvailable && _ollamaSelectable;
   bool get isRetryingOllama => _isRetryingOllama;
+    bool get hasUnsavedChanges => _hasUnsavedChanges;
 
   AIServiceSelector get aiSelector => _aiSelector;
   bool get openaiAvailable => _aiSelector.openaiAvailable;
@@ -614,7 +619,9 @@ class ChatProvider extends ChangeNotifier {
       _updateQuickResponses();
       notifyListeners();
 
-      await _autoSaveConversation();
+      _hasUnsavedChanges = true;
+      debugPrint('📝 [ChatProvider] Cambios pendientes marcados. Se guardarán al salir.');
+       notifyListeners();
     }
   }
 
@@ -642,22 +649,23 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> clearMessages({bool saveBeforeClear = true}) async {
+  Future<void> clearMessages() async { // Quita el argumento saveBeforeClear, ya no hace falta aquí
     debugPrint('🗑️ [ChatProvider] Limpiando mensajes...');
-
-    if (saveBeforeClear && _messages.isNotEmpty) {
-      await _conversationRepository.saveConversation(_messages);
-    }
+    
+    // Si el usuario limpia manualmente, podrías querer guardar la anterior o descartarla.
+    // Asumiendo que "Nueva Conversación" descarta lo actual:
+    
     _messages.clear();
     _isNewConversation = true;
     _needsHistoryLoad = false;
+    
+    // NUEVO: Reseteamos rastreadores
+    _currentConversationFile = null;
+    _hasUnsavedChanges = false;
 
     _clearAIServiceHistory();
-
     _addWelcomeMessage();
     notifyListeners();
-
-    debugPrint('   ✅ Mensajes limpiados');
   }
 
   void _clearAIServiceHistory() {
@@ -669,21 +677,37 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> loadConversation(File file) async {
+    // PROTECCIÓN CRÍTICA:
+    // Si intentamos cargar el mismo archivo que ya estamos editando y tenemos cambios sin guardar,
+    // ignoramos la carga para no perder los nuevos mensajes que están en memoria.
+    if (_currentConversationFile != null && 
+        _currentConversationFile!.path == file.path && 
+        _hasUnsavedChanges) {
+      debugPrint('🛑 [ChatProvider] Bloqueada recarga accidental: Ya tienes esta conversación abierta con cambios.');
+      return;
+    }
+
     debugPrint('📂 [ChatProvider] Cargando conversación desde archivo...');
 
-    final loadedMessages =
-        await _conversationRepository.loadConversation(file);
-    _messages
-      ..clear()
-      ..addAll(loadedMessages);
+    try {
+      final loadedMessages = await _conversationRepository.loadConversation(file);
+      _messages
+        ..clear()
+        ..addAll(loadedMessages);
 
-    _isNewConversation = false;
-    _needsHistoryLoad = true;
+      _isNewConversation = false;
+      _needsHistoryLoad = true;
+      
+      _currentConversationFile = file;
+      _hasUnsavedChanges = false; // Aquí se reseteaba el flag, lo cual era el problema
 
-    _updateQuickResponses();
-    notifyListeners();
+      _updateQuickResponses();
+      notifyListeners();
 
-    debugPrint('   ✅ Conversación cargada (${_messages.length} mensajes)');
+      debugPrint('   ✅ Conversación cargada (${_messages.length} mensajes)');
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error cargando conversación: $e');
+    }
   }
 
   @override
@@ -816,6 +840,43 @@ class ChatProvider extends ChangeNotifier {
         syncWasEnabled: false,
         message: 'Error eliminando conversaciones: $e',
       );
+    }
+  }
+
+  /// Este método debe llamarse cuando el usuario sale de la pantalla de chat.
+  /// Gestiona el guardado, sobrescritura y limpieza.
+  Future<void> endSession() async {
+    if (_isSaving) return; 
+    
+    // Validaciones básicas
+    if (_messages.isEmpty) return;
+    if (_messages.length == 1 && _messages.first.type == MessageTypeEntity.bot) return;
+    if (!_hasUnsavedChanges) return; // Si no hay cambios, no tocamos nada
+
+    _isSaving = true;
+    debugPrint('💾 [ChatProvider] Guardando sesión (Actualización)...');
+
+    try {
+      // PASAMOS EL ARCHIVO ACTUAL
+      // Si _currentConversationFile tiene valor, el repo sobrescribirá ese archivo.
+      // Si es null (nueva conv), el repo creará uno nuevo.
+      await _conversationRepository.saveConversation(
+        _messages, 
+        existingFile: _currentConversationFile
+      );
+      
+      debugPrint('   ✅ Conversación guardada/actualizada correctamente.');
+      
+      // 🚫 ELIMINADO: Ya no necesitamos borrar nada.
+      // El archivo antiguo ES el archivo actual.
+
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error al guardar sesión: $e');
+    } finally {
+      _hasUnsavedChanges = false;
+      // No ponemos _currentConversationFile a null aquí, por si el usuario sigue en la pantalla
+      // y hace más cambios, seguir actualizando el mismo archivo.
+      _isSaving = false;
     }
   }
 }

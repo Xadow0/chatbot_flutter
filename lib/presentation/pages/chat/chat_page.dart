@@ -17,13 +17,9 @@ class ChatPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    
-    // Obtener argumentos de navegación para determinar si es una conversación nueva
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final isNewConversation = args?['newConversation'] as bool? ?? false;
     
-    // Simplemente renderizamos el _ChatBody, que consumirá
-    // el provider global existente.
     return _ChatBody(
       preloadedConversationFile: preloadedConversationFile,
       isNewConversation: isNewConversation,
@@ -45,107 +41,131 @@ class _ChatBody extends StatefulWidget {
 }
 
 class _ChatBodyState extends State<_ChatBody> {
-  // GlobalKey para acceder al estado del MessageInput
   final GlobalKey<MessageInputState> _messageInputKey = GlobalKey<MessageInputState>();
+  
+  // Referencia local para usar en dispose()
+  late ChatProvider _chatProviderRef;
+  bool _canExit = false;
 
   @override
   void initState() {
     super.initState();
     
+    // Guardamos la referencia al inicio
+    _chatProviderRef = context.read<ChatProvider>();
+    
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final chatProvider = context.read<ChatProvider>();
-      
       if (widget.preloadedConversationFile != null) {
-        // Si viene con un archivo preloadedConversationFile (desde History),
-        // cargar esa conversación sin añadir mensajes extra
-        await chatProvider.loadConversation(widget.preloadedConversationFile!);
+        await _chatProviderRef.loadConversation(widget.preloadedConversationFile!);
       } else if (widget.isNewConversation) {
-        // Si navegamos desde el menú con newConversation=true,
-        // limpiar la conversación anterior y comenzar de cero con welcome message
-        await chatProvider.clearMessages(saveBeforeClear: true);
+        await _chatProviderRef.clearMessages(); 
       }
-      // Si no cumple ninguna condición, simplemente se muestra
-      // el estado actual del provider (última conversación o vacío)
     });
   }
 
-  /// Maneja la selección de una quick response
-  /// Si el texto comienza con '/', lo inserta en el campo de entrada
-  /// Si no, lo envía directamente como mensaje
+  // Mantener referencia actualizada si el widget se reconstruye
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _chatProviderRef = context.read<ChatProvider>();
+  }
+
+  /// EL SALVAVIDAS: Se ejecuta SIEMPRE al destruir la pantalla.
+  @override
+  void dispose() {
+    // Si por alguna razón salimos y aún hay cambios pendientes (el PopScope falló o fue bypass),
+    // forzamos el guardado aquí. No podemos hacer 'await', pero lanzamos el proceso.
+    if (_chatProviderRef.hasUnsavedChanges) { // Asegúrate de tener un getter para _hasUnsavedChanges en el provider
+       debugPrint('🚨 [ChatPage] Detectada salida sin guardar en dispose. Guardando ahora...');
+       _chatProviderRef.endSession();
+    }
+    super.dispose();
+  }
+
+  Future<void> _onWillPop() async {
+    // Intentamos guardar de forma ordenada esperando el resultado
+    await _chatProviderRef.endSession();
+    
+    if (mounted) {
+      setState(() {
+        _canExit = true;
+      });
+      Navigator.of(context).pop();
+    }
+  }
+
   void _handleQuickResponseSelected(String text) {
     if (text.startsWith('/')) {
-      // Es un comando: insertar en el campo de entrada
       _messageInputKey.currentState?.insertTextAtStart(text);
     } else {
-      // Es una respuesta normal: enviar directamente
-      final chatProvider = context.read<ChatProvider>();
-      chatProvider.sendMessage(text);
+      _chatProviderRef.sendMessage(text);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // El Consumer<ChatProvider> también encontrará el provider
-    // global sin problemas.
+    // Consumimos el provider para redibujar la UI, pero usamos _chatProviderRef para la lógica
     return Consumer<ChatProvider>(
       builder: (context, chatProvider, _) {
-        return GestureDetector(
-          // Ocultar selector cuando se toca fuera
-          onTap: () {
-            if (chatProvider.showModelSelector) {
-              chatProvider.hideModelSelector();
-            }
+        return PopScope(
+          canPop: _canExit,
+          onPopInvoked: (didPop) async {
+            if (didPop) return;
+            await _onWillPop();
           },
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Chatbot Demo'),
-              actions: [
-                if (chatProvider.isProcessing)
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+          child: GestureDetector(
+            onTap: () {
+              if (chatProvider.showModelSelector) {
+                chatProvider.hideModelSelector();
+              }
+            },
+            child: Scaffold(
+              appBar: AppBar(
+                title: const Text('Chatbot Demo'),
+                // Importante: Si usas el botón de atrás de la AppBar por defecto, Flutter usa maybePop automáticamente.
+                // Si añades botones manuales de salida, asegúrate de que llamen a Navigator.maybePop(context) 
+                // y NO a Navigator.pop(context) para que el PopScope funcione.
+                actions: [
+                  if (chatProvider.isProcessing)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Limpiar conversación',
+                    onPressed: () => chatProvider.clearMessages(),
+                  ),
+                ],
+              ),
+              drawer: const CustomDrawer(),
+              body: Column(
+                children: [
+                  const ModelSelectorBubble(),
+                  Expanded(
+                    child: MessageList(
+                      messages: chatProvider.messages
+                          .map((e) => Message.fromEntity(e))
+                          .toList(),
                     ),
                   ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Limpiar conversación',
-                  onPressed: chatProvider.clearMessages,
-                ),
-              ],
-            ),
-            drawer: const CustomDrawer(),
-            body: Column(
-              children: [
-                // Burbuja de selección de modelos
-                const ModelSelectorBubble(),
-                
-                // Lista de mensajes
-                Expanded(
-                  child: MessageList(
-                    messages: chatProvider.messages
-                        .map((e) => Message.fromEntity(e))
+                  QuickResponsesWidget(
+                    responses: chatProvider.quickResponses
+                        .map((e) => QuickResponse.fromEntity(e))
                         .toList(),
+                    onResponseSelected: _handleQuickResponseSelected,
                   ),
-                ),
-                
-                // Respuestas rápidas
-                QuickResponsesWidget(
-                  responses: chatProvider.quickResponses
-                      .map((e) => QuickResponse.fromEntity(e))
-                      .toList(),
-                  onResponseSelected: _handleQuickResponseSelected,
-                ),
-                
-                // Campo de entrada
-                MessageInput(
-                  key: _messageInputKey,
-                  onSendMessage: chatProvider.sendMessage,
-                  isBlocked: chatProvider.isProcessing,
-                ),
-              ],
+                  MessageInput(
+                    key: _messageInputKey,
+                    onSendMessage: chatProvider.sendMessage,
+                    isBlocked: chatProvider.isProcessing,
+                  ),
+                ],
+              ),
             ),
           ),
         );

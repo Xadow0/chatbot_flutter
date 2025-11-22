@@ -32,22 +32,34 @@ class ConversationRepositoryImpl implements ConversationRepository {
     return folder;
   }
 
-  /// Guarda una conversación completa (lista de entidades)
-  /// Si sync está habilitado, también la guarda en Firebase
+  /// Modificado: Acepta 'existingFile' opcional para sobrescribir en lugar de crear nuevo
   @override
-  Future<void> saveConversation(List<MessageEntity> messages, {String? suffix}) async {
+  Future<void> saveConversation(List<MessageEntity> messages, {File? existingFile, String? suffix}) async {
     if (messages.isEmpty) return;
     
-    final dir = await _getConversationsDir();
-    final fileName = _syncService.generateFileName(suffix: suffix);
-    final file = File('${dir.path}/$fileName');
+    File file;
+    String fileName;
+
+    if (existingFile != null) {
+      // ESTRATEGIA DE ACTUALIZACIÓN:
+      // Usamos el archivo existente. No cambiamos el nombre.
+      file = existingFile;
+      // Usamos la lógica segura de nombre que implementamos antes
+      fileName = file.uri.pathSegments.last; 
+    } else {
+      // ESTRATEGIA DE CREACIÓN:
+      // Generamos nombre nuevo solo si es una conversación nueva
+      final dir = await _getConversationsDir();
+      fileName = _syncService.generateFileName(suffix: suffix);
+      file = File('${dir.path}/$fileName');
+    }
     
-    // Guardar localmente
+    // 1. Guardar localmente (Sobrescribe si existe, crea si no)
     final models = messages.map((entity) => Message.fromEntity(entity)).toList();
     final jsonData = models.map((m) => m.toJson()).toList();
     await file.writeAsString(jsonEncode(jsonData));
     
-    // Si sync está habilitado, guardar también en Firebase
+    // 2. Guardar en Firebase (El método .set() de Firestore actúa como 'Upsert', actualizando si existe)
     if (_isSyncEnabled()) {
       await _syncService.saveConversationToFirebase(messages, fileName);
     }
@@ -57,8 +69,20 @@ class ConversationRepositoryImpl implements ConversationRepository {
   @override
   Future<List<FileSystemEntity>> listConversations() async {
     final dir = await _getConversationsDir();
+    
+    // Verificación de seguridad: si no existe la carpeta, retornamos lista vacía
+    if (!await dir.exists()) return [];
+
+    // Obtenemos solo los archivos
     final files = dir.listSync().whereType<File>().toList();
-    files.sort((a, b) => b.path.compareTo(a.path));
+
+    // CAMBIO APLICADO:
+    // Ordenamos usando la fecha de "última modificación" del sistema de archivos.
+    // Usamos (b, a) para orden descendente (más reciente primero).
+    files.sort((a, b) {
+      return b.lastModifiedSync().compareTo(a.lastModifiedSync());
+    });
+
     return files;
   }
 
@@ -112,8 +136,9 @@ class ConversationRepositoryImpl implements ConversationRepository {
     }
   }
 
-  /// Extrae el nombre del archivo sin la ruta completa
+  /// Extrae el nombre del archivo de forma segura para cualquier SO
   String _getFileName(File file) {
-    return file.path.split('/').last;
+    // file.uri normaliza la ruta y pathSegments maneja los separadores correctamente
+    return file.uri.pathSegments.last;
   }
 }
