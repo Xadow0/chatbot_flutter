@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/preferences_service.dart';
 import '../../data/services/firebase_sync_service.dart';
+import '../providers/command_management_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
@@ -15,6 +16,8 @@ class AuthProvider extends ChangeNotifier {
   bool _isSyncing = false;
   String? _errorMessage;
   String? _syncMessage;
+  
+  CommandManagementProvider? _commandProvider;
 
   AuthProvider({
     required AuthService authService,
@@ -34,15 +37,17 @@ class AuthProvider extends ChangeNotifier {
   String? get syncMessage => _syncMessage;
   bool get isAuthenticated => _user != null;
 
+  void setCommandProvider(CommandManagementProvider provider) {
+    _commandProvider = provider;
+  }
+
   void _init() {
     _authService.authStateChanges.listen((User? user) async {
       _user = user;
       
       if (user == null) {
-        // Si se desconecta, desactivamos sync visualmente
         _isCloudSyncEnabled = false;
       } else {
-        // Al conectar, recuperamos la preferencia del usuario
         _isCloudSyncEnabled = await _preferencesService.getCloudSyncEnabled();
       }
       
@@ -56,7 +61,6 @@ class AuthProvider extends ChangeNotifier {
       await _authService.signIn(email: email, password: password);
       _errorMessage = null;
       
-      // Si el usuario tenía sync habilitado, intentar sincronizar
       final hadSyncEnabled = await _preferencesService.getCloudSyncEnabled();
       if (hadSyncEnabled) {
         _isCloudSyncEnabled = true;
@@ -74,8 +78,6 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await _authService.signUp(email: email, password: password);
-      // Al registrarse, dejamos el sync desactivado por defecto
-      // El usuario lo activará manualmente desde settings
       await toggleCloudSync(false);
       _errorMessage = null;
     } catch (e) {
@@ -92,8 +94,6 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(false);
   }
 
-  /// Activa o desactiva la sincronización con la nube
-  /// Al activar, realiza una sincronización bidireccional automática
   Future<void> toggleCloudSync(bool value) async {
     if (_user == null) {
       _errorMessage = "Debes iniciar sesión para activar la sincronización";
@@ -105,18 +105,16 @@ class AuthProvider extends ChangeNotifier {
     await _preferencesService.saveCloudSyncEnabled(value);
     
     if (value) {
-      // Al activar, disparar sincronización inicial
       debugPrint("☁️ Sincronización activada. Iniciando proceso de sync...");
       await _performSync();
     } else {
-      debugPrint("📴 Sincronización desactivada");
+      debugPrint("🔴 Sincronización desactivada");
       _syncMessage = null;
     }
     
     notifyListeners();
   }
 
-  /// Ejecuta el proceso de sincronización bidireccional
   Future<void> _performSync() async {
     if (!_isCloudSyncEnabled || _user == null) return;
     
@@ -125,18 +123,43 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      final result = await _syncService.syncConversations();
+      final conversationResult = await _syncService.syncConversations();
       
-      if (result.success) {
-        if (result.uploaded > 0 || result.downloaded > 0) {
-          _syncMessage = "✅ Sincronizado: ${result.uploaded} subidas, ${result.downloaded} descargadas";
+      if (_commandProvider != null) {
+        _commandProvider!.resetSyncStatus();
+        final commandResult = await _commandProvider!.syncWithFirebase();
+        
+        if (conversationResult.success && commandResult.success) {
+          final totalUploaded = conversationResult.uploaded + commandResult.uploaded;
+          final totalDownloaded = conversationResult.downloaded + commandResult.downloaded;
+          
+          if (totalUploaded > 0 || totalDownloaded > 0) {
+            _syncMessage = "✅ Sincronizado: $totalUploaded subidas, $totalDownloaded descargadas";
+          } else {
+            _syncMessage = "✅ Todo sincronizado";
+          }
+          debugPrint("✅ [AuthProvider] Conversaciones: ↑${conversationResult.uploaded} ↓${conversationResult.downloaded}");
+          debugPrint("✅ [AuthProvider] Comandos: ↑${commandResult.uploaded} ↓${commandResult.downloaded}");
         } else {
-          _syncMessage = "✅ Todo sincronizado";
+          final errors = [
+            if (!conversationResult.success) conversationResult.error,
+            if (!commandResult.success) commandResult.error,
+          ].where((e) => e != null).join(', ');
+          _syncMessage = "❌ Error: $errors";
+          debugPrint("❌ [AuthProvider] Error en sync: $errors");
         }
-        debugPrint("✅ [AuthProvider] $syncMessage");
       } else {
-        _syncMessage = "❌ Error: ${result.error}";
-        debugPrint("❌ [AuthProvider] Error en sync: ${result.error}");
+        if (conversationResult.success) {
+          if (conversationResult.uploaded > 0 || conversationResult.downloaded > 0) {
+            _syncMessage = "✅ Sincronizado: ${conversationResult.uploaded} subidas, ${conversationResult.downloaded} descargadas";
+          } else {
+            _syncMessage = "✅ Todo sincronizado";
+          }
+          debugPrint("✅ [AuthProvider] $syncMessage");
+        } else {
+          _syncMessage = "❌ Error: ${conversationResult.error}";
+          debugPrint("❌ [AuthProvider] Error en sync: ${conversationResult.error}");
+        }
       }
     } catch (e) {
       _syncMessage = "❌ Error en sincronización: $e";
@@ -145,7 +168,6 @@ class AuthProvider extends ChangeNotifier {
       _isSyncing = false;
       notifyListeners();
       
-      // Limpiar mensaje después de 5 segundos
       Future.delayed(const Duration(seconds: 5), () {
         _syncMessage = null;
         notifyListeners();
@@ -153,7 +175,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Permite sincronizar manualmente bajo demanda
   Future<void> manualSync() async {
     if (!_isCloudSyncEnabled) {
       _errorMessage = "La sincronización no está activada";

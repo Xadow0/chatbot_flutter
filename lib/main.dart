@@ -7,7 +7,6 @@ import 'core/theme/app_theme.dart';
 import 'presentation/providers/chat_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/providers/auth_provider.dart';
-// --- NUEVA IMPORTACIÓN DEL PROVIDER ---
 import 'presentation/providers/command_management_provider.dart';
 
 import 'firebase_options.dart';
@@ -31,6 +30,7 @@ import 'data/services/local_ollama_service.dart';
 import 'data/services/auth_service.dart';
 import 'data/services/preferences_service.dart';
 import 'data/services/firebase_sync_service.dart';
+import 'data/services/firebase_command_sync_service.dart';
 import 'data/services/secure_storage_service.dart'; 
 import 'data/services/local_command_service.dart'; 
 
@@ -98,31 +98,47 @@ class _AppInitializerState extends State<AppInitializer> {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         
-        // 1. --- Servicios Base (Independientes) ---
         Provider<SecureStorageService>(
           create: (_) => SecureStorageService(),
         ),
         Provider<FirebaseSyncService>(
           create: (_) => FirebaseSyncService(),
         ),
+        Provider<FirebaseCommandSyncService>(
+          create: (_) => FirebaseCommandSyncService(),
+        ),
         Provider<PreferencesService>(
           create: (_) => PreferencesService(),
         ),
 
-        // 2. --- Core Providers (Services & Auth) ---
         ChangeNotifierProvider<AIServiceSelector>.value(
           value: result.aiServiceSelector,
         ),
 
         ChangeNotifierProvider(
-          create: (context) => AuthProvider(
-            authService: AuthService(),
-            preferencesService: context.read<PreferencesService>(),
-            syncService: context.read<FirebaseSyncService>(),
-          ),
+          create: (context) {
+            final authProvider = AuthProvider(
+              authService: AuthService(),
+              preferencesService: context.read<PreferencesService>(),
+              syncService: context.read<FirebaseSyncService>(),
+            );
+            
+            Future.microtask(() {
+              try {
+                final commandProvider = Provider.of<CommandManagementProvider>(
+                  context,
+                  listen: false,
+                );
+                authProvider.setCommandProvider(commandProvider);
+              } catch (e) {
+                debugPrint('⚠️ [Main] Error inyectando CommandProvider: $e');
+              }
+            });
+            
+            return authProvider;
+          },
         ),
 
-        // 3. --- Servicios de Datos (Dependen de Base) ---
         Provider<LocalCommandService>(
           create: (context) => LocalCommandService(
             context.read<SecureStorageService>(),
@@ -135,11 +151,16 @@ class _AppInitializerState extends State<AppInitializer> {
           ),
         ),
 
-        // 4. --- Repositorios (Dependen de Services) ---
         Provider<CommandRepository>(
-          create: (context) => CommandRepositoryImpl(
-            context.read<LocalCommandService>(),
-          ),
+          create: (context) {
+            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            
+            return CommandRepositoryImpl(
+              context.read<LocalCommandService>(),
+              context.read<FirebaseCommandSyncService>(),
+              () => authProvider.isCloudSyncEnabled,
+            );
+          },
         ),
         
         Provider<ChatRepository>(
@@ -159,17 +180,12 @@ class _AppInitializerState extends State<AppInitializer> {
           },
         ),
 
-        // 5. --- Providers de Estado / UI (Consumidores Finales) ---
-        
-        // [NUEVO] Provider para la gestión de comandos (UI)
-        // Depende de CommandRepository, que ya fue creado arriba.
         ChangeNotifierProvider(
           create: (context) => CommandManagementProvider(
-            context.read<CommandRepository>(),
+            context.read<CommandRepository>() as CommandRepositoryImpl,
           ),
         ),
         
-        // ChatProvider consume TODO lo anterior, por eso va al final.
         ChangeNotifierProvider(
           create: (context) {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -294,7 +310,7 @@ Future<String> _determineInitialRoute() async {
   final hasKeys = await apiKeysManager.hasAnyApiKey();
   
   if (!hasKeys) {
-    debugPrint('🔐 [Main] No hay API keys guardadas');
+    debugPrint('🔍 [Main] No hay API keys guardadas');
     
     await _migrateFromEnvIfAvailable(apiKeysManager);
     
@@ -304,7 +320,7 @@ Future<String> _determineInitialRoute() async {
       debugPrint('✅ [Main] Keys migradas correctamente → Ir al menú principal');
       return AppRoutes.startMenu;
     } else {
-      debugPrint('🔐 [Main] Sin keys → Ir a onboarding');
+      debugPrint('🔑 [Main] Sin keys → Ir a onboarding');
       return AppRoutes.apiKeysOnboarding;
     }
   } else {

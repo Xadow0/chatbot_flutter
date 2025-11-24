@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../domain/entities/command_entity.dart';
 import '../../providers/command_management_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class UserCommandsPage extends StatefulWidget {
   const UserCommandsPage({super.key});
@@ -15,26 +16,29 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => 
-      context.read<CommandManagementProvider>().loadCommands()
-    );
+    Future.microtask(() async {
+      final authProvider = context.read<AuthProvider>();
+      final commandProvider = context.read<CommandManagementProvider>();
+      
+      await commandProvider.loadCommands(
+        autoSync: authProvider.isCloudSyncEnabled,
+      );
+    });
   }
 
   void _showCommandDialog(BuildContext context, {CommandEntity? command}) {
-  // 1. Capturamos la instancia viva del provider desde el contexto de la PÁGINA (donde sí existe)
-  final commandProvider = context.read<CommandManagementProvider>();
+    final commandProvider = context.read<CommandManagementProvider>();
 
-  showDialog(
-    context: context,
-    builder: (dialogContext) {
-      // 2. Inyectamos esa misma instancia dentro del árbol del DIÁLOGO
-      return ChangeNotifierProvider.value(
-        value: commandProvider,
-        child: _CommandEditorDialog(existingCommand: command),
-      );
-    },
-  );
-}
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return ChangeNotifierProvider.value(
+          value: commandProvider,
+          child: _CommandEditorDialog(existingCommand: command),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +146,6 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
               ),
             ],
           ),
-          // Mostramos la descripción si existe, sino null
           subtitle: hasDescription 
             ? Padding(
                 padding: const EdgeInsets.only(top: 4.0),
@@ -181,15 +184,18 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
   void _confirmDelete(BuildContext context, CommandEntity command) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('¿Eliminar comando?'),
         content: Text('Se eliminará ${command.trigger} permanentemente.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
           TextButton(
-            onPressed: () {
-              context.read<CommandManagementProvider>().deleteCommand(command.id);
-              Navigator.pop(context);
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await context.read<CommandManagementProvider>().deleteCommand(command.id);
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
           ),
@@ -199,7 +205,6 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
   }
 }
 
-// --- DIALOGO DE EDICIÓN / CREACIÓN ---
 class _CommandEditorDialog extends StatefulWidget {
   final CommandEntity? existingCommand;
 
@@ -212,7 +217,6 @@ class _CommandEditorDialog extends StatefulWidget {
 class _CommandEditorDialogState extends State<_CommandEditorDialog> {
   final _formKey = GlobalKey<FormState>();
   
-  // Controladores
   late TextEditingController _triggerCtrl;
   late TextEditingController _titleCtrl;
   late TextEditingController _descriptionCtrl;
@@ -244,7 +248,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
         id: isEditing ? widget.existingCommand!.id : const Uuid().v4(),
         trigger: _triggerCtrl.text.trim(),
         title: _titleCtrl.text.trim(),
-        description: _descriptionCtrl.text.trim(), // Se guarda la descripción (puede estar vacía)
+        description: _descriptionCtrl.text.trim(),
         promptTemplate: _promptCtrl.text.trim(),
         systemType: SystemCommandType.none,
       );
@@ -264,7 +268,6 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // FILA 1: Trigger y Título
               Row(
                 children: [
                   Expanded(
@@ -292,7 +295,6 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
               ),
               const SizedBox(height: 16),
               
-              // CAMPO DE DESCRIPCIÓN
               TextFormField(
                 controller: _descriptionCtrl,
                 decoration: const InputDecoration(
@@ -305,7 +307,6 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
               ),
               const SizedBox(height: 16),
 
-              // CAMPO PROMPT
               TextFormField(
                 controller: _promptCtrl,
                 maxLines: 5,
