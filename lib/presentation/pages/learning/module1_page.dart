@@ -28,6 +28,11 @@ class _Module1PageState extends State<Module1Page> {
       Navigator.pop(context);
     }
   }
+  
+  // Función para salir directamente al menú principal
+  void _goHome() {
+    Navigator.pop(context);
+  }
 
   Future<void> _completeModule() async {
     final prefs = await SharedPreferences.getInstance();
@@ -44,15 +49,22 @@ class _Module1PageState extends State<Module1Page> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header con botón de retroceso
+            // Header con botón de retroceso Y botón de Casa
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Separa los botones
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back, size: 28),
                     onPressed: _previousPage,
-                    tooltip: 'Volver',
+                    tooltip: 'Volver atrás',
+                  ),
+                  // NUEVO: Botón para volver al menú (Casa)
+                  IconButton(
+                    icon: const Icon(Icons.home_rounded, size: 28),
+                    onPressed: _goHome,
+                    tooltip: 'Salir al menú',
                   ),
                 ],
               ),
@@ -155,6 +167,9 @@ class _CommunicationPageState extends State<_CommunicationPage> {
   bool _isGenerating = false;
   bool _generationComplete = false;
   
+  Timer? _textTimer; // Variable para controlar el timer del texto
+  Timer? _generationTimer; // Variable para controlar el timer de generación
+
   final List<String> _targetWords = [
     'La', 'IA', 'genera', 'texto', 'prediciendo', 'la', 'palabra',
     'más', 'probable', 'en', 'cada', 'momento'
@@ -171,28 +186,41 @@ class _CommunicationPageState extends State<_CommunicationPage> {
     _startExplanationAnimation();
   }
 
+  @override
+  void dispose() {
+    // Limpieza de timers al salir
+    _textTimer?.cancel();
+    _generationTimer?.cancel();
+    super.dispose();
+  }
+
   void _startExplanationAnimation() {
     int charIndex = 0;
-    Timer.periodic(const Duration(milliseconds: 30), (timer) {
+    _textTimer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
       if (charIndex < _fullExplanation.length) {
         setState(() {
           _displayedExplanation = _fullExplanation.substring(0, charIndex + 1);
         });
         charIndex++;
       } else {
-        timer.cancel();
-        setState(() {
-          _explanationComplete = true;
-        });
-        // Mostrar el botón después de completar la explicación
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            setState(() {
-              _showStartButton = true;
-            });
-          }
-        });
+        _finishExplanation();
       }
+    });
+  }
+
+  // NUEVO: Función para saltar la animación
+  void _skipExplanation() {
+    if (_explanationComplete) return;
+    _finishExplanation();
+  }
+
+  // Lógica común para terminar la explicación (ya sea por tiempo o por skip)
+  void _finishExplanation() {
+    _textTimer?.cancel();
+    setState(() {
+      _displayedExplanation = _fullExplanation;
+      _explanationComplete = true;
+      _showStartButton = true; // Mostramos el botón inmediatamente si se salta
     });
   }
 
@@ -218,7 +246,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
 
     int candidateIndex = 0;
 
-    Timer.periodic(const Duration(milliseconds: 250), (timer) {
+    _generationTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       if (candidateIndex < _candidateWords.length) {
         setState(() {
           _currentWord = _candidateWords[candidateIndex];
@@ -233,7 +261,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
           _wordIndex++;
         });
         Future.delayed(const Duration(milliseconds: 200), () {
-          _generateNextWord();
+          if (mounted) _generateNextWord();
         });
       }
     });
@@ -268,195 +296,218 @@ class _CommunicationPageState extends State<_CommunicationPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Text(
-            '¿Cómo se comunica contigo?',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          
-          // Explicación animada
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              _displayedExplanation,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                height: 1.5,
+    return SingleChildScrollView( // Añadido Scroll para evitar overflow en pantallas pequeñas
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Text(
+              '¿Cómo se comunica contigo?',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Simulación de generación
-          if (_explanationComplete) ...[
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: theme.colorScheme.primary,
-                  width: 2,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _showStartButton || _isGenerating || _generationComplete
-                        ? 'Generación en tiempo real:'
-                        : '',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
+            const SizedBox(height: 24),
+            
+            // Explicación animada con botón Skip
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    _displayedExplanation,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      height: 1.5,
                     ),
                   ),
-                  if (_showStartButton || _isGenerating || _generationComplete)
-                    const SizedBox(height: 12),
-                  
-                  // Botón para comenzar la animación
-                  if (_showStartButton) ...[
-                    Text(
-                      'Presione el botón para simular una generación de texto en tiempo real como lo haría una IA:',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withAlpha((0.8 * 255).round()),
+                ),
+                // Botón Saltar Animación
+                if (!_explanationComplete)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: TextButton.icon(
+                      onPressed: _skipExplanation,
+                      icon: const Icon(Icons.fast_forward, size: 16),
+                      label: const Text('Saltar'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: ElevatedButton.icon(
-                        onPressed: _startWordGeneration,
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Comenzar Animación'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
+                  ),
+              ],
+            ),
+            
+            const SizedBox(height: 32),
+            
+            // Simulación de generación
+            if (_explanationComplete) ...[
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: theme.colorScheme.primary,
+                    width: 2,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _showStartButton || _isGenerating || _generationComplete
+                          ? 'Generación en tiempo real:'
+                          : '',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    if (_showStartButton || _isGenerating || _generationComplete)
+                      const SizedBox(height: 12),
+                    
+                    // Botón para comenzar la animación
+                    if (_showStartButton) ...[
+                      Text(
+                        'Presione el botón para simular una generación de texto en tiempo real como lo haría una IA:',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withAlpha((0.8 * 255).round()),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: ElevatedButton.icon(
+                          onPressed: _startWordGeneration,
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('Comenzar Animación'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                  
-                  // Texto generado
-                  if (_isGenerating || _generationComplete)
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        ..._generatedWords.map((word) => Text(
-                          '$word ',
-                          style: theme.textTheme.bodyLarge,
-                        )),
-                        if (_currentWord.isNotEmpty)
-                          Container(
+                    ],
+                    
+                    // Texto generado
+                    if (_isGenerating || _generationComplete)
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          ..._generatedWords.map((word) => Text(
+                            '$word ',
+                            style: theme.textTheme.bodyLarge,
+                          )),
+                          if (_currentWord.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary.withAlpha((0.2 * 255).round()),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: theme.colorScheme.primary,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Text(
+                                _currentWord,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          if (_isGenerating && _currentWord.isEmpty)
+                            Container(
+                              width: 20,
+                              height: 20,
+                              margin: const EdgeInsets.only(left: 4),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    
+                    if (_candidateWords.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Candidatas:',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round()),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _candidateWords.map((word) {
+                          final isSelected = word == _currentWord;
+                          return Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 12,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withAlpha((0.2 * 255).round()),
-                              borderRadius: BorderRadius.circular(4),
+                              color: isSelected
+                                  ? theme.colorScheme.primary.withAlpha((0.1 * 255).round())
+                                  : theme.colorScheme.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: theme.colorScheme.primary,
-                                width: 2,
+                                color: isSelected
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.outline.withAlpha((0.3 * 255).round()),
+                                width: isSelected ? 2 : 1,
                               ),
                             ),
                             child: Text(
-                              _currentWord,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
+                              word,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: isSelected
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
-                          ),
-                        if (_isGenerating && _currentWord.isEmpty)
-                          Container(
-                            width: 20,
-                            height: 20,
-                            margin: const EdgeInsets.only(left: 4),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                      ],
-                    ),
-                  
-                  if (_candidateWords.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      'Candidatas:',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round()),
+                          );
+                        }).toList(),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _candidateWords.map((word) {
-                        final isSelected = word == _currentWord;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? theme.colorScheme.primary.withAlpha((0.1 * 255).round())
-                                : theme.colorScheme.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isSelected
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.outline.withAlpha((0.3 * 255).round()),
-                              width: isSelected ? 2 : 1,
-                            ),
-                          ),
-                          child: Text(
-                            word,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: isSelected
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
+            ],
+            
+            const SizedBox(height: 20),
+            
+            // Botón continuar
+            if (_generationComplete)
+              ElevatedButton(
+                onPressed: widget.onNext,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                child: const Text('Continuar'),
+              ),
+            const SizedBox(height: 20),
           ],
-          
-          const Spacer(),
-          
-          // Botón continuar
-          if (_generationComplete)
-            ElevatedButton(
-              onPressed: widget.onNext,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              child: const Text('Continuar'),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -497,6 +548,8 @@ class _ExplanationPageState extends State<_ExplanationPage> {
   bool _answeredCorrectly = false;
   bool _showExplanations = false;
   
+  Timer? _textTimer; // Timer controlado
+  
   List<_QuizOption> _quizOptions = [];
 
   @override
@@ -505,22 +558,44 @@ class _ExplanationPageState extends State<_ExplanationPage> {
     _startTextAnimation();
   }
 
+  @override
+  void dispose() {
+    _textTimer?.cancel();
+    super.dispose();
+  }
+
   void _startTextAnimation() {
     int charIndex = 0;
-    Timer.periodic(const Duration(milliseconds: 30), (timer) {
+    _textTimer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
       if (charIndex < _fullText.length) {
         setState(() {
           _displayedText = _fullText.substring(0, charIndex + 1);
         });
         charIndex++;
       } else {
-        timer.cancel();
-        Future.delayed(const Duration(seconds: 1), () {
-          setState(() {
-            _showQuiz = true;
-          });
-          _generateQuizOptions();
+        _finishAnimation();
+      }
+    });
+  }
+
+  // NUEVO: Función Skip
+  void _skipAnimation() {
+    if (_showQuiz) return;
+    _finishAnimation();
+  }
+
+  void _finishAnimation() {
+    _textTimer?.cancel();
+    setState(() {
+      _displayedText = _fullText;
+    });
+    // Si saltamos, mostramos el quiz inmediatamente
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {
+          _showQuiz = true;
         });
+        if (_quizOptions.isEmpty) _generateQuizOptions();
       }
     });
   }
@@ -645,15 +720,17 @@ class _ExplanationPageState extends State<_ExplanationPage> {
     });
     
     Future.delayed(const Duration(milliseconds: 500), () {
-      if (_quizOptions[index].isCorrect) {
-        setState(() {
-          _answeredCorrectly = true;
-          _showExplanations = true;
-        });
-      } else {
-        setState(() {
-          _showExplanations = true;
-        });
+      if (mounted) {
+        if (_quizOptions[index].isCorrect) {
+          setState(() {
+            _answeredCorrectly = true;
+            _showExplanations = true;
+          });
+        } else {
+          setState(() {
+            _showExplanations = true;
+          });
+        }
       }
     });
   }
@@ -683,18 +760,37 @@ class _ExplanationPageState extends State<_ExplanationPage> {
           ),
           const SizedBox(height: 24),
           
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              _displayedText,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                height: 1.5,
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  _displayedText,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    height: 1.5,
+                  ),
+                ),
               ),
-            ),
+              if (!_showQuiz)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextButton.icon(
+                    onPressed: _skipAnimation,
+                    icon: const Icon(Icons.fast_forward, size: 16),
+                    label: const Text('Saltar'),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
+                    ),
+                  ),
+                ),
+            ],
           ),
           
           const SizedBox(height: 32),
@@ -934,6 +1030,8 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
   String _introText = '';
   bool _introComplete = false;
   final String _fullIntroText = 'Para terminar, vamos a hacer un ejercicio de pensar qué puede y no puede hacer una IA. Marca en cada opción la que consideres correcta:';
+  
+  Timer? _textTimer;
 
   @override
   void initState() {
@@ -942,20 +1040,37 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
     _startIntroAnimation();
   }
 
+  @override
+  void dispose() {
+    _textTimer?.cancel();
+    super.dispose();
+  }
+
   void _startIntroAnimation() {
     int charIndex = 0;
-    Timer.periodic(const Duration(milliseconds: 40), (timer) {
+    _textTimer = Timer.periodic(const Duration(milliseconds: 40), (timer) {
       if (charIndex < _fullIntroText.length) {
         setState(() {
           _introText = _fullIntroText.substring(0, charIndex + 1);
         });
         charIndex++;
       } else {
-        timer.cancel();
-        setState(() {
-          _introComplete = true;
-        });
+        _finishAnimation();
       }
+    });
+  }
+
+  // NUEVO: Función Skip
+  void _skipAnimation() {
+    if (_introComplete) return;
+    _finishAnimation();
+  }
+
+  void _finishAnimation() {
+    _textTimer?.cancel();
+    setState(() {
+      _introText = _fullIntroText;
+      _introComplete = true;
     });
   }
 
@@ -1003,36 +1118,54 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
           const SizedBox(height: 16),
           
           if (!_showResults)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withAlpha((0.3 * 255).round()),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline,
-                    color: theme.colorScheme.primary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _introText,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.left,
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withAlpha((0.3 * 255).round()),
                     ),
                   ),
-                ],
-              ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline,
+                        color: theme.colorScheme.primary,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _introText,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface,
+                            height: 1.5,
+                          ),
+                          textAlign: TextAlign.left,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_introComplete)
+                   Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: TextButton.icon(
+                      onPressed: _skipAnimation,
+                      icon: const Icon(Icons.fast_forward, size: 16),
+                      label: const Text('Saltar'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
+                      ),
+                    ),
+                  ),
+              ],
             )
           else if (_correctAnswers == _questions.length)
             Container(
