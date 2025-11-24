@@ -97,7 +97,7 @@ class _MessageBubble extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -215,9 +215,7 @@ class _MessageBubble extends StatelessWidget {
             // Botón de Copiar
             // Usamos SelectionContainer.disabled para que el texto del icono no sea seleccionable accidentalmente
             SelectionContainer.disabled(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: InkWell(
+              child: InkWell(
                   onTap: () => _copyToClipboard(context, message.content),
                   borderRadius: BorderRadius.circular(12),
                   child: Padding(
@@ -232,7 +230,6 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Necesario para LogicalKeyboardKey y HardwareKeyboard
 
 class MessageInput extends StatefulWidget {
   final Function(String) onSendMessage;
@@ -16,13 +17,38 @@ class MessageInput extends StatefulWidget {
 
 class MessageInputState extends State<MessageInput> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode(); // Nodo para interceptar teclas
 
-  /// Inserta texto al inicio del campo de entrada
-  /// Útil para quick responses que funcionan como comandos
+  @override
+  void initState() {
+    super.initState();
+    // Configurar la intercepción de teclas directamente en el FocusNode
+    _focusNode.onKeyEvent = (node, event) {
+      // Solo nos interesa cuando la tecla se "baja" (KeyDown)
+      if (event is KeyDownEvent) {
+        // Si es la tecla ENTER
+        if (event.logicalKey == LogicalKeyboardKey.enter) {
+          // Verificamos si SHIFT está presionado
+          if (HardwareKeyboard.instance.isShiftPressed) {
+            // Shift + Enter: Dejar pasar el evento para que haga el salto de línea normal
+            return KeyEventResult.ignored;
+          } else {
+            // Solo Enter: Enviar mensaje y detener la propagación (para no insertar \n)
+            // Solo enviamos si no está bloqueado
+            if (!widget.isBlocked) {
+              _handleSend();
+            }
+            return KeyEventResult.handled;
+          }
+        }
+      }
+      return KeyEventResult.ignored;
+    };
+  }
+
   void insertTextAtStart(String text) {
     final currentText = _controller.text;
     _controller.text = text + currentText;
-    // Posicionar cursor al final del texto insertado
     _controller.selection = TextSelection.collapsed(offset: text.length);
   }
 
@@ -30,11 +56,14 @@ class MessageInputState extends State<MessageInput> {
     if (_controller.text.trim().isEmpty || widget.isBlocked) return;
     widget.onSendMessage(_controller.text.trim());
     _controller.clear();
+    // Opcional: Mantener el foco en el input después de enviar
+    _focusNode.requestFocus(); 
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose(); // Importante limpiar el nodo
     super.dispose();
   }
 
@@ -53,25 +82,39 @@ class MessageInputState extends State<MessageInput> {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end, // Alinea el botón abajo si el texto crece
         children: [
           Expanded(
             child: TextField(
               controller: _controller,
+              focusNode: _focusNode, // Vinculamos el FocusNode aquí
               enabled: !widget.isBlocked,
+              
+              // --- CONFIGURACIÓN DINÁMICA ---
+              keyboardType: TextInputType.multiline,
+              minLines: 1,
+              maxLines: 8, // Crece hasta 8 líneas
+              textInputAction: TextInputAction.newline, // Mantiene el botón de 'Enter' visualmente
+              // ------------------------------
+
               decoration: InputDecoration(
                 hintText: widget.isBlocked
                     ? 'Procesando respuesta...'
                     : 'Escribe un mensaje...',
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               ),
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _handleSend(),
+              // Ya no usamos onSubmitted porque lo manejamos manualmente en el FocusNode
             ),
           ),
           const SizedBox(width: 8),
-          IconButton.filled(
-            icon: const Icon(Icons.send),
-            onPressed: widget.isBlocked ? null : _handleSend,
-            tooltip: 'Enviar',
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: IconButton.filled(
+              icon: const Icon(Icons.send),
+              onPressed: widget.isBlocked ? null : _handleSend,
+              tooltip: 'Enviar',
+            ),
           ),
         ],
       ),
