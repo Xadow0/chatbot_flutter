@@ -270,6 +270,9 @@ class ChatProvider extends ChangeNotifier {
       }
 
       await _restoreUserPreferences();
+      
+      // Cargar quick responses iniciales (incluye comandos del usuario)
+      await _updateQuickResponses();
 
       _ollamaSelectable = _aiSelector.ollamaAvailable;
 
@@ -506,6 +509,12 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Refresca los quick responses, útil cuando se crean/editan comandos de usuario
+  Future<void> refreshQuickResponses() async {
+    await _updateQuickResponses();
+    notifyListeners();
+  }
+
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty || _isProcessing) return;
 
@@ -616,7 +625,7 @@ class ChatProvider extends ChangeNotifier {
       }
     } finally {
       _isProcessing = false;
-      _updateQuickResponses();
+      await _updateQuickResponses();
       notifyListeners();
 
       _hasUnsavedChanges = true;
@@ -625,11 +634,34 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  void _updateQuickResponses() {
+  Future<void> _updateQuickResponses() async {
     final messageModels =
         _messages.map((entity) => Message.fromEntity(entity)).toList();
-    _quickResponses =
+    
+    // Obtener respuestas contextuales del sistema
+    final systemResponses =
         QuickResponseProvider.getContextualResponsesAsEntities(messageModels);
+    
+    // Obtener comandos del usuario desde el repositorio
+    try {
+      final allCommands = await _commandRepository.getAllCommands();
+      
+      // Filtrar solo comandos de usuario (no del sistema)
+      final userCommands = allCommands.where((cmd) => !cmd.isSystem).toList();
+      
+      // Convertir comandos del usuario a QuickResponseEntity
+      // Solo necesitamos el trigger como texto
+      final userQuickResponses = userCommands
+          .map((cmd) => QuickResponseEntity(text: cmd.trigger))
+          .toList();
+      
+      // Combinar respuestas del sistema con comandos del usuario
+      _quickResponses = [...systemResponses, ...userQuickResponses];
+    } catch (e) {
+      debugPrint('⚠️ [ChatProvider] Error cargando comandos de usuario para quick responses: $e');
+      // En caso de error, solo usar las respuestas del sistema
+      _quickResponses = systemResponses;
+    }
   }
 
   Future<void> _autoSaveConversation() async {
@@ -701,7 +733,7 @@ class ChatProvider extends ChangeNotifier {
       _currentConversationFile = file;
       _hasUnsavedChanges = false; // Aquí se reseteaba el flag, lo cual era el problema
 
-      _updateQuickResponses();
+      await _updateQuickResponses();
       notifyListeners();
 
       debugPrint('   ✅ Conversación cargada (${_messages.length} mensajes)');

@@ -52,7 +52,14 @@ class QuickResponsesWidget extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 8),
                     child: _QuickResponseChip(
                       response: response,
-                      onTap: () => onResponseSelected(response.text),
+                      onTap: () {
+                        // Asegurar que el comando tenga un espacio al final
+                        String commandText = response.text;
+                        if (!commandText.endsWith(' ')) {
+                          commandText += ' ';
+                        }
+                        onResponseSelected(commandText);
+                      },
                     ),
                   );
                 }),

@@ -51,7 +51,7 @@ class _StartMenuPageState extends State<StartMenuPage>
     super.dispose();
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -81,35 +81,20 @@ class _StartMenuPageState extends State<StartMenuPage>
                                 // 1. AUMENTO ESPACIO SUPERIOR
                                 const SizedBox(height: 85), 
                                 
-                                // TÍTULO
-                                const Text(
-                                  'TRAINING.IA',
-                                  style: TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 2,
-                                    color: Colors.lightBlue,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                
-                                const SizedBox(height: 10), 
-
-                                // ICONO PRINCIPAL
+                                // --- LOGO PRINCIPAL ---
+                                // Reemplaza al Texto e Icono anterior
                                 Container(
-                                  padding: const EdgeInsets.all(16), 
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.black12,
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 300, // Altura máxima controlada
+                                    maxWidth: 400,  // Ancho máximo controlado
                                   ),
-                                  child: const Icon(
-                                    Icons.psychology_outlined,
-                                    size: 60, 
-                                    color: Colors.lightBlue,
+                                  child: Image.asset(
+                                    'assets/images/logo.png',
+                                    fit: BoxFit.contain, // Ajusta la imagen sin deformarla
                                   ),
                                 ),
 
-                                const SizedBox(height: 10), 
+                                const SizedBox(height: 20), 
 
                                 Text(
                                   'Bienvenido a la estación de entrenamiento IA',

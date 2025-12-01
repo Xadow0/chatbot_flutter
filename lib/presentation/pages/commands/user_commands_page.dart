@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../domain/entities/command_entity.dart';
 import '../../providers/command_management_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../widgets/custom_drawer.dart';
 
 class UserCommandsPage extends StatefulWidget {
@@ -198,6 +199,14 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await context.read<CommandManagementProvider>().deleteCommand(command.id);
+              
+              // Refrescar quick responses en ChatProvider si está disponible
+              try {
+                await context.read<ChatProvider>().refreshQuickResponses();
+              } catch (e) {
+                // ChatProvider podría no estar disponible en todos los contextos
+                debugPrint('⚠️ No se pudo refrescar quick responses: $e');
+              }
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
           ),
@@ -223,14 +232,35 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
   late TextEditingController _titleCtrl;
   late TextEditingController _descriptionCtrl;
   late TextEditingController _promptCtrl;
+  
+  bool _hasContentPlaceholder = false;
 
   @override
   void initState() {
     super.initState();
-    _triggerCtrl = TextEditingController(text: widget.existingCommand?.trigger ?? '/');
+    
+    // Remover espacio final del trigger al editar
+    String triggerText = widget.existingCommand?.trigger ?? '/';
+    if (triggerText.endsWith(' ')) {
+      triggerText = triggerText.substring(0, triggerText.length - 1);
+    }
+    
+    _triggerCtrl = TextEditingController(text: triggerText);
     _titleCtrl = TextEditingController(text: widget.existingCommand?.title ?? '');
     _descriptionCtrl = TextEditingController(text: widget.existingCommand?.description ?? ''); 
     _promptCtrl = TextEditingController(text: widget.existingCommand?.promptTemplate ?? '');
+    
+    _hasContentPlaceholder = _promptCtrl.text.contains('{{content}}');
+    
+    // Listener para detectar cambios en el prompt
+    _promptCtrl.addListener(() {
+      final newHasContent = _promptCtrl.text.contains('{{content}}');
+      if (newHasContent != _hasContentPlaceholder) {
+        setState(() {
+          _hasContentPlaceholder = newHasContent;
+        });
+      }
+    });
   }
 
   @override
@@ -242,21 +272,69 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
     super.dispose();
   }
 
-  void _save() {
+  void _save() async {
     if (_formKey.currentState!.validate()) {
+      // Si no tiene {{content}}, mostrar diálogo de confirmación
+      if (!_hasContentPlaceholder) {
+        final shouldContinue = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Comando sin {{content}}'),
+              ],
+            ),
+            content: const Text(
+              'El prompt no contiene {{content}}, por lo que el comando no podrá usar texto personalizado.\n\n¿Deseas guardar el comando de todas formas?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Guardar sin {{content}}'),
+              ),
+            ],
+          ),
+        );
+        
+        if (shouldContinue != true) return;
+      }
+      
       final isEditing = widget.existingCommand != null;
+      
+      // Añadir espacio al final del trigger automáticamente
+      String finalTrigger = _triggerCtrl.text.trim();
+      if (!finalTrigger.endsWith(' ')) {
+        finalTrigger += ' ';
+      }
       
       final newCommand = CommandEntity(
         id: isEditing ? widget.existingCommand!.id : const Uuid().v4(),
-        trigger: _triggerCtrl.text.trim(),
+        trigger: finalTrigger,
         title: _titleCtrl.text.trim(),
         description: _descriptionCtrl.text.trim(),
         promptTemplate: _promptCtrl.text.trim(),
         systemType: SystemCommandType.none,
       );
 
-      context.read<CommandManagementProvider>().saveCommand(newCommand);
-      Navigator.pop(context);
+      await context.read<CommandManagementProvider>().saveCommand(newCommand);
+      
+      // Refrescar quick responses en ChatProvider si está disponible
+      try {
+        await context.read<ChatProvider>().refreshQuickResponses();
+      } catch (e) {
+        // ChatProvider podría no estar disponible en todos los contextos
+        debugPrint('⚠️ No se pudo refrescar quick responses: $e');
+      }
+      
+      if (mounted) {
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -276,10 +354,25 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
                     flex: 1,
                     child: TextFormField(
                       controller: _triggerCtrl,
-                      decoration: const InputDecoration(labelText: 'Comando', hintText: '/cmd'),
+                      decoration: const InputDecoration(
+                        labelText: 'Comando', 
+                        hintText: '/cmd',
+                      ),
+                      onChanged: (value) {
+                        // Eliminar espacios y enters automáticamente
+                        final cleanValue = value.replaceAll(RegExp(r'[\s\n\r]'), '');
+                        if (value != cleanValue) {
+                          _triggerCtrl.value = TextEditingValue(
+                            text: cleanValue,
+                            selection: TextSelection.collapsed(offset: cleanValue.length),
+                          );
+                        }
+                      },
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Requerido';
-                        if (!v.startsWith('/')) return 'Usa /';
+                        if (!v.startsWith('/')) return 'Debe comenzar con /';
+                        if (v.contains(RegExp(r'[\s\n\r]'))) return 'No debe contener espacios';
+                        if (v.length <= 1) return 'Muy corto';
                         return null;
                       },
                     ),
@@ -290,7 +383,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
                     child: TextFormField(
                       controller: _titleCtrl,
                       decoration: const InputDecoration(labelText: 'Nombre', hintText: 'Ej: Resumir'),
-                      validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                      validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
                     ),
                   ),
                 ],
@@ -309,30 +402,53 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
               ),
               const SizedBox(height: 16),
 
-              TextFormField(
-                controller: _promptCtrl,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  labelText: 'Prompt (Template)', 
-                  hintText: 'Escribe tu prompt aquí...',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) => v!.isEmpty ? 'Requerido' : null,
-              ),
+              _buildPromptField(),
               const SizedBox(height: 8),
               
+              // Mensaje informativo siempre visible
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1), 
+                  borderRadius: BorderRadius.circular(8)
+                ),
                 child: const Row(
                   children: [
                     Icon(Icons.info_outline, size: 16, color: Colors.blue),
                     SizedBox(width: 8),
-                    Expanded(child: Text('Usa {{content}} para insertar el texto que escribas después del comando.', style: TextStyle(fontSize: 11))),
+                    Expanded(
+                      child: Text(
+                        'Usa {{content}} para insertar el texto que escribas después del comando.',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
                   ],
                 ),
-              )
+              ),
+              
+              // Mensaje de advertencia si no tiene {{content}}
+              if (!_hasContentPlaceholder) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1), 
+                    borderRadius: BorderRadius.circular(8)
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_outlined, size: 16, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          ' Sin {{content}}, el comando no podrá usar texto adicional.',
+                          style: TextStyle(fontSize: 11, color: Colors.orange[800]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ]
             ],
           ),
         ),
@@ -341,6 +457,50 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(onPressed: _save, child: const Text('Guardar')),
       ],
+    );
+  }
+  
+  Widget _buildPromptField() {
+    return TextFormField(
+      controller: _promptCtrl,
+      maxLines: 5,
+      decoration: const InputDecoration(
+        labelText: 'Prompt (Template)', 
+        hintText: 'Escribe tu prompt aquí...',
+        alignLabelWithHint: true,
+        border: OutlineInputBorder(),
+      ),
+      validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
+      // Usar el buildCounter para resaltar {{content}}
+      buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
+        return null; // No mostrar contador
+      },
+    );
+  }
+}
+
+// Widget personalizado para el campo de prompt con highlight de {{content}}
+class _HighlightedPromptField extends StatelessWidget {
+  final TextEditingController controller;
+  final String? Function(String?)? validator;
+
+  const _HighlightedPromptField({
+    required this.controller,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      maxLines: 5,
+      decoration: const InputDecoration(
+        labelText: 'Prompt (Template)', 
+        hintText: 'Escribe tu prompt aquí...',
+        alignLabelWithHint: true,
+        border: OutlineInputBorder(),
+      ),
+      validator: validator,
     );
   }
 }

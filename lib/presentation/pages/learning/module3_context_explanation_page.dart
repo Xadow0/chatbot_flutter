@@ -43,11 +43,15 @@ class Module3ContextExplanationPage extends StatelessWidget {
                     title: 'Refinar la conversación actual',
                     color: Colors.blue,
                     description:
-                        'Cuando la dirección de la respuesta es correcta pero necesita ajustes. Puedes pedir cambios de estilo, formato, claridad o nivel de detalle sin empezar de cero.\n\n'
-                        'Ejemplos:\n'
-                        '- “Hazlo más breve y directo.”\n'
-                        '- “Explícalo para principiantes.”\n'
-                        '- “Convierte esta respuesta en una tabla.”',
+                        'Úsalo cuando la IA te da información correcta pero el formato, tono o nivel de detalle no es el que necesitas. Esta estrategia aprovecha el contexto ya establecido.\n\n'
+                        'Ejemplo real:\n'
+                        'Le pediste a la IA: "Explícame cómo funciona la fotosíntesis"\n'
+                        'La IA te dio una explicación técnica con muchos términos científicos.\n\n'
+                        'Puedes refinar diciendo:\n'
+                        '• "Hazlo más sencillo, como si le explicaras a un niño de 10 años"\n'
+                        '• "Resume esto en 3 puntos clave"\n'
+                        '• "Ahora ponlo en formato de lista con viñetas"\n'
+                        '• "Añade un ejemplo cotidiano para entenderlo mejor"',
                   ),
 
                   const SizedBox(height: 12),
@@ -56,13 +60,20 @@ class Module3ContextExplanationPage extends StatelessWidget {
                   _buildStrategyCard(
                     context,
                     icon: Icons.refresh,
-                    title: 'Empezar desde cero',
+                    title: 'Empezar desde cero (Nueva conversación)',
                     color: Colors.green,
                     description:
-                        'Ideal cuando la conversación se ha desviado o el enfoque inicial no era el adecuado. Reiniciar evita arrastrar errores o supuestos incorrectos.\n\n'
-                        'Ejemplos:\n'
-                        '- “Voy a reformular la petición desde cero.”\n'
-                        '- “Olvida el historial anterior y genera una propuesta nueva basada en esto.”',
+                        'Úsalo cuando la conversación ha tomado un rumbo completamente equivocado o la IA ha malinterpretado tu intención desde el principio. Al crear una nueva conversación, evitas arrastrar contexto erróneo.\n\n'
+                        'Cuándo hacerlo:\n'
+                        '• La IA asumió algo incorrecto y sus respuestas siguientes parten de esa suposición\n'
+                        '• Probaste varios ajustes pero la respuesta sigue sin ser útil\n'
+                        '• Quieres un enfoque totalmente diferente\n'
+                        '• La conversación se volvió confusa con muchas idas y venidas\n\n'
+                        'Ejemplo real:\n'
+                        'Pediste: "Ayúdame con una receta de pasta"\n'
+                        'La IA asumió que querías pasta italiana con salsa de tomate.\n'
+                        'En realidad buscabas una receta de pasta casera (hacer la masa desde cero).\n\n'
+                        '→ Crear nueva conversación y reformular: "Enséñame a hacer pasta fresca casera desde cero"',
                   ),
 
                   const SizedBox(height: 12),
@@ -74,10 +85,14 @@ class Module3ContextExplanationPage extends StatelessWidget {
                     title: 'Iteración guiada por ejemplos',
                     color: Colors.purple,
                     description:
-                        'Puedes enseñar a la IA el tipo de salida exacta que buscas mediante ejemplos. Esto mejora la coherencia en tono, estructura y calidad.\n\n'
-                        'Ejemplos:\n'
-                        '- “Aquí tienes un ejemplo del estilo que quiero. Reescribe tu respuesta siguiendo ese formato.”\n'
-                        '- “Imita esta estructura: definición → ejemplo → síntesis.”',
+                        'Úsalo cuando necesitas que la IA siga un formato, estilo o estructura muy específica. Mostrarle un ejemplo es más efectivo que describirlo con palabras.\n\n'
+                        'Ejemplo real:\n'
+                        'Quieres que la IA escriba descripciones de productos para tu tienda online, pero sus textos son muy genéricos.\n\n'
+                        'Le muestras un ejemplo:\n'
+                        '"Aquí tienes un ejemplo del estilo que busco:\n\n'
+                        '✨ Camiseta Vintage Wave - 29.99€\n'
+                        'Suave como una brisa de verano. Esta camiseta de algodón 100% orgánico te abraza con su corte relajado. Perfect para esos días donde el estilo casual es tu mejor aliado.\n\n'
+                        'Ahora escribe una descripción similar para estos otros productos: [lista de productos]"',
                   ),
 
                   const SizedBox(height: 12),
@@ -89,18 +104,38 @@ class Module3ContextExplanationPage extends StatelessWidget {
                     title: 'Meta-preguntas',
                     color: Colors.orange,
                     description:
-                        'A veces no sabes exactamente cómo formular tu petición. Las meta-preguntas permiten que la IA te diga qué necesita o cómo mejorar tu instrucción.\n\n'
-                        'Ejemplos:\n'
-                        '- “¿Qué información te falta para dar la mejor respuesta posible?”\n'
-                        '- “Reformula mi solicitud para hacerla más clara.”\n'
-                        '- “Proponme una manera más efectiva de pedir esto.”',
+                        'Úsalo cuando no estás seguro de cómo pedir algo o sientes que tus instrucciones no son claras. Deja que la IA te ayude a mejorar tu propia pregunta.\n\n'
+                        'Ejemplo real:\n'
+                        'Quieres crear un plan de entrenamiento pero no sabes qué información necesita la IA.\n\n'
+                        'Preguntas meta útiles:\n'
+                        '• "¿Qué información necesitas de mí para crear un buen plan de entrenamiento?"\n'
+                        '• "¿Cómo debería estructurar mi pregunta para obtener mejores resultados?"\n'
+                        '• "¿Qué detalles adicionales harían tu respuesta más precisa?"\n\n'
+                        'La IA te dirá: "Necesitaría saber tu nivel actual, objetivos, días disponibles, lesiones previas, equipamiento..."\n\n'
+                        'Esto te ayuda a reformular tu pregunta de forma más completa.',
                   ),
 
                   const SizedBox(height: 20),
 
-                  const Text(
-                    'En este módulo aprenderás cuándo usar cada estrategia, cómo aplicarlas y cómo combinarlas para obtener mejores resultados.',
-                    style: TextStyle(fontSize: 16, height: 1.5, fontStyle: FontStyle.italic),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lightbulb_outline, color: Colors.amber[700], size: 28),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Consejo: Combina estas estrategias. Por ejemplo, usa meta-preguntas para entender qué necesitas, luego refina la conversación con ejemplos para obtener el resultado perfecto.',
+                            style: TextStyle(fontSize: 14, height: 1.4, fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
