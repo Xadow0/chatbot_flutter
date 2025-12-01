@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'module3_intro_page.dart';
+import 'module3_context_explanation_page.dart';
 import 'module3_iteration_page.dart';
 import 'module3_conclusion_page.dart';
 
@@ -73,6 +74,8 @@ class _Module3PageState extends State<Module3Page> {
       case 0:
         return Module3IntroPage(onStart: _nextPage);
       case 1:
+        return Module3ContextExplanationPage(onNext: _nextPage);
+      case 2:
         return Module3IterationPage(
           iterationSequence: [
             IterationType.reformular,
@@ -80,9 +83,9 @@ class _Module3PageState extends State<Module3Page> {
             IterationType.ejemplificar,
             IterationType.acotar
           ],
-          onNext: _nextPage, // Cambiado: ahora va a la página de conclusión
+          onNext: _nextPage,
         );
-      case 2:
+      case 3:
         return Module3ConclusionPage(onFinish: _completeModule);
       default:
         return const SizedBox();

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../presentation/providers/chat_provider.dart';
 import '../../../presentation/pages/chat/chat_page.dart';
+import '../../../presentation/widgets/custom_drawer.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -192,6 +193,7 @@ class _HistoryPageState extends State<HistoryPage> {
     final hasSelections = _selectedIndices.isNotEmpty;
 
     return Scaffold(
+      drawer: const CustomDrawer(),
       appBar: AppBar(
         title: const Text('Historial de conversaciones'),
       ),

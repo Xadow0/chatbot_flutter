@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../domain/entities/command_entity.dart';
 import '../../providers/command_management_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/custom_drawer.dart';
 
 class UserCommandsPage extends StatefulWidget {
   const UserCommandsPage({super.key});
@@ -46,6 +47,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      drawer: const CustomDrawer(),
       appBar: AppBar(
         title: const Text('Mis Comandos'),
         centerTitle: true,
