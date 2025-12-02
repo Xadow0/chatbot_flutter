@@ -31,6 +31,10 @@ class _Module3PageState extends State<Module3Page> {
     }
   }
 
+  void _goHome() {
+    Navigator.pop(context);
+  }
+
   Future<void> _completeModule() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('module_3_completed', true);
@@ -46,15 +50,22 @@ class _Module3PageState extends State<Module3Page> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header con botón de retroceso
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
+                // Esto separa los elementos: uno a la izquierda, otro a la derecha
+                mainAxisAlignment: MainAxisAlignment.spaceBetween, 
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back, size: 28),
                     onPressed: _previousPage,
                     tooltip: 'Volver',
+                  ),
+                  // Añadimos el botón de Casa aquí, igual que en el Módulo 2
+                  IconButton(
+                    icon: const Icon(Icons.home_rounded, size: 28),
+                    onPressed: _goHome,
+                    tooltip: 'Salir al menú',
                   ),
                 ],
               ),
