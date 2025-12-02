@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import '../../../data/services/gemini_service.dart';
+import '../../../../data/services/gemini_service.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 
 enum IterationType { reformular, aclarar, ejemplificar, acotar }

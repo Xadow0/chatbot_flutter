@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../data/services/gemini_service.dart';
+import '../../../../data/services/gemini_service.dart';
 import 'package:markdown_widget/markdown_widget.dart';
-import '../../../domain/entities/message_entity.dart';
-import '../../../domain/repositories/conversation_repository.dart';
+import '../../../../domain/entities/message_entity.dart';
+import '../../../../domain/repositories/conversation_repository.dart';
 import 'package:provider/provider.dart';
 
 class Module2Page extends StatefulWidget {
