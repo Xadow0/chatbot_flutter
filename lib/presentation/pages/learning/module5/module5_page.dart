@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'module4_intro_page.dart';
-import 'module4_context_explanation_page.dart';
-import 'module4_practice_page.dart';
-import 'module4_conclusion_page.dart';
+import 'module5_intro_page.dart';
+import 'module5_context_explanation_page.dart';
+import 'module5_ethics_scenarios_page.dart';
+import 'module5_conclusion_page.dart';
 
-class Module4Page extends StatefulWidget {
-  const Module4Page({super.key});
+class Module5Page extends StatefulWidget {
+  const Module5Page({super.key});
 
   @override
-  State<Module4Page> createState() => _Module4PageState();
+  State<Module5Page> createState() => _Module5PageState();
 }
 
-class _Module4PageState extends State<Module4Page> {
+class _Module5PageState extends State<Module5Page> {
   int _currentPage = 0;
 
   void _nextPage() {
@@ -38,7 +38,7 @@ class _Module4PageState extends State<Module4Page> {
 
   Future<void> _completeModule() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('module_4_completed', true);
+    await prefs.setBool('module_5_completed', true);
     if (mounted) {
       Navigator.pop(context);
     }
@@ -55,7 +55,7 @@ class _Module4PageState extends State<Module4Page> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
-                // Alineación para separar los botones (izquierda y derecha)
+                // Alineación para separar los botones a los extremos
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
@@ -85,21 +85,20 @@ class _Module4PageState extends State<Module4Page> {
   Widget _buildCurrentPage() {
     switch (_currentPage) {
       case 0:
-        return Module4IntroPage(onStart: _nextPage);
+        return Module5IntroPage(onStart: _nextPage);
       case 1:
-        return Module4ContextExplanationPage(onNext: _nextPage);
+        return Module5ContextExplanationPage(onNext: _nextPage);
       case 2:
-        return Module4PracticePage(
-          techniqueSequence: [
-            TechniqueType.descomposicion,
-            TechniqueType.metaPreguntas,
-            TechniqueType.plantillas,
-            TechniqueType.practica, 
+        return Module5EthicsScenariosPage(
+          scenarioSequence: [
+            EthicsScenarioType.sesgos,
+            EthicsScenarioType.decisiones,
+            EthicsScenarioType.responsabilidad,
           ],
           onNext: _nextPage,
         );
       case 3:
-        return Module4ConclusionPage(onFinish: _completeModule);
+        return Module5ConclusionPage(onFinish: _completeModule);
       default:
         return const SizedBox();
     }

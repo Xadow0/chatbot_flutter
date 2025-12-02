@@ -8,6 +8,7 @@ import '../presentation/pages/learning/module1/module1_page.dart';
 import '../presentation/pages/learning/module2/module2_page.dart';
 import '../presentation/pages/learning/module3/module3_page.dart';
 import '../presentation/pages/learning/module4/module4_page.dart';
+import '../presentation/pages/learning/module5/module5_page.dart';
 import '../presentation/pages/commands/user_commands_page.dart'; 
 
 import '../presentation/pages/onboarding/api_keys_onboarding_page.dart';
@@ -23,6 +24,7 @@ class AppRoutes {
   static const String learningModule2 = '/learning/module2';
   static const String learningModule3 = '/learning/module3';
   static const String learningModule4 = '/learning/module4';
+  static const String learningModule5 = '/learning/module5';
   static const String commands = '/commands';
 
   static const String apiKeysOnboarding = '/api-keys-onboarding';
@@ -39,7 +41,7 @@ class AppRoutes {
       learningModule2: (context) => const Module2Page(),
       learningModule3: (context) => const Module3Page(),
       learningModule4: (context) => const Module4Page(),
-    
+      learningModule5: (context) => const Module5Page(),
       commands: (context) => const UserCommandsPage(),
       apiKeysOnboarding: (context) => const ApiKeysOnboardingPage(),
       apiKeysSettings: (context) => const ApiKeysSettingsPage(),
