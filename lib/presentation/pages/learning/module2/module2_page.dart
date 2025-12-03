@@ -685,13 +685,14 @@ $userPrompt
 
 TU TAREA DE EVALUACIÓN:
 1. Analiza si el prompt es claro, específico y no deja lugar a alucinaciones.
-2. Evalúa si se distinguen bien los elementos (Rol, Tarea, etc.).
+2. El prompt estará dividido en Contexto, Rol, Tarea, Formato y Tono. Analiza que estos puntos se hayan deifindo correctamente y sean adecuados para el objetivo general.
+Si alguno de estos puntos es ambiguo o podría mejorarse, indícalo claramente sin rodeos.
 3. Asigna una PUNTUACIÓN del 0 al 100 basándote en la probabilidad de obtener un resultado excelente.
 4. CRITERIO DE ÉXITO: Si la puntuación es superior a 70, se considera un prompt "Completo y Efectivo".
 
 FORMATO DE TU RESPUESTA:
 - Empieza con una línea en negrita indicando la puntuación: **Puntuación: X/100**.
-- Si la puntuación es > 70: Felicita al usuario, dile que su prompt está listo para usarse y explica brevemente por qué es bueno.
+- Si la puntuación es > 70: Felicita al usuario, dile que su prompt está listo para usarse y explica brevemente por qué es bueno. Si hay alguna mejora menor, indícasela.
 - Si la puntuación es <= 70: Sé amable pero crítica. Explica qué le falta (ej. "El contexto es muy vago" o "No definiste bien el formato de salida") y dale un ejemplo concreto de cómo arreglar esa parte específica.
 - Termina con una frase motivadora.
 ''';

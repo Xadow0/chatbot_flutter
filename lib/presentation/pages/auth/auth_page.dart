@@ -14,12 +14,22 @@ class _AuthPageState extends State<AuthPage>
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
-  bool _isLogin = true; 
+  bool _isLogin = true;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  
+  // Para validación de contraseña
+  bool _hasMinLength = false;
+  bool _hasUpperCase = false;
+  bool _hasLowerCase = false;
+  bool _hasNumber = false;
+  bool _passwordsMatch = false;
 
   @override
   void initState() {
@@ -47,19 +57,192 @@ class _AuthPageState extends State<AuthPage>
     ));
 
     _animController.forward();
+    
+    // Listeners para validación en tiempo real
+    _passwordController.addListener(_validatePassword);
+    _confirmPasswordController.addListener(_validatePassword);
   }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _animController.dispose();
     super.dispose();
+  }
+
+  void _validatePassword() {
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+    
+    setState(() {
+      _hasMinLength = password.length >= 6;
+      _hasUpperCase = password.contains(RegExp(r'[A-Z]'));
+      _hasLowerCase = password.contains(RegExp(r'[a-z]'));
+      _hasNumber = password.contains(RegExp(r'[0-9]'));
+      _passwordsMatch = password.isNotEmpty && password == confirmPassword;
+    });
+  }
+
+  double _getPasswordStrength() {
+    int strength = 0;
+    if (_hasMinLength) strength++;
+    if (_hasUpperCase) strength++;
+    if (_hasLowerCase) strength++;
+    if (_hasNumber) strength++;
+    return strength / 4;
+  }
+
+  Color _getPasswordStrengthColor() {
+    final strength = _getPasswordStrength();
+    if (strength < 0.5) return Colors.red;
+    if (strength < 0.75) return Colors.orange;
+    return Colors.green;
+  }
+
+  String _getPasswordStrengthText() {
+    final strength = _getPasswordStrength();
+    if (strength < 0.5) return 'Débil';
+    if (strength < 0.75) return 'Media';
+    return 'Fuerte';
+  }
+
+  void _showConfirmationDialog() {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue),
+            const SizedBox(width: 10),
+            const Text('Confirmar registro'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Por favor, verifica tus datos antes de continuar:',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 20),
+            _buildSummaryRow(Icons.email_outlined, 'Correo', email),
+            const SizedBox(height: 12),
+            _buildSummaryRow(
+              Icons.lock_outline, 
+              'Contraseña', 
+              '•' * password.length,
+              subtitle: 'Fortaleza: ${_getPasswordStrengthText()}',
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.amber[700], size: 20),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Recuerda guardar tus credenciales en un lugar seguro.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmSubmit();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text('Confirmar y crear cuenta'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(IconData icon, String label, String value, {String? subtitle}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[600]),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _getPasswordStrengthColor(),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Si es registro, mostrar diálogo de confirmación
+    if (!_isLogin) {
+      _showConfirmationDialog();
+    } else {
+      await _confirmSubmit();
+    }
+  }
+
+  Future<void> _confirmSubmit() async {
     final authProvider = context.read<AuthProvider>();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -162,11 +345,17 @@ class _AuthPageState extends State<AuthPage>
                         primaryColor: primaryColor,
                         fillColor: inputFillColor,
                         textColor: theme.colorScheme.onSurface,
-                        // 1. Acción: SIGUIENTE
                         textInputAction: TextInputAction.next,
                         validator: (value) {
-                          if (value == null || value.isEmpty || !value.contains('@')) {
-                            return 'Introduce un correo válido';
+                          final trimmed = value?.trim() ?? '';
+                          if (trimmed.isEmpty) {
+                            return 'El correo no puede estar vacío';
+                          }
+                          if (!trimmed.contains('@') || !trimmed.contains('.')) {
+                            return 'Formato de correo inválido';
+                          }
+                          if (trimmed.length < 5) {
+                            return 'El correo es demasiado corto';
                           }
                           return null;
                         },
@@ -178,21 +367,76 @@ class _AuthPageState extends State<AuthPage>
                         controller: _passwordController,
                         label: 'Contraseña',
                         icon: Icons.lock_outline,
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         primaryColor: primaryColor,
                         fillColor: inputFillColor,
                         textColor: theme.colorScheme.onSurface,
-                        // 2. Acción: ENVIAR (DONE)
-                        textInputAction: TextInputAction.done,
-                        // 3. Ejecutar submit al pulsar enter
-                        onSubmitted: (_) => _submit(),
+                        textInputAction: _isLogin ? TextInputAction.done : TextInputAction.next,
+                        onSubmitted: _isLogin ? (_) => _submit() : null,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            color: primaryColor.withOpacity(0.7),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
                         validator: (value) {
-                          if (value == null || value.length < 6) {
+                          if (value == null || value.isEmpty) {
+                            return 'La contraseña no puede estar vacía';
+                          }
+                          if (value.length < 6) {
                             return 'Mínimo 6 caracteres';
                           }
                           return null;
                         },
                       ),
+                      
+                      // Indicador de fortaleza de contraseña (solo en registro)
+                      if (!_isLogin && _passwordController.text.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildPasswordStrengthIndicator(primaryColor),
+                      ],
+                      
+                      // ---- INPUT: CONFIRM PASSWORD (solo en registro) ----
+                      if (!_isLogin) ...[
+                        const SizedBox(height: 20),
+                        _buildTextField(
+                          controller: _confirmPasswordController,
+                          label: 'Confirmar Contraseña',
+                          icon: Icons.lock_outline,
+                          obscureText: _obscureConfirmPassword,
+                          primaryColor: primaryColor,
+                          fillColor: inputFillColor,
+                          textColor: theme.colorScheme.onSurface,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _submit(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                              color: primaryColor.withOpacity(0.7),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                              });
+                            },
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Confirma tu contraseña';
+                            }
+                            if (value != _passwordController.text) {
+                              return 'Las contraseñas no coinciden';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                      
                       const SizedBox(height: 40),
 
                       if (authProvider.isLoading)
@@ -214,6 +458,9 @@ class _AuthPageState extends State<AuthPage>
                             _formKey.currentState?.reset();
                             _emailController.clear();
                             _passwordController.clear();
+                            _confirmPasswordController.clear();
+                            _obscurePassword = true;
+                            _obscureConfirmPassword = true;
                           });
                         },
                         style: TextButton.styleFrom(
@@ -246,6 +493,79 @@ class _AuthPageState extends State<AuthPage>
     );
   }
 
+  Widget _buildPasswordStrengthIndicator(Color primaryColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: LinearProgressIndicator(
+                value: _getPasswordStrength(),
+                backgroundColor: Colors.grey.withOpacity(0.2),
+                color: _getPasswordStrengthColor(),
+                minHeight: 4,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _getPasswordStrengthText(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _getPasswordStrengthColor(),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            _buildPasswordRequirement('6+ caracteres', _hasMinLength),
+            _buildPasswordRequirement('Mayúscula', _hasUpperCase),
+            _buildPasswordRequirement('Minúscula', _hasLowerCase),
+            _buildPasswordRequirement('Número', _hasNumber),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasswordRequirement(String text, bool met) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: met ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: met ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            met ? Icons.check_circle : Icons.circle_outlined,
+            size: 14,
+            color: met ? Colors.green : Colors.grey,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: met ? Colors.green : Colors.grey,
+              fontWeight: met ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -258,18 +578,20 @@ class _AuthPageState extends State<AuthPage>
     TextInputAction? textInputAction,
     void Function(String)? onSubmitted,
     String? Function(String?)? validator,
+    Widget? suffixIcon,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      textInputAction: textInputAction, // Asignamos la acción del teclado
-      onFieldSubmitted: onSubmitted,    // Asignamos la función al pulsar enter
+      textInputAction: textInputAction,
+      onFieldSubmitted: onSubmitted,
       style: TextStyle(fontSize: 16, color: textColor),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
         prefixIcon: Icon(icon, color: primaryColor.withOpacity(0.8)),
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: fillColor,
         contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),

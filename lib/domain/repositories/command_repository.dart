@@ -13,4 +13,9 @@ abstract class CommandRepository {
   /// Elimina un comando personalizado por su ID.
   /// Lanza una excepción si se intenta eliminar un comando de sistema.
   Future<void> deleteCommand(String id);
+
+  /// Elimina todos los comandos personalizados locales del usuario.
+  /// Se usa cuando el usuario elimina su cuenta.
+  /// Los comandos del sistema NO se ven afectados.
+  Future<void> deleteAllLocalCommands();
 }

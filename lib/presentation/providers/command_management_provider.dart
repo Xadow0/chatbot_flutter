@@ -85,4 +85,28 @@ class CommandManagementProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Elimina todos los comandos de usuario locales del dispositivo
+  /// Se usa cuando el usuario elimina su cuenta de forma permanente
+  /// 
+  /// Nota: Los comandos del sistema NO se eliminan, solo los personalizados del usuario
+  Future<void> deleteAllLocalCommands() async {
+    try {
+      debugPrint('🗑️ [CommandManagementProvider] Eliminando comandos de usuario locales...');
+      
+      // Eliminar todos los comandos locales a través del repositorio
+      await _repository.deleteAllLocalCommands();
+      
+      // Limpiar la lista en memoria (solo comandos de usuario)
+      _commands.removeWhere((cmd) => cmd.systemType == SystemCommandType.none);
+      
+      // Notificar cambios
+      notifyListeners();
+      
+      debugPrint('✅ [CommandManagementProvider] Comandos de usuario eliminados');
+    } catch (e) {
+      debugPrint('❌ [CommandManagementProvider] Error al eliminar comandos: $e');
+      rethrow;
+    }
+  }
 }

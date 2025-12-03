@@ -91,6 +91,33 @@ class LocalCommandService {
     }
   }
 
+  /// Elimina TODOS los comandos personalizados del usuario del almacenamiento local
+  /// Se usa cuando el usuario elimina su cuenta de forma permanente
+  /// 
+  /// IMPORTANTE: 
+  /// - Los comandos del sistema NO se ven afectados (existen solo en código)
+  /// - Esta operación es irreversible
+  /// - Solo elimina comandos del almacenamiento local (no de Firebase)
+  Future<void> deleteAllCommands() async {
+    try {
+      // Obtener la cantidad actual de comandos para logging
+      final currentCommands = await getUserCommands();
+      final commandCount = currentCommands.length;
+      
+      debugPrint('🗑️ [LocalCommandService] Eliminando $commandCount comandos de usuario...');
+      
+      // Eliminar la clave completa del almacenamiento seguro
+      // Esto elimina todos los comandos de una sola vez
+      await _secureStorage.delete(key: _storageKey);
+      
+      debugPrint('✅ [LocalCommandService] $commandCount comandos eliminados del almacenamiento local');
+      
+    } catch (e) {
+      debugPrint('❌ [LocalCommandService] Error al eliminar todos los comandos: $e');
+      rethrow;
+    }
+  }
+
   /// Método privado para serializar y guardar la lista en SecureStorage
   Future<void> _saveListToStorage(List<CommandModel> commands) async {
     // Convertimos la lista de objetos a lista de mapas JSON

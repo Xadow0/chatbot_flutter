@@ -94,6 +94,102 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(false);
   }
 
+  /// Elimina la cuenta del usuario de forma permanente
+  /// 
+  /// ORDEN IMPORTANTE:
+  /// 1. Elimina datos de Firestore (conversaciones en la nube)
+  /// 2. Elimina datos locales
+  /// 3. Elimina cuenta de Firebase Auth
+  /// 4. ACTUALIZA MANUALMENTE el estado (fix para problema de threading)
+  Future<void> deleteAccount(String password) async {
+    if (_user == null) {
+      _errorMessage = "No hay usuario autenticado";
+      notifyListeners();
+      return;
+    }
+
+    _setLoading(true);
+    
+    try {
+      final email = _user!.email!;
+      
+      // 1. PRIMERO: Eliminar datos de Firestore (conversaciones en la nube)
+      debugPrint('☁️ [AuthProvider] Eliminando datos de Firestore...');
+      try {
+        await _syncService.deleteAllUserData();
+        debugPrint('✅ [AuthProvider] Datos de Firestore eliminados');
+      } catch (e) {
+        debugPrint('⚠️ [AuthProvider] Error eliminando de Firestore: $e');
+        // Continuamos aunque falle, intentaremos eliminar lo demás
+      }
+      
+      // 2. SEGUNDO: Eliminar datos locales
+      debugPrint('🗑️ [AuthProvider] Eliminando datos locales...');
+      await _deleteLocalData();
+      
+      // 3. TERCERO: Eliminar cuenta de Firebase Auth
+      debugPrint('🔐 [AuthProvider] Eliminando cuenta de Firebase Auth...');
+      await _authService.deleteAccountWithPassword(
+        email: email,
+        password: password,
+      );
+      
+      // ⭐ 4. CRÍTICO: Actualizar estado manualmente
+      // El listener authStateChanges tiene problemas de threading y no siempre notifica
+      // Por eso actualizamos el estado manualmente para que la UI responda inmediatamente
+      _user = null;
+      _isCloudSyncEnabled = false;
+      _errorMessage = null;
+      
+      debugPrint('✅ [AuthProvider] ¡Cuenta eliminada completamente!');
+      
+      // ⭐ Notificar cambios INMEDIATAMENTE
+      // Esto hace que isAuthenticated sea false y la UI pueda reaccionar
+      notifyListeners();
+      
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password') {
+        _errorMessage = 'Contraseña incorrecta. No se pudo eliminar la cuenta.';
+      } else if (e.code == 'requires-recent-login') {
+        _errorMessage = 'Por seguridad, debes cerrar sesión e iniciar sesión nuevamente antes de eliminar tu cuenta.';
+      } else if (e.code == 'timeout') {
+        _errorMessage = 'La operación tardó demasiado. Verifica tu conexión e intenta de nuevo.';
+      } else if (e.code == 'network-request-failed') {
+        _errorMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+      } else {
+        _errorMessage = 'Error al eliminar la cuenta: ${e.message}';
+      }
+      debugPrint('❌ [AuthProvider] Error al eliminar cuenta: ${e.code}');
+    } catch (e) {
+      _errorMessage = 'Error inesperado al eliminar la cuenta: $e';
+      debugPrint('❌ [AuthProvider] Error inesperado: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Elimina todos los datos locales del usuario
+  /// Incluye: conversaciones, comandos y preferencias
+  Future<void> _deleteLocalData() async {
+    try {
+      // Eliminar conversaciones locales
+      await _syncService.deleteAllLocalConversations();
+      
+      // Eliminar comandos locales si existe el provider
+      if (_commandProvider != null) {
+        await _commandProvider!.deleteAllLocalCommands();
+      }
+      
+      // Limpiar preferencias relacionadas con sync
+      await _preferencesService.saveCloudSyncEnabled(false);
+      
+      debugPrint('✅ [AuthProvider] Datos locales eliminados');
+    } catch (e) {
+      debugPrint('⚠️ [AuthProvider] Error al eliminar datos locales: $e');
+      // No lanzamos el error, continuamos con la eliminación de la cuenta
+    }
+  }
+
   Future<void> toggleCloudSync(bool value) async {
     if (_user == null) {
       _errorMessage = "Debes iniciar sesión para activar la sincronización";

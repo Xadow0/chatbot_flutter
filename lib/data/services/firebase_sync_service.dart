@@ -271,6 +271,106 @@ class FirebaseSyncService {
   }
 
   // ==========================================================================
+  // ELIMINACIÓN DE DATOS LOCALES (para eliminación de cuenta)
+  // ==========================================================================
+
+  /// Elimina todas las conversaciones locales del dispositivo
+  /// Se usa cuando el usuario elimina su cuenta de forma permanente
+  /// 
+  /// Esta operación:
+  /// 1. Elimina todos los archivos .json del directorio de conversaciones
+  /// 2. Elimina el directorio de conversaciones si está vacío
+  /// 
+  /// Nota: Esta función NO elimina datos de Firebase, solo locales
+  Future<void> deleteAllLocalConversations() async {
+    try {
+      final localDir = await _getConversationsDir();
+      
+      // Obtener todos los archivos de conversaciones
+      final files = localDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.json'))
+          .toList();
+      
+      debugPrint('🗑️ [FirebaseSync] Eliminando ${files.length} conversaciones locales...');
+      
+      // Eliminar cada archivo
+      int deletedCount = 0;
+      for (final file in files) {
+        try {
+          await file.delete();
+          deletedCount++;
+          debugPrint('   ✓ Eliminado: ${_getFileName(file)}');
+        } catch (e) {
+          debugPrint('   ✗ Error eliminando ${_getFileName(file)}: $e');
+        }
+      }
+      
+      // Intentar eliminar el directorio si está vacío
+      try {
+        final remainingFiles = localDir.listSync();
+        if (remainingFiles.isEmpty) {
+          await localDir.delete();
+          debugPrint('📁 [FirebaseSync] Directorio de conversaciones eliminado');
+        }
+      } catch (e) {
+        debugPrint('⚠️ [FirebaseSync] No se pudo eliminar el directorio: $e');
+      }
+      
+      debugPrint('✅ [FirebaseSync] $deletedCount conversaciones locales eliminadas');
+      
+    } catch (e) {
+      debugPrint('❌ [FirebaseSync] Error al eliminar conversaciones locales: $e');
+      rethrow;
+    }
+  }
+
+  /// Elimina todos los datos del usuario tanto local como remotamente
+  /// Se usa cuando se elimina la cuenta del usuario
+  /// 
+  /// Esta operación:
+  /// 1. Elimina todas las conversaciones de Firebase
+  /// 2. Elimina todas las conversaciones locales
+  /// 3. Elimina el documento del usuario en Firebase (si existe)
+  Future<bool> deleteAllUserData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        debugPrint('⚠️ [FirebaseSync] No hay usuario autenticado');
+        return false;
+      }
+
+      debugPrint('🗑️ [FirebaseSync] Iniciando eliminación completa de datos del usuario...');
+
+      // 1. Eliminar conversaciones de Firebase
+      final firebaseDeleted = await deleteAllFromFirebase();
+      if (!firebaseDeleted) {
+        debugPrint('⚠️ [FirebaseSync] Error al eliminar conversaciones de Firebase');
+      }
+
+      // 2. Eliminar conversaciones locales
+      await deleteAllLocalConversations();
+
+      // 3. Eliminar documento del usuario (opcional, según tu estructura)
+      try {
+        await _firestore.collection('users').doc(user.uid).delete();
+        debugPrint('✅ [FirebaseSync] Documento de usuario eliminado');
+      } catch (e) {
+        debugPrint('⚠️ [FirebaseSync] Error al eliminar documento de usuario: $e');
+        // No es crítico, continuamos
+      }
+
+      debugPrint('✅ [FirebaseSync] Todos los datos del usuario eliminados');
+      return true;
+
+    } catch (e) {
+      debugPrint('❌ [FirebaseSync] Error eliminando datos del usuario: $e');
+      return false;
+    }
+  }
+
+  // ==========================================================================
   // UTILIDADES
   // ==========================================================================
 

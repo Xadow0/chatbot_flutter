@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../domain/entities/command_entity.dart';
 import '../../domain/repositories/command_repository.dart';
 import '../models/command_model.dart';
@@ -57,6 +58,19 @@ class CommandRepositoryImpl implements CommandRepository {
     
     if (_isSyncEnabled()) {
       await _firebaseSyncService.deleteCommandFromFirebase(commandToDelete.trigger);
+    }
+  }
+
+  @override
+  Future<void> deleteAllLocalCommands() async {
+    try {
+      // Eliminar todos los comandos locales del usuario
+      await _localCommandService.deleteAllCommands();
+      
+      debugPrint('✅ [CommandRepository] Todos los comandos de usuario eliminados localmente');
+    } catch (e) {
+      debugPrint('❌ [CommandRepository] Error al eliminar comandos locales: $e');
+      rethrow;
     }
   }
 
