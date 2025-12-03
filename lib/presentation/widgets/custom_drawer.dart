@@ -50,7 +50,11 @@ class CustomDrawer extends StatelessWidget {
                   title: const Text('Chat Libre'),
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.pushNamed(context, AppRoutes.chat); 
+                    Navigator.pushNamed(
+                      context, 
+                      AppRoutes.chat,
+                      arguments: {'newConversation': true},
+                    ); 
                   },
                 ),
 
@@ -198,7 +202,7 @@ class CustomDrawer extends StatelessWidget {
                   child: Text(
                     authProvider.isCloudSyncEnabled ? 'Sync ON' : 'Sync OFF',
                     style: TextStyle(
-                      color: authProvider.isCloudSyncEnabled ? Colors.greenAccent : Colors.white70,
+                      color: authProvider.isCloudSyncEnabled ? const Color.fromARGB(255, 0, 112, 58) : const Color.fromARGB(179, 81, 79, 79),
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),

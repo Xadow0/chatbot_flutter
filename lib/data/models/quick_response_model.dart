@@ -3,10 +3,18 @@ import '../../domain/entities/quick_response_entity.dart';
 class QuickResponse {
   final String text;
   final String? description;
+  
+  /// El prompt completo asociado al comando.
+  final String? promptTemplate;
+  
+  /// Indica si el comando es editable.
+  final bool isEditable;
 
   const QuickResponse({
     required this.text,
     this.description,
+    this.promptTemplate,
+    this.isEditable = false,
   });
 
   // ============================================================================
@@ -18,6 +26,8 @@ class QuickResponse {
     return QuickResponseEntity(
       text: text,
       description: description,
+      promptTemplate: promptTemplate,
+      isEditable: isEditable,
     );
   }
 
@@ -26,20 +36,51 @@ class QuickResponse {
     return QuickResponse(
       text: entity.text,
       description: entity.description,
+      promptTemplate: entity.promptTemplate,
+      isEditable: entity.isEditable,
     );
   }
 }
 
 class QuickResponseProvider {
-  // Respuestas por defecto
+  // Respuestas por defecto (comandos del sistema)
+  // NOTA: Los comandos del sistema siempre son NO editables
   static const List<QuickResponse> defaultResponses = [
-    QuickResponse(text: '/evaluarprompt ', description: 'Evalúa y mejora un prompt'),
-    QuickResponse(text: '/traducir ', description: 'Traduce texto a otro idioma'),
-    QuickResponse(text: '/resumir ', description: 'Resume un texto largo'),
-    QuickResponse(text: '/codigo ', description: 'Genera código desde descripción'),
-    QuickResponse(text: '/corregir ', description: 'Corrige ortografía y gramática'),
-    QuickResponse(text: '/explicar ', description: 'Explica un concepto'),
-    QuickResponse(text: '/comparar ', description: 'Compara dos o más opciones'),
+    QuickResponse(
+      text: '/evaluarprompt',
+      description: 'Evalúa y mejora un prompt',
+      isEditable: false,
+    ),
+    QuickResponse(
+      text: '/traducir',
+      description: 'Traduce texto a otro idioma',
+      isEditable: false,
+    ),
+    QuickResponse(
+      text: '/resumir',
+      description: 'Resume un texto largo',
+      isEditable: false,
+    ),
+    QuickResponse(
+      text: '/codigo',
+      description: 'Genera código desde descripción',
+      isEditable: false,
+    ),
+    QuickResponse(
+      text: '/corregir',
+      description: 'Corrige ortografía y gramática',
+      isEditable: false,
+    ),
+    QuickResponse(
+      text: '/explicar',
+      description: 'Explica un concepto',
+      isEditable: false,
+    ),
+    QuickResponse(
+      text: '/comparar',
+      description: 'Compara dos o más opciones',
+      isEditable: false,
+    ),
   ];
 
   /// Respuestas por defecto como entidades

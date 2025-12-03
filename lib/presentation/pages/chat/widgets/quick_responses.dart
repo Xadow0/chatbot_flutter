@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import '../../../../data/models/quick_response_model.dart';
 
 class QuickResponsesWidget extends StatelessWidget {
   final List<QuickResponse> responses;
-  final Function(String) onResponseSelected;
+  
+  /// Callback cuando se selecciona una respuesta (click izquierdo normal)
+  final Function(QuickResponse) onResponseSelected;
+  
+  /// Callback cuando se solicita editar un comando no editable (click derecho → "Editar")
+  final Function(QuickResponse)? onEditRequested;
 
   const QuickResponsesWidget({
     super.key,
     required this.responses,
     required this.onResponseSelected,
+    this.onEditRequested,
   });
 
   @override
@@ -52,14 +59,10 @@ class QuickResponsesWidget extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 8),
                     child: _QuickResponseChip(
                       response: response,
-                      onTap: () {
-                        // Asegurar que el comando tenga un espacio al final
-                        String commandText = response.text;
-                        if (!commandText.endsWith(' ')) {
-                          commandText += ' ';
-                        }
-                        onResponseSelected(commandText);
-                      },
+                      onTap: () => onResponseSelected(response),
+                      onEditTap: onEditRequested != null 
+                          ? () => onEditRequested!(response)
+                          : null,
                     ),
                   );
                 }),
@@ -73,55 +76,195 @@ class QuickResponsesWidget extends StatelessWidget {
   }
 }
 
-class _QuickResponseChip extends StatelessWidget {
+class _QuickResponseChip extends StatefulWidget {
   final QuickResponse response;
   final VoidCallback onTap;
+  final VoidCallback? onEditTap;
 
   const _QuickResponseChip({
     required this.response,
     required this.onTap,
+    this.onEditTap,
   });
 
   @override
-  Widget build(BuildContext context) {
-    // Intentamos obtener una descripción si el modelo la tuviera, si no, mostramos una genérica.
-    // Nota: Si tu modelo 'QuickResponse' tiene un campo 'description', úsalo aquí:
-    // final String tooltipText = response.description ?? "Ejecutar ${response.text}";
-    final String tooltipText = "Ejecutar comando: ${response.text}";
+  State<_QuickResponseChip> createState() => _QuickResponseChipState();
+}
 
-    return ActionChip(
-      // TOOLTIP: Muestra el texto al dejar el ratón encima
-      tooltip: tooltipText,
-      
-      visualDensity: VisualDensity.compact,
-      
-      // PADDING: Control estricto del espacio interno del botón
-      padding: EdgeInsets.zero,
-      labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
+class _QuickResponseChipState extends State<_QuickResponseChip> {
+  OverlayEntry? _overlayEntry;
+  final LayerLink _layerLink = LayerLink();
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _showContextMenu(BuildContext context, Offset globalPosition) {
+    // Solo mostrar menú contextual si NO es editable
+    if (widget.response.isEditable) return;
+    if (widget.onEditTap == null) return;
+
+    _removeOverlay();
+
+    final overlay = Overlay.of(context);
+    final renderBox = context.findRenderObject() as RenderBox;
+    final size = renderBox.size;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Stack(
         children: [
-          Icon(
-            Icons.bolt, 
-            size: 14, 
-            color: Theme.of(context).colorScheme.onSecondaryContainer,
+          // Área táctil para cerrar el menú
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _removeOverlay,
+              behavior: HitTestBehavior.opaque,
+              child: Container(color: Colors.transparent),
+            ),
           ),
-          const SizedBox(width: 4), 
-          Text(
-            response.text,
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).colorScheme.onSecondaryContainer,
-              fontWeight: FontWeight.w500,
+          // Menú contextual
+          Positioned(
+            left: globalPosition.dx - 50,
+            top: globalPosition.dy - 60,
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  _removeOverlay();
+                  widget.onEditTap?.call();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.edit_note,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Editar prompt',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
-      onPressed: onTap,
-      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-      side: BorderSide.none,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    );
+
+    overlay.insert(_overlayEntry!);
+  }
+
+  String _getTooltipText() {
+    if (widget.response.isEditable) {
+      return 'Click: Insertar prompt para editar';
+    } else {
+      return 'Click: Insertar comando\nClick derecho: Editar prompt';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEditable = widget.response.isEditable;
+
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: Listener(
+        // Detectar click derecho (botón secundario del mouse)
+        onPointerDown: (event) {
+          if (event.kind == PointerDeviceKind.mouse &&
+              event.buttons == kSecondaryMouseButton) {
+            _showContextMenu(context, event.position);
+          }
+        },
+        child: GestureDetector(
+          // Click izquierdo normal
+          onTap: widget.onTap,
+          // Long press en móviles para mostrar menú contextual
+          onLongPress: (!isEditable && widget.onEditTap != null)
+              ? () {
+                  final renderBox = context.findRenderObject() as RenderBox;
+                  final position = renderBox.localToGlobal(Offset.zero);
+                  _showContextMenu(
+                    context,
+                    Offset(position.dx + renderBox.size.width / 2, position.dy),
+                  );
+                }
+              : null,
+          child: Tooltip(
+            message: _getTooltipText(),
+            preferBelow: false,
+            child: ActionChip(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isEditable ? Icons.edit_note : Icons.bolt,
+                    size: 14,
+                    color: isEditable
+                        ? Colors.green[700]
+                        : Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.response.text,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  // Indicador visual para comandos editables
+                  if (isEditable) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: Colors.green[600],
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              onPressed: widget.onTap,
+              backgroundColor: isEditable
+                  ? Colors.green.withOpacity(0.1)
+                  : Theme.of(context).colorScheme.secondaryContainer,
+              side: isEditable
+                  ? BorderSide(color: Colors.green.withOpacity(0.3))
+                  : BorderSide.none,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

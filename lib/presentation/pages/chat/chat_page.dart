@@ -94,13 +94,31 @@ class _ChatBodyState extends State<_ChatBody> {
     }
   }
 
-  void _handleQuickResponseSelected(String text) {
-    if (text.startsWith('/')) {
-      _messageInputKey.currentState?.insertTextAtStart(text);
-    } else {
-      _chatProviderRef.sendMessage(text);
+  void _handleQuickResponseSelected(QuickResponse response) {
+  if (response.isEditable) {
+    // Comando EDITABLE: Insertar el prompt completo para que el usuario lo edite
+    final promptToInsert = response.promptTemplate ?? '';
+    if (promptToInsert.isNotEmpty) {
+      _messageInputKey.currentState?.insertTextAtStart(promptToInsert);
     }
+  } else {
+    // Comando NO EDITABLE: Comportamiento tradicional (insertar "/comando ")
+    String commandText = response.text;
+    if (!commandText.endsWith(' ')) {
+      commandText += ' ';
+    }
+    _messageInputKey.currentState?.insertTextAtStart(commandText);
   }
+}
+
+/// Maneja la solicitud de "Editar" desde el menú contextual de un comando NO editable.
+/// Inserta el prompt completo en el input para edición manual única.
+void _handleEditRequested(QuickResponse response) {
+  final promptToInsert = response.promptTemplate ?? '';
+  if (promptToInsert.isNotEmpty) {
+    _messageInputKey.currentState?.insertTextAtStart(promptToInsert);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +176,7 @@ class _ChatBodyState extends State<_ChatBody> {
                         .map((e) => QuickResponse.fromEntity(e))
                         .toList(),
                     onResponseSelected: _handleQuickResponseSelected,
+                    onEditRequested: _handleEditRequested,
                   ),
                   MessageInput(
                     key: _messageInputKey,

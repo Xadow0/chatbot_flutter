@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../config/routes.dart';
 import '../../providers/auth_provider.dart';
 import '../auth/auth_page.dart';
-import '../commands/user_commands_page.dart'; 
+import '../commands/user_commands_page.dart';
 
 class StartMenuPage extends StatefulWidget {
   const StartMenuPage({super.key});
@@ -75,26 +75,27 @@ class _StartMenuPageState extends State<StartMenuPage>
                         ),
                         child: IntrinsicHeight(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 24.0),
                             child: Column(
                               children: [
-                                // 1. AUMENTO ESPACIO SUPERIOR
-                                const SizedBox(height: 85), 
-                                
+                                // 1. AJUSTE: MENOR ESPACIO SUPERIOR (antes 85)
+                                const SizedBox(height: 60),
+
                                 // --- LOGO PRINCIPAL ---
-                                // Reemplaza al Texto e Icono anterior
+                                // 2. AJUSTE: MENOR ALTURA MÁXIMA (antes 300)
                                 Container(
                                   constraints: const BoxConstraints(
-                                    maxHeight: 300, // Altura máxima controlada
-                                    maxWidth: 400,  // Ancho máximo controlado
+                                    maxHeight: 220, 
+                                    maxWidth: 350,
                                   ),
                                   child: Image.asset(
                                     'assets/images/logo.png',
-                                    fit: BoxFit.contain, // Ajusta la imagen sin deformarla
+                                    fit: BoxFit.contain,
                                   ),
                                 ),
 
-                                const SizedBox(height: 20), 
+                                const SizedBox(height: 20),
 
                                 Text(
                                   'Bienvenido a la estación de entrenamiento IA',
@@ -103,9 +104,9 @@ class _StartMenuPageState extends State<StartMenuPage>
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                                
+
                                 // ESPACIO FLEXIBLE
-                                const Spacer(), 
+                                const Spacer(),
 
                                 // --- BOTONES DEL MENÚ ---
                                 _buildMenuButton(
@@ -121,7 +122,8 @@ class _StartMenuPageState extends State<StartMenuPage>
                                     );
                                   },
                                 ),
-                                const SizedBox(height: 16),
+                                // 3. AJUSTE: MENOR SEPARACIÓN (antes 16)
+                                const SizedBox(height: 12),
 
                                 _buildMenuButton(
                                   context: context,
@@ -129,10 +131,11 @@ class _StartMenuPageState extends State<StartMenuPage>
                                   label: 'Aprendizaje',
                                   color: Colors.green,
                                   onPressed: () {
-                                    Navigator.pushNamed(context, AppRoutes.learning);
+                                    Navigator.pushNamed(
+                                        context, AppRoutes.learning);
                                   },
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
 
                                 _buildMenuButton(
                                   context: context,
@@ -140,52 +143,53 @@ class _StartMenuPageState extends State<StartMenuPage>
                                   label: 'Historial',
                                   color: Colors.orange,
                                   onPressed: () {
-                                    Navigator.pushNamed(context, AppRoutes.history);
+                                    Navigator.pushNamed(
+                                        context, AppRoutes.history);
                                   },
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
 
                                 // --- GESTIÓN DE COMANDOS ---
                                 _buildMenuButton(
                                   context: context,
-                                  icon: Icons.terminal_rounded, 
+                                  icon: Icons.terminal_rounded,
                                   label: 'Comandos',
-                                  color: Colors.purple, 
+                                  color: Colors.purple,
                                   onPressed: () {
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const UserCommandsPage()));
+                                    Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const UserCommandsPage()));
                                   },
                                 ),
-                                const SizedBox(height: 16),
-                                
+                                const SizedBox(height: 12),
+
                                 _buildMenuButton(
                                   context: context,
                                   icon: Icons.settings,
                                   label: 'Ajustes',
                                   color: Colors.grey,
                                   onPressed: () {
-                                    Navigator.pushNamed(context, AppRoutes.settings);
+                                    Navigator.pushNamed(
+                                        context, AppRoutes.settings);
                                   },
                                 ),
-                                
-                                const Spacer(), 
 
-                                // CRÉDITOS
+                                const Spacer(),
+
+                                // ACERCA DE
                                 TextButton.icon(
                                   onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Créditos próximamente'),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
+                                    _showAboutDialog(context);
                                   },
                                   icon: const Icon(Icons.info_outline, size: 20),
                                   label: const Text(
-                                    'Créditos',
+                                    'Acerca de',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                 ),
-                                
+
                                 const SizedBox(height: 10),
                               ],
                             ),
@@ -204,12 +208,25 @@ class _StartMenuPageState extends State<StartMenuPage>
             Positioned(
               top: 12,
               left: 16,
-              right: 16, 
+              right: 16,
               child: _buildAuthHeader(context),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // --- MÉTODO ACERCA DE (Copiado de CustomDrawer) ---
+  void _showAboutDialog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'TRAINING.IA',
+      applicationVersion: '1.0.0',
+      applicationIcon: const Icon(Icons.psychology),
+      children: [
+        const Text('Plataforma de entrenamiento inteligente y gestión de comandos.'),
+      ],
     );
   }
 
@@ -219,14 +236,15 @@ class _StartMenuPageState extends State<StartMenuPage>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final backgroundColor = isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.1);
+    final backgroundColor =
+        isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.1);
     final borderColor = isDark ? Colors.white24 : Colors.black12;
     final primaryColor = theme.colorScheme.primary;
 
     // 1. ESTADO: NO AUTENTICADO
     if (!authProvider.isAuthenticated) {
       return Align(
-        alignment: Alignment.centerLeft, 
+        alignment: Alignment.centerLeft,
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -240,21 +258,15 @@ class _StartMenuPageState extends State<StartMenuPage>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: backgroundColor, 
+                color: backgroundColor,
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                  color: primaryColor.withOpacity(0.5), 
-                  width: 1.5
-                ),
+                    color: primaryColor.withOpacity(0.5), width: 1.5),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min, 
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.login_rounded, 
-                    size: 20, 
-                    color: primaryColor
-                  ),
+                  Icon(Icons.login_rounded, size: 20, color: primaryColor),
                   const SizedBox(width: 8),
                   Text(
                     'Iniciar Sesión',
@@ -289,10 +301,9 @@ class _StartMenuPageState extends State<StartMenuPage>
             child: Text(
               authProvider.user?.email?.substring(0, 1).toUpperCase() ?? 'U',
               style: const TextStyle(
-                color: Colors.white, 
-                fontSize: 14, 
-                fontWeight: FontWeight.bold
-              ),
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 12),
@@ -322,7 +333,7 @@ class _StartMenuPageState extends State<StartMenuPage>
               ],
             ),
           ),
-          
+
           // Switch de Sincronización
           Column(
             mainAxisSize: MainAxisSize.min,
@@ -331,9 +342,9 @@ class _StartMenuPageState extends State<StartMenuPage>
                 height: 24,
                 child: Switch(
                   value: authProvider.isCloudSyncEnabled,
-                  onChanged: authProvider.isSyncing 
-                    ? null 
-                    : (val) => authProvider.toggleCloudSync(val),
+                  onChanged: authProvider.isSyncing
+                      ? null
+                      : (val) => authProvider.toggleCloudSync(val),
                   activeThumbColor: Colors.green,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -342,10 +353,11 @@ class _StartMenuPageState extends State<StartMenuPage>
               Text(
                 authProvider.isCloudSyncEnabled ? 'Sync ON' : 'Sync OFF',
                 style: TextStyle(
-                  fontSize: 8,
-                  color: authProvider.isCloudSyncEnabled ? Colors.green : Colors.grey,
-                  fontWeight: FontWeight.bold
-                ),
+                    fontSize: 8,
+                    color: authProvider.isCloudSyncEnabled
+                        ? Colors.green
+                        : Colors.grey,
+                    fontWeight: FontWeight.bold),
               )
             ],
           ),
@@ -362,9 +374,12 @@ class _StartMenuPageState extends State<StartMenuPage>
     required Color color,
     required VoidCallback onPressed,
   }) {
+    // 4. AJUSTE: MENOR ALTURA DE BOTÓN (antes 70)
+    const double buttonHeight = 60.0;
+
     return Container(
       width: double.infinity,
-      height: 70,
+      height: buttonHeight,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
@@ -395,7 +410,7 @@ class _StartMenuPageState extends State<StartMenuPage>
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8), 
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -403,7 +418,7 @@ class _StartMenuPageState extends State<StartMenuPage>
                   child: Icon(
                     icon,
                     color: Colors.white,
-                    size: 28,
+                    size: 24, 
                   ),
                 ),
                 const SizedBox(width: 20),
@@ -412,7 +427,7 @@ class _StartMenuPageState extends State<StartMenuPage>
                     label,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 20,
+                      fontSize: 18, 
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
@@ -421,7 +436,7 @@ class _StartMenuPageState extends State<StartMenuPage>
                 const Icon(
                   Icons.arrow_forward_ios_rounded,
                   color: Colors.white,
-                  size: 20,
+                  size: 18, 
                 ),
               ],
             ),

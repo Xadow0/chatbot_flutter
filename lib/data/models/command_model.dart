@@ -9,6 +9,7 @@ class CommandModel extends CommandEntity {
     required super.promptTemplate,
     super.isSystem,
     super.systemType,
+    super.isEditable,
   });
 
   factory CommandModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +21,7 @@ class CommandModel extends CommandEntity {
       promptTemplate: json['promptTemplate'] as String,
       isSystem: json['isSystem'] as bool? ?? false,
       systemType: _stringToEnum(json['systemType'] as String?),
+      isEditable: json['isEditable'] as bool? ?? false, // Fallback para datos antiguos
     );
   }
 
@@ -32,6 +34,7 @@ class CommandModel extends CommandEntity {
       'promptTemplate': promptTemplate,
       'isSystem': isSystem,
       'systemType': systemType.name,
+      'isEditable': isEditable,
     };
   }
 
@@ -44,6 +47,31 @@ class CommandModel extends CommandEntity {
       promptTemplate: entity.promptTemplate,
       isSystem: entity.isSystem,
       systemType: entity.systemType,
+      isEditable: entity.isEditable,
+    );
+  }
+
+  /// Crea una copia del modelo con algunos campos modificados
+  @override
+  CommandModel copyWith({
+    String? id,
+    String? trigger,
+    String? title,
+    String? description,
+    String? promptTemplate,
+    bool? isSystem,
+    SystemCommandType? systemType,
+    bool? isEditable,
+  }) {
+    return CommandModel(
+      id: id ?? this.id,
+      trigger: trigger ?? this.trigger,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      promptTemplate: promptTemplate ?? this.promptTemplate,
+      isSystem: isSystem ?? this.isSystem,
+      systemType: systemType ?? this.systemType,
+      isEditable: isEditable ?? this.isEditable,
     );
   }
 
@@ -61,6 +89,9 @@ class CommandModel extends CommandEntity {
 
   /// Retorna los comandos por defecto con sus PROMPTS COMPLETOS y placeholders.
   /// Las variables dinámicas (como el idioma detectado) se representan con {{variable}}.
+  /// 
+  /// NOTA: Los comandos del sistema siempre son NO editables (isEditable: false)
+  /// ya que tienen lógica especial de procesamiento.
   static List<CommandModel> getDefaultCommands() {
     return [
       // --- EVALUAR PROMPT ---
@@ -71,6 +102,7 @@ class CommandModel extends CommandEntity {
         description: 'Evalúa y mejora tu prompt identificando Task, Context y Referencias.',
         isSystem: true,
         systemType: SystemCommandType.evaluarPrompt,
+        isEditable: false, // Comandos del sistema siempre NO editables
         promptTemplate: '''
 Actúa como un evaluador y mejorador de prompts para el prompt que adjunto como "Mensaje del usuario". No repitas tu función ni el mensaje del usuario, céntrate en mejorar el prompt. 
 El usuario mandará un prompt para que lo evalúes y mejores, para cada caso, debes identificar los tres pasos que cualquier prompt debería tener:
@@ -109,6 +141,7 @@ Estos son los pasos que debes cumplir para evaluar y mejorar el prompt:
         description: 'Traduce texto manteniendo intención y tono. Detecta idiomas automáticamente.',
         isSystem: true,
         systemType: SystemCommandType.traducir,
+        isEditable: false,
         promptTemplate: '''
 Actúa como un traductor experto especializado en lenguaje natural y contexto conversacional.  
 Tu tarea es traducir el texto proporcionado por el usuario al **{{targetLanguage}}**, manteniendo **la intención, el tono, el registro, y el significado original**.  
@@ -137,6 +170,7 @@ Evita traducciones literales o robóticas: prioriza la **fidelidad semántica y 
         description: 'Resume textos largos extrayendo ideas principales de forma clara y concisa.',
         isSystem: true,
         systemType: SystemCommandType.resumir,
+        isEditable: false,
         promptTemplate: '''
 Actúa como un experto en síntesis y análisis de textos.  
 Tu tarea es crear un **resumen claro y conciso** del texto proporcionado, extrayendo las ideas principales y eliminando información redundante o poco relevante.
@@ -171,6 +205,7 @@ Tu tarea es crear un **resumen claro y conciso** del texto proporcionado, extray
         description: 'Genera código limpio y documentado basado en tu descripción.',
         isSystem: true,
         systemType: SystemCommandType.codigo,
+        isEditable: false,
         promptTemplate: '''
 Actúa como un desarrollador experto y mentor de programación.  
 Tu tarea es generar código de alta calidad basado en la descripción proporcionada por el usuario.
@@ -210,6 +245,7 @@ Tu tarea es generar código de alta calidad basado en la descripción proporcion
         description: 'Corrección ortográfica, gramatical y de estilo con explicación de cambios.',
         isSystem: true,
         systemType: SystemCommandType.corregir,
+        isEditable: false,
         promptTemplate: '''
 Actúa como un corrector profesional de textos y experto en gramática y ortografía.  
 Tu tarea es corregir todos los errores del texto proporcionado y mejorar su claridad y fluidez.
@@ -247,6 +283,7 @@ Tu tarea es corregir todos los errores del texto proporcionado y mejorar su clar
         description: 'Explica conceptos de forma didáctica, progresiva y con ejemplos.',
         isSystem: true,
         systemType: SystemCommandType.explicar,
+        isEditable: false,
         promptTemplate: '''
 Actúa como un profesor experto y comunicador claro.  
 Tu tarea es explicar el concepto solicitado de forma didáctica, comprensible y completa.
@@ -288,6 +325,7 @@ Tu tarea es explicar el concepto solicitado de forma didáctica, comprensible y 
         description: 'Compara dos o más opciones destacando ventajas, desventajas y casos de uso.',
         isSystem: true,
         systemType: SystemCommandType.comparar,
+        isEditable: false,
         promptTemplate: '''
 Actúa como un analista objetivo y experto en comparaciones.  
 Tu tarea es comparar las opciones proporcionadas de forma equilibrada, destacando ventajas, desventajas y casos de uso apropiados.

@@ -78,7 +78,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await _authService.signUp(email: email, password: password);
-      await toggleCloudSync(false);
+      await toggleCloudSync(true);
       _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString();

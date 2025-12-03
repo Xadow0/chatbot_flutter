@@ -20,6 +20,16 @@ class CommandEntity extends Equatable {
   final String promptTemplate; // El prompt con placeholders {{content}}, {{targetLanguage}}, etc.
   final bool isSystem;       // Si es false, se puede editar/borrar
   final SystemCommandType systemType;
+  
+  /// Indica si el comando es editable desde quick_responses.
+  /// 
+  /// - `true` (Editable): Al seleccionar desde quick_responses, se inserta 
+  ///   el promptTemplate completo en el input para que el usuario pueda modificarlo.
+  /// - `false` (No Editable): Al seleccionar, se inserta "/comando " y se procesa
+  ///   automáticamente combinando el promptTemplate con el contenido del usuario.
+  /// 
+  /// Por defecto es `false` para mantener compatibilidad con comandos existentes.
+  final bool isEditable;
 
   const CommandEntity({
     required this.id,
@@ -29,8 +39,41 @@ class CommandEntity extends Equatable {
     required this.promptTemplate,
     this.isSystem = false,
     this.systemType = SystemCommandType.none,
+    this.isEditable = false,
   });
 
+  /// Crea una copia del comando con algunos campos modificados
+  CommandEntity copyWith({
+    String? id,
+    String? trigger,
+    String? title,
+    String? description,
+    String? promptTemplate,
+    bool? isSystem,
+    SystemCommandType? systemType,
+    bool? isEditable,
+  }) {
+    return CommandEntity(
+      id: id ?? this.id,
+      trigger: trigger ?? this.trigger,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      promptTemplate: promptTemplate ?? this.promptTemplate,
+      isSystem: isSystem ?? this.isSystem,
+      systemType: systemType ?? this.systemType,
+      isEditable: isEditable ?? this.isEditable,
+    );
+  }
+
   @override
-  List<Object?> get props => [id, trigger, title, description, promptTemplate, isSystem, systemType];
+  List<Object?> get props => [
+    id, 
+    trigger, 
+    title, 
+    description, 
+    promptTemplate, 
+    isSystem, 
+    systemType,
+    isEditable,
+  ];
 }

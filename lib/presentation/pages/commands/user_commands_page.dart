@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../domain/entities/command_entity.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
+import '../../../domain/entities/command_entity.dart';
 import '../../providers/command_management_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
@@ -76,7 +80,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
                 if (provider.userCommands.isEmpty)
                   _buildEmptyState(theme)
                 else
-                  ...provider.userCommands.map((cmd) => _buildCommandCard(context, cmd, isEditable: true)),
+                  ...provider.userCommands.map((cmd) => _buildCommandCard(context, cmd, isUserCommand: true)),
 
                 const SizedBox(height: 24),
                 
@@ -84,7 +88,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
                   padding: EdgeInsets.only(left: 8, bottom: 8),
                   child: Text('Comandos del Sistema', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                 ),
-                ...provider.systemCommands.map((cmd) => _buildCommandCard(context, cmd, isEditable: false)),
+                ...provider.systemCommands.map((cmd) => _buildCommandCard(context, cmd, isUserCommand: false)),
                 
                 const SizedBox(height: 80),
               ],
@@ -110,7 +114,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
     );
   }
 
-  Widget _buildCommandCard(BuildContext context, CommandEntity command, {required bool isEditable}) {
+  Widget _buildCommandCard(BuildContext context, CommandEntity command, {required bool isUserCommand}) {
     final hasDescription = command.description.isNotEmpty;
 
     return Card(
@@ -124,12 +128,12 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isEditable ? Colors.purple.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+              color: isUserCommand ? Colors.purple.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isEditable ? Icons.bolt : Icons.lock_outline,
-              color: isEditable ? Colors.purple : Colors.grey,
+              isUserCommand ? Icons.bolt : Icons.lock_outline,
+              color: isUserCommand ? Colors.purple : Colors.grey,
             ),
           ),
           title: Row(
@@ -138,6 +142,26 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
                 command.trigger,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Monospace', color: Colors.purple),
               ),
+              const SizedBox(width: 8),
+              // Indicador de tipo de comando (Editable / No Editable)
+              if (isUserCommand)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: command.isEditable 
+                        ? Colors.green.withOpacity(0.1) 
+                        : Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    command.isEditable ? 'Editable' : 'Auto',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: command.isEditable ? Colors.green[700] : Colors.blue[700],
+                    ),
+                  ),
+                ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -160,7 +184,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
                 ),
               )
             : null,
-          trailing: isEditable
+          trailing: isUserCommand
               ? PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
@@ -216,6 +240,10 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
   }
 }
 
+// =============================================================================
+// DIÁLOGO DE EDICIÓN DE COMANDOS
+// =============================================================================
+
 class _CommandEditorDialog extends StatefulWidget {
   final CommandEntity? existingCommand;
 
@@ -234,6 +262,11 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
   late TextEditingController _promptCtrl;
   
   bool _hasContentPlaceholder = false;
+  
+  /// Controla si el comando es editable o no
+  /// - true: Al seleccionar desde quick_responses, se inserta el prompt completo
+  /// - false: Al seleccionar, se inserta "/comando " (comportamiento tradicional)
+  bool _isEditable = false;
 
   @override
   void initState() {
@@ -251,6 +284,9 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
     _promptCtrl = TextEditingController(text: widget.existingCommand?.promptTemplate ?? '');
     
     _hasContentPlaceholder = _promptCtrl.text.contains('{{content}}');
+    
+    // Inicializar el estado de isEditable desde el comando existente
+    _isEditable = widget.existingCommand?.isEditable ?? false;
     
     // Listener para detectar cambios en el prompt
     _promptCtrl.addListener(() {
@@ -274,8 +310,10 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
 
   void _save() async {
     if (_formKey.currentState!.validate()) {
-      // Si no tiene {{content}}, mostrar diálogo de confirmación
-      if (!_hasContentPlaceholder) {
+      // Si NO es editable y no tiene {{content}}, mostrar diálogo de confirmación
+      // (Para comandos editables, el usuario edita el prompt directamente, 
+      // así que {{content}} no es necesario)
+      if (!_isEditable && !_hasContentPlaceholder) {
         final shouldContinue = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
@@ -320,6 +358,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
         description: _descriptionCtrl.text.trim(),
         promptTemplate: _promptCtrl.text.trim(),
         systemType: SystemCommandType.none,
+        isEditable: _isEditable, // ← NUEVO: Guardar el estado de editable
       );
 
       await context.read<CommandManagementProvider>().saveCommand(newCommand);
@@ -347,7 +386,9 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // --- Fila: Comando + Nombre ---
               Row(
                 children: [
                   Expanded(
@@ -390,6 +431,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
               ),
               const SizedBox(height: 16),
               
+              // --- Descripción ---
               TextFormField(
                 controller: _descriptionCtrl,
                 decoration: const InputDecoration(
@@ -402,53 +444,117 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
               ),
               const SizedBox(height: 16),
 
+              // --- Prompt ---
               _buildPromptField(),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               
-              // Mensaje informativo siempre visible
+              // =================================================================
+              // NUEVO: Switch para Editable / No Editable
+              // =================================================================
               Container(
-                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1), 
-                  borderRadius: BorderRadius.circular(8)
+                  color: _isEditable 
+                      ? Colors.green.withOpacity(0.05) 
+                      : Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isEditable 
+                        ? Colors.green.withOpacity(0.3) 
+                        : Colors.blue.withOpacity(0.3),
+                  ),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Usa {{content}} para insertar el texto que escribas después del comando.',
-                        style: TextStyle(fontSize: 11),
-                      ),
+                child: SwitchListTile(
+                  title: Text(
+                    _isEditable ? 'Modo: Editable' : 'Modo: Automático',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: _isEditable ? Colors.green[700] : Colors.blue[700],
                     ),
-                  ],
+                  ),
+                  subtitle: Text(
+                    _isEditable 
+                        ? 'Al seleccionar, se insertará el prompt completo para que puedas editarlo antes de enviar.'
+                        : 'Al seleccionar, se insertará "/comando" y se procesará automáticamente con el texto que escribas.',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  value: _isEditable,
+                  onChanged: (value) => setState(() => _isEditable = value),
+                  activeColor: Colors.green,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 ),
               ),
+              const SizedBox(height: 12),
               
-              // Mensaje de advertencia si no tiene {{content}}
-              if (!_hasContentPlaceholder) ...[
-                const SizedBox(height: 8),
+              // =================================================================
+              // Mensaje informativo sobre {{content}} - SOLO para modo Automático
+              // =================================================================
+              if (!_isEditable) ...[
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1), 
-                    borderRadius: BorderRadius.circular(8)
+                    color: Colors.blue.withOpacity(0.1), 
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.warning_outlined, size: 16, color: Colors.orange),
-                      const SizedBox(width: 8),
+                      Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                      SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          ' Sin {{content}}, el comando no podrá usar texto adicional.',
-                          style: TextStyle(fontSize: 11, color: Colors.orange[800]),
+                          'Usa {{content}} para insertar el texto que escribas después del comando.',
+                          style: TextStyle(fontSize: 11),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ]
+                
+                // Mensaje de advertencia si no tiene {{content}} (solo en modo automático)
+                if (!_hasContentPlaceholder) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1), 
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_outlined, size: 16, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Sin {{content}}, el comando no podrá usar texto adicional.',
+                            style: TextStyle(fontSize: 11, color: Colors.orange[800]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+              
+              // Mensaje informativo para modo Editable
+              if (_isEditable)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1), 
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.edit_note, size: 16, color: Colors.green),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'El prompt se insertará completo en el chat para que puedas modificarlo antes de enviarlo.',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -480,6 +586,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
 }
 
 // Widget personalizado para el campo de prompt con highlight de {{content}}
+// (Se mantiene por si se quiere usar en el futuro)
 class _HighlightedPromptField extends StatelessWidget {
   final TextEditingController controller;
   final String? Function(String?)? validator;

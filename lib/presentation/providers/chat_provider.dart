@@ -650,9 +650,14 @@ class ChatProvider extends ChangeNotifier {
       final userCommands = allCommands.where((cmd) => !cmd.isSystem).toList();
       
       // Convertir comandos del usuario a QuickResponseEntity
-      // Solo necesitamos el trigger como texto
+      // Ahora incluimos el promptTemplate y isEditable
       final userQuickResponses = userCommands
-          .map((cmd) => QuickResponseEntity(text: cmd.trigger))
+          .map((cmd) => QuickResponseEntity(
+            text: cmd.trigger,
+            description: cmd.description,
+            promptTemplate: cmd.promptTemplate, // NUEVO
+            isEditable: cmd.isEditable,          // NUEVO
+          ))
           .toList();
       
       // Combinar respuestas del sistema con comandos del usuario
