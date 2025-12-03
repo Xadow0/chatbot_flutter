@@ -115,27 +115,14 @@ class _AppInitializerState extends State<AppInitializer> {
           value: result.aiServiceSelector,
         ),
 
+        // 1. AuthProvider corregido: Se eliminó el Future.microtask problemático
         ChangeNotifierProvider(
           create: (context) {
-            final authProvider = AuthProvider(
+            return AuthProvider(
               authService: AuthService(),
               preferencesService: context.read<PreferencesService>(),
               syncService: context.read<FirebaseSyncService>(),
             );
-            
-            Future.microtask(() {
-              try {
-                final commandProvider = Provider.of<CommandManagementProvider>(
-                  context,
-                  listen: false,
-                );
-                authProvider.setCommandProvider(commandProvider);
-              } catch (e) {
-                debugPrint('⚠️ [Main] Error inyectando CommandProvider: $e');
-              }
-            });
-            
-            return authProvider;
           },
         ),
 
@@ -180,10 +167,25 @@ class _AppInitializerState extends State<AppInitializer> {
           },
         ),
 
+        // 2. CommandManagementProvider corregido: Aquí realizamos la inyección inversa
         ChangeNotifierProvider(
-          create: (context) => CommandManagementProvider(
-            context.read<CommandRepository>() as CommandRepositoryImpl,
-          ),
+          create: (context) {
+            // Creamos la instancia
+            final commandProvider = CommandManagementProvider(
+              context.read<CommandRepository>() as CommandRepositoryImpl,
+            );
+
+            // Buscamos el AuthProvider (que ya existe arriba) y le inyectamos los comandos
+            try {
+              final authProvider = context.read<AuthProvider>();
+              authProvider.setCommandProvider(commandProvider);
+              // debugPrint('✅ [Main] CommandProvider inyectado correctamente en AuthProvider');
+            } catch (e) {
+              debugPrint('⚠️ [Main] Error vinculando AuthProvider con CommandProvider: $e');
+            }
+
+            return commandProvider;
+          },
         ),
         
         ChangeNotifierProvider(
