@@ -144,10 +144,10 @@ class CustomDrawer extends StatelessWidget {
           image: const AssetImage('assets/images/header_bg.png'), 
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
-            primaryColor.withOpacity(0.8), 
+            primaryColor.withValues(alpha: 0.8), 
             BlendMode.darken
           ),
-          onError: (_, __) {}, 
+          onError: (_, _) {}, 
         ),
       ),
       child: authProvider.isAuthenticated
@@ -179,7 +179,7 @@ class CustomDrawer extends StatelessWidget {
                     onChanged: authProvider.isSyncing 
                         ? null 
                         : (val) => authProvider.toggleCloudSync(val),
-                    activeColor: Colors.greenAccent,
+                    activeThumbColor: const Color.fromARGB(255, 8, 133, 73),
                     activeTrackColor: Colors.white24,
                     inactiveThumbColor: Colors.grey,
                     inactiveTrackColor: Colors.white10,
@@ -189,7 +189,7 @@ class CustomDrawer extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: authProvider.isCloudSyncEnabled 
-                        ? Colors.greenAccent.withOpacity(0.2)
+                        ? const Color.fromARGB(255, 16, 155, 88).withValues(alpha: 0.2)
                         : Colors.white10,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
@@ -216,7 +216,7 @@ class CustomDrawer extends StatelessWidget {
         Text(
           'TRAINING.IA',
           style: TextStyle(
-            color: textColor.withOpacity(0.7),
+            color: textColor.withValues(alpha: 0.7),
             fontSize: 12,
             letterSpacing: 1.2,
           ),
@@ -249,7 +249,7 @@ class CustomDrawer extends StatelessWidget {
         Text(
           'TRAINING.IA',
           style: TextStyle(
-            color: textColor.withOpacity(0.7),
+            color: textColor.withValues(alpha: 0.7),
             fontSize: 12,
             letterSpacing: 1.2,
           ),
@@ -279,7 +279,7 @@ class CustomDrawer extends StatelessWidget {
               Text(
                 'Iniciar Sesión',
                 style: TextStyle(
-                  color: textColor.withOpacity(0.9),
+                  color: textColor.withValues(alpha: 0.9),
                   decoration: TextDecoration.underline,
                   decorationColor: textColor,
                 ),

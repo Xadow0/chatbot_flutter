@@ -237,7 +237,7 @@ class _StartMenuPageState extends State<StartMenuPage>
     final isDark = theme.brightness == Brightness.dark;
 
     final backgroundColor =
-        isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.1);
+        isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1);
     final borderColor = isDark ? Colors.white24 : Colors.black12;
     final primaryColor = theme.colorScheme.primary;
 
@@ -261,7 +261,7 @@ class _StartMenuPageState extends State<StartMenuPage>
                 color: backgroundColor,
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                    color: primaryColor.withOpacity(0.5), width: 1.5),
+                    color: primaryColor.withValues(alpha: 0.5), width: 1.5),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -318,7 +318,7 @@ class _StartMenuPageState extends State<StartMenuPage>
                   'Sesión iniciada como:',
                   style: TextStyle(
                     fontSize: 10,
-                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                   ),
                 ),
                 Text(
@@ -387,12 +387,12 @@ class _StartMenuPageState extends State<StartMenuPage>
           end: Alignment.bottomRight,
           colors: [
             color,
-            color.withOpacity(0.7),
+            color.withValues(alpha: 0.7),
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.4),
+            color: color.withValues(alpha: 0.4),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -412,7 +412,7 @@ class _StartMenuPageState extends State<StartMenuPage>
                 Container(
                   padding: const EdgeInsets.all(8), 
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(

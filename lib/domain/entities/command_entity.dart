@@ -30,6 +30,10 @@ class CommandEntity extends Equatable {
   /// 
   /// Por defecto es `false` para mantener compatibilidad con comandos existentes.
   final bool isEditable;
+  
+  /// ID de la carpeta a la que pertenece el comando.
+  /// Si es `null`, el comando no está en ninguna carpeta.
+  final String? folderId;
 
   const CommandEntity({
     required this.id,
@@ -40,6 +44,7 @@ class CommandEntity extends Equatable {
     this.isSystem = false,
     this.systemType = SystemCommandType.none,
     this.isEditable = false,
+    this.folderId,
   });
 
   /// Crea una copia del comando con algunos campos modificados
@@ -52,6 +57,8 @@ class CommandEntity extends Equatable {
     bool? isSystem,
     SystemCommandType? systemType,
     bool? isEditable,
+    String? folderId,
+    bool clearFolderId = false,
   }) {
     return CommandEntity(
       id: id ?? this.id,
@@ -62,6 +69,7 @@ class CommandEntity extends Equatable {
       isSystem: isSystem ?? this.isSystem,
       systemType: systemType ?? this.systemType,
       isEditable: isEditable ?? this.isEditable,
+      folderId: clearFolderId ? null : (folderId ?? this.folderId),
     );
   }
 
@@ -75,5 +83,6 @@ class CommandEntity extends Equatable {
     isSystem, 
     systemType,
     isEditable,
+    folderId,
   ];
 }

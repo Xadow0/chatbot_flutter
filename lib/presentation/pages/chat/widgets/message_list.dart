@@ -125,7 +125,7 @@ class _MessageBubble extends StatelessWidget {
                             color: colorScheme.onPrimary,
                             fontSize: 15,
                           ),
-                          selectionColor: colorScheme.onPrimary.withOpacity(0.4),
+                          selectionColor: colorScheme.onPrimary.withValues(alpha: 0.4),
                         )
                       : MarkdownWidget(
                           data: _cleanMarkdownText(message.content),
@@ -224,8 +224,8 @@ class _MessageBubble extends StatelessWidget {
                       Icons.copy_rounded,
                       size: 14,
                       color: isUser 
-                          ? colorScheme.onPrimary.withOpacity(0.7) 
-                          : colorScheme.onSurface.withOpacity(0.5),
+                          ? colorScheme.onPrimary.withValues(alpha: 0.7) 
+                          : colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ),

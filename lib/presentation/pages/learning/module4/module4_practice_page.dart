@@ -343,7 +343,7 @@ class _AnimatedTechniqueWidgetState extends State<AnimatedTechniqueWidget>
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color:
-                      _getTechniqueColor().withOpacity(isDark ? 0.3 : 0.15),
+                      _getTechniqueColor().withValues(alpha: isDark ? 0.3 : 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -351,7 +351,7 @@ class _AnimatedTechniqueWidgetState extends State<AnimatedTechniqueWidget>
                   style: TextStyle(
                     fontSize: 14,
                     color: isDark
-                        ? _getTechniqueColor().withOpacity(0.9)
+                        ? _getTechniqueColor().withValues(alpha: 0.9)
                         : _getTechniqueColor(),
                     fontWeight: FontWeight.w600,
                   ),
@@ -463,14 +463,14 @@ class _AnimatedTechniqueWidgetState extends State<AnimatedTechniqueWidget>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: step.color.withOpacity(isDark ? 0.2 : 0.1),
+              color: step.color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: step.color.withOpacity(isDark ? 0.5 : 0.3),
+                color: step.color.withValues(alpha: isDark ? 0.5 : 0.3),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: step.color.withOpacity(isDark ? 0.2 : 0.1),
+                  color: step.color.withValues(alpha: isDark ? 0.2 : 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -492,7 +492,7 @@ class _AnimatedTechniqueWidgetState extends State<AnimatedTechniqueWidget>
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color:
-                          isDark ? step.color.withOpacity(0.9) : step.color,
+                          isDark ? step.color.withValues(alpha: 0.9) : step.color,
                     ),
                   ),
                 ),
@@ -657,13 +657,13 @@ class _StepProgressIndicator extends StatelessWidget {
             color: isActive
                 ? color
                 : isPast
-                    ? color.withOpacity(0.5)
+                    ? color.withValues(alpha: 0.5)
                     : (isDark ? Colors.grey[700] : Colors.grey[300]),
             borderRadius: BorderRadius.circular(5),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: color.withOpacity(0.4),
+                      color: color.withValues(alpha: 0.4),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -790,7 +790,7 @@ class _AnimatedStepIcon extends StatelessWidget {
               return LinearGradient(
                 colors: [
                   color,
-                  color.withOpacity(0.6),
+                  color.withValues(alpha: 0.6),
                   color,
                 ],
                 stops: [
@@ -896,16 +896,16 @@ class _ResultCardState extends State<_ResultCard>
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: widget.color.withOpacity(widget.isDark ? 0.15 : 0.05),
+            color: widget.color.withValues(alpha: widget.isDark ? 0.15 : 0.05),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: widget.color.withOpacity(widget.isDark ? 0.5 : 0.2),
+              color: widget.color.withValues(alpha: widget.isDark ? 0.5 : 0.2),
               width: 2,
             ),
             boxShadow: [
               BoxShadow(
                 color: widget.color
-                    .withOpacity(0.1 + (_glowAnimation.value * 0.1)),
+                    .withValues(alpha: 0.1 + (_glowAnimation.value * 0.1)),
                 blurRadius: 8 + (_glowAnimation.value * 8),
                 spreadRadius: _glowAnimation.value * 2,
               ),
@@ -917,7 +917,7 @@ class _ResultCardState extends State<_ResultCard>
               Icon(
                 Icons.check_circle,
                 color: widget.isDark
-                    ? widget.color.withOpacity(0.9)
+                    ? widget.color.withValues(alpha: 0.9)
                     : widget.color,
                 size: 24,
               ),
@@ -1208,13 +1208,13 @@ class _PracticeExerciseWidgetState extends State<PracticeExerciseWidget> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.blue.withOpacity(isDark ? 0.2 : 0.1),
-                  Colors.purple.withOpacity(isDark ? 0.2 : 0.1),
+                  Colors.blue.withValues(alpha: isDark ? 0.2 : 0.1),
+                  Colors.purple.withValues(alpha: isDark ? 0.2 : 0.1),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Colors.blue.withOpacity(isDark ? 0.5 : 0.3),
+                color: Colors.blue.withValues(alpha: isDark ? 0.5 : 0.3),
                 width: 2,
               ),
             ),
@@ -1267,10 +1267,10 @@ class _PracticeExerciseWidgetState extends State<PracticeExerciseWidget> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(isDark ? 0.2 : 0.1),
+              color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Colors.amber.withOpacity(isDark ? 0.5 : 0.3),
+                color: Colors.amber.withValues(alpha: isDark ? 0.5 : 0.3),
               ),
             ),
             child: Row(
@@ -1377,10 +1377,10 @@ class _PracticeExerciseWidgetState extends State<PracticeExerciseWidget> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(isDark ? 0.2 : 0.1),
+            color: Colors.blue.withValues(alpha: isDark ? 0.2 : 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Colors.blue.withOpacity(isDark ? 0.5 : 0.3),
+              color: Colors.blue.withValues(alpha: isDark ? 0.5 : 0.3),
             ),
           ),
           child: Row(

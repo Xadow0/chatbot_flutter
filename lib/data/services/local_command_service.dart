@@ -36,6 +36,13 @@ class LocalCommandService {
     }
   }
 
+  /// Obtiene comandos filtrados por carpeta
+  /// Si folderId es null, retorna comandos sin carpeta
+  Future<List<CommandModel>> getCommandsByFolder(String? folderId) async {
+    final commands = await getUserCommands();
+    return commands.where((c) => c.folderId == folderId).toList();
+  }
+
   /// Guarda un comando (Crear o Editar).
   /// Si el comando ya existe (mismo ID), lo actualiza.
   /// Si no existe, lo añade a la lista.
@@ -62,6 +69,61 @@ class LocalCommandService {
       
     } catch (e) {
       debugPrint('❌ [LocalCommandService] Error al guardar comando: $e');
+      rethrow;
+    }
+  }
+
+  /// Mueve un comando a una carpeta específica
+  /// Si folderId es null, el comando queda sin carpeta
+  Future<void> moveCommandToFolder(String commandId, String? folderId) async {
+    try {
+      final currentCommands = await getUserCommands();
+      
+      final index = currentCommands.indexWhere((c) => c.id == commandId);
+      
+      if (index < 0) {
+        debugPrint('⚠️ [LocalCommandService] Comando no encontrado: $commandId');
+        return;
+      }
+
+      final updatedCommand = currentCommands[index].copyWith(
+        folderId: folderId,
+        clearFolderId: folderId == null,
+      );
+      
+      currentCommands[index] = updatedCommand;
+      
+      await _saveListToStorage(currentCommands);
+      debugPrint('📁 [LocalCommandService] Comando movido a carpeta: $folderId');
+      
+    } catch (e) {
+      debugPrint('❌ [LocalCommandService] Error al mover comando: $e');
+      rethrow;
+    }
+  }
+
+  /// Mueve todos los comandos de una carpeta a "sin carpeta"
+  /// Se usa cuando se elimina una carpeta
+  Future<void> removeCommandsFromFolder(String folderId) async {
+    try {
+      final currentCommands = await getUserCommands();
+      
+      bool hasChanges = false;
+      final updatedCommands = currentCommands.map((cmd) {
+        if (cmd.folderId == folderId) {
+          hasChanges = true;
+          return cmd.copyWith(clearFolderId: true);
+        }
+        return cmd;
+      }).toList();
+
+      if (hasChanges) {
+        await _saveListToStorage(updatedCommands);
+        debugPrint('📤 [LocalCommandService] Comandos removidos de carpeta: $folderId');
+      }
+      
+    } catch (e) {
+      debugPrint('❌ [LocalCommandService] Error al remover comandos de carpeta: $e');
       rethrow;
     }
   }

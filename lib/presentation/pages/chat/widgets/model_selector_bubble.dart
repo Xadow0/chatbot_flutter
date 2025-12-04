@@ -1007,6 +1007,7 @@ class ModelSelectorBubble extends StatelessWidget {
     }
   }
 
+  // ignore: unused_element
   Future<void> _selectLocalOllamaModel(BuildContext context, ChatProvider chatProvider, String modelName) async {
     if (chatProvider.localOllamaLoading) {
       _showError(context, 'Espera a que termine el proceso actual...');
@@ -1023,6 +1024,7 @@ class ModelSelectorBubble extends StatelessWidget {
     }
   }
 
+  //ignore: unused_element
   Future<void> _refreshOllama(BuildContext context, ChatProvider chatProvider) async {
     try {
       await chatProvider.refreshConnection();

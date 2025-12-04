@@ -316,7 +316,7 @@ class _AnimatedEthicsScenarioWidgetState
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: _getScenarioColor().withOpacity(isDark ? 0.3 : 0.15),
+                  color: _getScenarioColor().withValues(alpha: isDark ? 0.3 : 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -324,7 +324,7 @@ class _AnimatedEthicsScenarioWidgetState
                   style: TextStyle(
                     fontSize: 14,
                     color: isDark
-                        ? _getScenarioColor().withOpacity(0.9)
+                        ? _getScenarioColor().withValues(alpha: 0.9)
                         : _getScenarioColor(),
                     fontWeight: FontWeight.w600,
                   ),
@@ -431,15 +431,15 @@ class _AnimatedEthicsScenarioWidgetState
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: step.color.withOpacity(isDark ? 0.2 : 0.1),
+              color: step.color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: step.color.withOpacity(isDark ? 0.5 : 0.3),
+                color: step.color.withValues(alpha: isDark ? 0.5 : 0.3),
                 width: 2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: step.color.withOpacity(isDark ? 0.2 : 0.1),
+                  color: step.color.withValues(alpha: isDark ? 0.2 : 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -463,7 +463,7 @@ class _AnimatedEthicsScenarioWidgetState
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: isDark
-                          ? step.color.withOpacity(0.9)
+                          ? step.color.withValues(alpha: 0.9)
                           : step.color,
                     ),
                   ),
@@ -606,13 +606,13 @@ class _StepProgressIndicator extends StatelessWidget {
             color: isActive
                 ? color
                 : isPast
-                    ? color.withOpacity(0.5)
+                    ? color.withValues(alpha: 0.5)
                     : (isDark ? Colors.grey[700] : Colors.grey[300]),
             borderRadius: BorderRadius.circular(5),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: color.withOpacity(0.4),
+                      color: color.withValues(alpha: 0.4),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -708,7 +708,7 @@ class _AnimatedStepIcon extends StatelessWidget {
               return LinearGradient(
                 colors: [
                   color,
-                  color.withOpacity(0.6),
+                  color.withValues(alpha: 0.6),
                   color,
                 ],
                 stops: [
@@ -822,16 +822,16 @@ class _LessonCardState extends State<_LessonCard>
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: lessonColor.withOpacity(widget.isDark ? 0.2 : 0.1),
+            color: lessonColor.withValues(alpha: widget.isDark ? 0.2 : 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: lessonColor.withOpacity(widget.isDark ? 0.5 : 0.3),
+              color: lessonColor.withValues(alpha: widget.isDark ? 0.5 : 0.3),
               width: 2,
             ),
             boxShadow: [
               BoxShadow(
                 color: lessonColor
-                    .withOpacity(0.1 + (_glowAnimation.value * 0.15)),
+                    .withValues(alpha: 0.1 + (_glowAnimation.value * 0.15)),
                 blurRadius: 10 + (_glowAnimation.value * 10),
                 spreadRadius: _glowAnimation.value * 2,
               ),
@@ -843,7 +843,7 @@ class _LessonCardState extends State<_LessonCard>
               Icon(
                 widget.step.lessonIcon ?? Icons.school,
                 color: widget.isDark
-                    ? lessonColor.withOpacity(0.9)
+                    ? lessonColor.withValues(alpha: 0.9)
                     : lessonColor,
                 size: 32,
               ),
@@ -858,7 +858,7 @@ class _LessonCardState extends State<_LessonCard>
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: widget.isDark
-                            ? lessonColor.withOpacity(0.9)
+                            ? lessonColor.withValues(alpha: 0.9)
                             : lessonColor,
                       ),
                     ),

@@ -126,7 +126,7 @@ class _IntroPage extends StatelessWidget {
           Text(
             'Descubre los fundamentos básicos de la Inteligencia Artificial',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -318,7 +318,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
@@ -338,7 +338,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                       label: const Text('Saltar'),
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
+                        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -379,7 +379,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                       Text(
                         'Presione el botón para simular una generación de texto en tiempo real como lo haría una IA:',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withAlpha((0.8 * 255).round()),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -415,7 +415,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withAlpha((0.2 * 255).round()),
+                                color: theme.colorScheme.primary.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(
                                   color: theme.colorScheme.primary,
@@ -448,7 +448,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                       Text(
                         'Candidatas:',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round()),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -464,13 +464,13 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? theme.colorScheme.primary.withAlpha((0.1 * 255).round())
+                                  ? theme.colorScheme.primary.withValues(alpha: 0.1)
                                   : theme.colorScheme.surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: isSelected
                                     ? theme.colorScheme.primary
-                                    : theme.colorScheme.outline.withAlpha((0.3 * 255).round()),
+                                    : theme.colorScheme.outline.withValues(alpha: 0.3),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
@@ -479,7 +479,7 @@ class _CommunicationPageState extends State<_CommunicationPage> {
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: isSelected
                                     ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurface.withAlpha((0.7 * 255).round()),
+                                    : theme.colorScheme.onSurface.withValues(alpha: 0.7),
                                 fontWeight: isSelected
                                     ? FontWeight.bold
                                     : FontWeight.normal,
@@ -767,7 +767,7 @@ class _ExplanationPageState extends State<_ExplanationPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
+                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
@@ -786,7 +786,7 @@ class _ExplanationPageState extends State<_ExplanationPage> {
                     label: const Text('Saltar'),
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
+                      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
@@ -826,11 +826,11 @@ class _ExplanationPageState extends State<_ExplanationPage> {
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: showAsCorrect
-                                  ? Colors.green.withAlpha((0.1 * 255).round())
+                                  ? Colors.green.withValues(alpha: 0.1)
                                   : showAsIncorrect
-                                      ? Colors.red.withAlpha((0.1 * 255).round())
+                                      ? Colors.red.withValues(alpha: 0.1)
                                       : isSelected
-                                          ? theme.colorScheme.primaryContainer.withAlpha((0.5 * 255).round())
+                                          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
                                           : theme.colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
@@ -867,13 +867,13 @@ class _ExplanationPageState extends State<_ExplanationPage> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: (_answeredCorrectly && option.isCorrect)
-                                  ? Colors.green.withAlpha((0.05 * 255).round())
-                                  : Colors.red.withAlpha((0.05 * 255).round()),
+                                  ? Colors.green.withValues(alpha: 0.05)
+                                  : Colors.red.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: (_answeredCorrectly && option.isCorrect)
-                                    ? Colors.green.withAlpha((0.3 * 255).round())
-                                    : Colors.red.withAlpha((0.3 * 255).round()),
+                                    ? Colors.green.withValues(alpha: 0.3)
+                                    : Colors.red.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Row(
@@ -889,7 +889,7 @@ class _ExplanationPageState extends State<_ExplanationPage> {
                                   child: Text(
                                     option.explanation,
                                     style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: theme.colorScheme.onSurface.withAlpha((0.8 * 255).round()),
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                                     ),
                                   ),
                                 ),
@@ -1124,10 +1124,10 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withAlpha((0.3 * 255).round()),
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: theme.colorScheme.primary.withAlpha((0.3 * 255).round()),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -1161,7 +1161,7 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
                       label: const Text('Saltar'),
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
+                        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -1171,7 +1171,7 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.green.withAlpha((0.1 * 255).round()),
+                color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: Colors.green,
@@ -1211,7 +1211,7 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
                   Text(
                     'Al presionar "Finalizar" volverás al menú de módulos y podrás continuar con el siguiente.',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withAlpha((0.8 * 255).round()),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -1222,7 +1222,7 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.withAlpha((0.1 * 255).round()),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: Colors.orange,
@@ -1268,8 +1268,8 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
                         decoration: BoxDecoration(
                           color: _showResults
                               ? (isCorrect
-                                  ? Colors.green.withAlpha((0.1 * 255).round())
-                                  : Colors.red.withAlpha((0.1 * 255).round()))
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : Colors.red.withValues(alpha: 0.1))
                               : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                           border: _showResults
@@ -1347,13 +1347,13 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: isCorrect
-                                ? Colors.green.withAlpha((0.05 * 255).round())
-                                : Colors.red.withAlpha((0.05 * 255).round()),
+                                ? Colors.green.withValues(alpha: 0.05)
+                                : Colors.red.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: isCorrect
-                                  ? Colors.green.withAlpha((0.3 * 255).round())
-                                  : Colors.red.withAlpha((0.3 * 255).round()),
+                                  ? Colors.green.withValues(alpha: 0.3)
+                                  : Colors.red.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
@@ -1369,7 +1369,7 @@ class _CapabilitiesQuizPageState extends State<_CapabilitiesQuizPage> {
                                 child: Text(
                                   question.explanation,
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurface.withAlpha((0.8 * 255).round()),
+                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                                   ),
                                 ),
                               ),
@@ -1453,17 +1453,17 @@ class _OptionButton extends StatelessWidget {
     
     if (isCorrect != null) {
       if (isCorrect!) {
-        backgroundColor = Colors.green.withAlpha((0.1 * 255).round());
+        backgroundColor = Colors.green.withValues(alpha: 0.1);
         borderColor = Colors.green;
         textColor = Colors.green;
       } else if (isSelected && !isCorrect!) {
-        backgroundColor = Colors.red.withAlpha((0.1 * 255).round());
+        backgroundColor = Colors.red.withValues(alpha: 0.1);
         borderColor = Colors.red;
         textColor = Colors.red;
       } else {
         backgroundColor = theme.colorScheme.surfaceContainerHigh;
-        borderColor = theme.colorScheme.outline.withAlpha((0.3 * 255).round());
-        textColor = theme.colorScheme.onSurface.withAlpha((0.5 * 255).round());
+        borderColor = theme.colorScheme.outline.withValues(alpha: 0.3);
+        textColor = theme.colorScheme.onSurface.withValues(alpha: 0.5);
       }
     } else {
       if (isSelected) {
@@ -1472,8 +1472,8 @@ class _OptionButton extends StatelessWidget {
         textColor = theme.colorScheme.primary;
       } else {
         backgroundColor = theme.colorScheme.surfaceContainerHigh;
-        borderColor = theme.colorScheme.outline.withAlpha((0.3 * 255).round());
-        textColor = theme.colorScheme.onSurface.withAlpha((0.7 * 255).round());
+        borderColor = theme.colorScheme.outline.withValues(alpha: 0.3);
+        textColor = theme.colorScheme.onSurface.withValues(alpha: 0.7);
       }
     }
 

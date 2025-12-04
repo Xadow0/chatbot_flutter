@@ -340,7 +340,7 @@ class _ComparisonPageState extends State<_ComparisonPage> {
                       label: const Text('Saltar'),
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
+                        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.5),
                       ),
                     ),
                  ),

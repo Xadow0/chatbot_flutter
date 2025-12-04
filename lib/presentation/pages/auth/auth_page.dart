@@ -144,9 +144,9 @@ class _AuthPageState extends State<AuthPage>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
+                color: Colors.amber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -277,7 +277,7 @@ class _AuthPageState extends State<AuthPage>
     
     final primaryColor = _isLogin ? Colors.blue : Colors.green;
     final subtitleColor = isDark ? Colors.grey[400] : Colors.grey[600];
-    final inputFillColor = isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.05);
+    final inputFillColor = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.withValues(alpha: 0.05);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -376,7 +376,7 @@ class _AuthPageState extends State<AuthPage>
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                            color: primaryColor.withOpacity(0.7),
+                            color: primaryColor.withValues(alpha: 0.7),
                           ),
                           onPressed: () {
                             setState(() {
@@ -417,7 +417,7 @@ class _AuthPageState extends State<AuthPage>
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                              color: primaryColor.withOpacity(0.7),
+                              color: primaryColor.withValues(alpha: 0.7),
                             ),
                             onPressed: () {
                               setState(() {
@@ -502,7 +502,7 @@ class _AuthPageState extends State<AuthPage>
             Expanded(
               child: LinearProgressIndicator(
                 value: _getPasswordStrength(),
-                backgroundColor: Colors.grey.withOpacity(0.2),
+                backgroundColor: Colors.grey.withValues(alpha: 0.2),
                 color: _getPasswordStrengthColor(),
                 minHeight: 4,
                 borderRadius: BorderRadius.circular(2),
@@ -538,10 +538,10 @@ class _AuthPageState extends State<AuthPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: met ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+        color: met ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: met ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
+          color: met ? Colors.green.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -589,8 +589,8 @@ class _AuthPageState extends State<AuthPage>
       style: TextStyle(fontSize: 16, color: textColor),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
-        prefixIcon: Icon(icon, color: primaryColor.withOpacity(0.8)),
+        labelStyle: TextStyle(color: textColor.withValues(alpha: 0.7)),
+        prefixIcon: Icon(icon, color: primaryColor.withValues(alpha: 0.8)),
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: fillColor,
@@ -601,7 +601,7 @@ class _AuthPageState extends State<AuthPage>
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: Colors.grey.withOpacity(0.2)),
+          borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
@@ -631,12 +631,12 @@ class _AuthPageState extends State<AuthPage>
           end: Alignment.bottomRight,
           colors: [
             color,
-            color.withOpacity(0.7),
+            color.withValues(alpha: 0.7),
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.4),
+            color: color.withValues(alpha: 0.4),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

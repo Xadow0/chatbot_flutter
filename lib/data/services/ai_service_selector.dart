@@ -119,6 +119,7 @@ class AIServiceSelector extends ChangeNotifier {
     // No es necesario hacer nada más, el listener se encarga.
   }
   
+  //ignore: unused_element
   Future<void> _initializeServices() async {
     debugPrint('🎬 [AIServiceSelector] Inicializando servicios de IA...');
     

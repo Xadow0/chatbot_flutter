@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import '../../../../data/models/quick_response_model.dart';
 
-class QuickResponsesWidget extends StatelessWidget {
+class QuickResponsesWidget extends StatefulWidget {
   final List<QuickResponse> responses;
   
   /// Callback cuando se selecciona una respuesta (click izquierdo normal)
@@ -19,9 +19,57 @@ class QuickResponsesWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    if (responses.isEmpty) return const SizedBox.shrink();
+  State<QuickResponsesWidget> createState() => _QuickResponsesWidgetState();
+}
 
+class _QuickResponsesWidgetState extends State<QuickResponsesWidget> {
+  /// Carpeta actualmente expandida (null = vista principal)
+  String? _expandedFolderId;
+  
+  /// Nombre de la carpeta expandida para el breadcrumb
+  String? _expandedFolderName;
+  String? _expandedFolderIcon;
+
+  void _openFolder(QuickResponse folder) {
+    setState(() {
+      _expandedFolderId = folder.folderId;
+      _expandedFolderName = folder.text;
+      _expandedFolderIcon = folder.folderIcon;
+    });
+  }
+
+  void _closeFolder() {
+    setState(() {
+      _expandedFolderId = null;
+      _expandedFolderName = null;
+      _expandedFolderIcon = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.responses.isEmpty) return const SizedBox.shrink();
+
+    // Si hay una carpeta expandida, mostrar sus comandos
+    if (_expandedFolderId != null) {
+      final folder = widget.responses.firstWhere(
+        (r) => r.folderId == _expandedFolderId,
+        orElse: () {
+          // Si no se encuentra, cerrar la carpeta
+          Future.microtask(() => _closeFolder());
+          return widget.responses.first;
+        },
+      );
+      
+      if (folder.isFolder && folder.children != null) {
+        return _buildFolderContent(folder);
+      }
+    }
+
+    return _buildMainView();
+  }
+
+  Widget _buildMainView() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -54,16 +102,21 @@ class QuickResponsesWidget extends StatelessWidget {
             child: Row(
               children: [
                 const SizedBox(width: 12),
-                ...responses.map((response) {
+                ...widget.responses.map((response) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: _QuickResponseChip(
-                      response: response,
-                      onTap: () => onResponseSelected(response),
-                      onEditTap: onEditRequested != null 
-                          ? () => onEditRequested!(response)
-                          : null,
-                    ),
+                    child: response.isFolder
+                        ? _FolderChip(
+                            response: response,
+                            onTap: () => _openFolder(response),
+                          )
+                        : _QuickResponseChip(
+                            response: response,
+                            onTap: () => widget.onResponseSelected(response),
+                            onEditTap: widget.onEditRequested != null
+                                ? () => widget.onEditRequested!(response)
+                                : null,
+                          ),
                   );
                 }),
                 const SizedBox(width: 4),
@@ -74,7 +127,218 @@ class QuickResponsesWidget extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildFolderContent(QuickResponse folder) {
+    final children = folder.children ?? [];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((0.5 * 255).round()),
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Breadcrumb / Header con botón volver
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                // Botón volver
+                InkWell(
+                  onTap: _closeFolder,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.arrow_back,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Volver',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Nombre de la carpeta
+                Text(
+                  _expandedFolderIcon ?? '📁',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    _expandedFolderName ?? '',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.bold,
+                        ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // Contador de comandos
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${children.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Lista de comandos
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                if (children.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Carpeta vacía',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                        fontSize: 13,
+                      ),
+                    ),
+                  )
+                else
+                  ...children.map((child) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _QuickResponseChip(
+                        response: child,
+                        onTap: () => widget.onResponseSelected(child),
+                        onEditTap: widget.onEditRequested != null
+                            ? () => widget.onEditRequested!(child)
+                            : null,
+                      ),
+                    );
+                  }),
+                const SizedBox(width: 4),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+// =============================================================================
+// CHIP DE CARPETA
+// =============================================================================
+
+class _FolderChip extends StatelessWidget {
+  final QuickResponse response;
+  final VoidCallback onTap;
+
+  const _FolderChip({
+    required this.response,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final childCount = response.children?.length ?? 0;
+
+    return Tooltip(
+      message: '$childCount comando${childCount != 1 ? 's' : ''} - Click para abrir',
+      preferBelow: false,
+      child: ActionChip(
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              response.folderIcon ?? '📁',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              response.text,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSecondaryContainer,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            // Badge con cantidad
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$childCount',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
+            ),
+          ],
+        ),
+        onPressed: onTap,
+        backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// CHIP DE COMANDO
+// =============================================================================
 
 class _QuickResponseChip extends StatefulWidget {
   final QuickResponse response;
@@ -114,8 +378,6 @@ class _QuickResponseChipState extends State<_QuickResponseChip> {
     _removeOverlay();
 
     final overlay = Overlay.of(context);
-    final renderBox = context.findRenderObject() as RenderBox;
-    final size = renderBox.size;
 
     _overlayEntry = OverlayEntry(
       builder: (context) => Stack(
@@ -179,6 +441,8 @@ class _QuickResponseChipState extends State<_QuickResponseChip> {
   String _getTooltipText() {
     if (widget.response.isEditable) {
       return 'Click: Insertar prompt para editar';
+    } else if (widget.response.isSystem) {
+      return 'Click: Insertar comando\nClick derecho: Editar prompt';
     } else {
       return 'Click: Insertar comando\nClick derecho: Editar prompt';
     }
@@ -187,6 +451,7 @@ class _QuickResponseChipState extends State<_QuickResponseChip> {
   @override
   Widget build(BuildContext context) {
     final isEditable = widget.response.isEditable;
+    final isSystem = widget.response.isSystem;
 
     return CompositedTransformTarget(
       link: _layerLink,
@@ -223,11 +488,15 @@ class _QuickResponseChipState extends State<_QuickResponseChip> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isEditable ? Icons.edit_note : Icons.bolt,
+                    isSystem 
+                        ? Icons.lock_outline 
+                        : (isEditable ? Icons.edit_note : Icons.bolt),
                     size: 14,
-                    color: isEditable
-                        ? Colors.green[700]
-                        : Theme.of(context).colorScheme.onSecondaryContainer,
+                    color: isSystem
+                        ? Colors.grey[600]
+                        : (isEditable
+                            ? Colors.green[700]
+                            : Theme.of(context).colorScheme.onSecondaryContainer),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -253,12 +522,16 @@ class _QuickResponseChipState extends State<_QuickResponseChip> {
                 ],
               ),
               onPressed: widget.onTap,
-              backgroundColor: isEditable
-                  ? Colors.green.withOpacity(0.1)
-                  : Theme.of(context).colorScheme.secondaryContainer,
+              backgroundColor: isSystem
+                  ? Colors.grey.withValues(alpha: 0.15)
+                  : (isEditable
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : Theme.of(context).colorScheme.secondaryContainer),
               side: isEditable
-                  ? BorderSide(color: Colors.green.withOpacity(0.3))
-                  : BorderSide.none,
+                  ? BorderSide(color: Colors.green.withValues(alpha: 0.3))
+                  : (isSystem 
+                      ? BorderSide(color: Colors.grey.withValues(alpha: 0.3))
+                      : BorderSide.none),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),

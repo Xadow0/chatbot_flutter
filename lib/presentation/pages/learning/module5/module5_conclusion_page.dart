@@ -29,19 +29,18 @@ class Module5ConclusionPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
 
-                  // Resumen de lecciones
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.red.withOpacity(0.1),
-                          Colors.orange.withOpacity(0.1),
+                          Colors.red.withValues(alpha: 0.1),
+                          Colors.orange.withValues(alpha: 0.1),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.red.withOpacity(0.3),
+                        color: Colors.red.withValues(alpha: 0.3),
                         width: 2,
                       ),
                     ),
@@ -77,7 +76,6 @@ class Module5ConclusionPage extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // Recordatorios clave
                   _buildReminderCard(
                     icon: Icons.warning_amber,
                     title: 'Verifica Siempre',
@@ -108,14 +106,13 @@ class Module5ConclusionPage extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // Compromiso ético
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.blue.withOpacity(0.3),
+                        color: Colors.blue.withValues(alpha: 0.3),
                         width: 2,
                       ),
                     ),
@@ -157,13 +154,13 @@ class Module5ConclusionPage extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // Mensaje final
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                      border: Border.all(
+                          color: Colors.green.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
@@ -224,9 +221,9 @@ class Module5ConclusionPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,7 +231,7 @@ class Module5ConclusionPage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 24),

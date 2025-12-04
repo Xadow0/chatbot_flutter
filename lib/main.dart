@@ -31,8 +31,10 @@ import 'data/services/auth_service.dart';
 import 'data/services/preferences_service.dart';
 import 'data/services/firebase_sync_service.dart';
 import 'data/services/firebase_command_sync_service.dart';
+import 'data/services/firebase_folder_sync_service.dart';
 import 'data/services/secure_storage_service.dart'; 
-import 'data/services/local_command_service.dart'; 
+import 'data/services/local_command_service.dart';
+import 'data/services/local_folder_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -107,6 +109,9 @@ class _AppInitializerState extends State<AppInitializer> {
         Provider<FirebaseCommandSyncService>(
           create: (_) => FirebaseCommandSyncService(),
         ),
+        Provider<FirebaseFolderSyncService>(
+          create: (_) => FirebaseFolderSyncService(),
+        ),
         Provider<PreferencesService>(
           create: (_) => PreferencesService(),
         ),
@@ -115,7 +120,6 @@ class _AppInitializerState extends State<AppInitializer> {
           value: result.aiServiceSelector,
         ),
 
-        // 1. AuthProvider corregido: Se eliminó el Future.microtask problemático
         ChangeNotifierProvider(
           create: (context) {
             return AuthProvider(
@@ -126,8 +130,16 @@ class _AppInitializerState extends State<AppInitializer> {
           },
         ),
 
+        // LocalCommandService
         Provider<LocalCommandService>(
           create: (context) => LocalCommandService(
+            context.read<SecureStorageService>(),
+          ),
+        ),
+
+        // LocalFolderService
+        Provider<LocalFolderService>(
+          create: (context) => LocalFolderService(
             context.read<SecureStorageService>(),
           ),
         ),
@@ -138,13 +150,16 @@ class _AppInitializerState extends State<AppInitializer> {
           ),
         ),
 
+        // CommandRepository con 5 argumentos
         Provider<CommandRepository>(
           create: (context) {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             
             return CommandRepositoryImpl(
               context.read<LocalCommandService>(),
+              context.read<LocalFolderService>(),
               context.read<FirebaseCommandSyncService>(),
+              context.read<FirebaseFolderSyncService>(),
               () => authProvider.isCloudSyncEnabled,
             );
           },
@@ -167,30 +182,45 @@ class _AppInitializerState extends State<AppInitializer> {
           },
         ),
 
-        // 2. CommandManagementProvider corregido: Aquí realizamos la inyección inversa
+        // CommandManagementProvider
         ChangeNotifierProvider(
           create: (context) {
-            // Creamos la instancia
+            final authProvider = Provider.of<AuthProvider>(context, listen: false);
             final commandProvider = CommandManagementProvider(
               context.read<CommandRepository>() as CommandRepositoryImpl,
             );
 
-            // Buscamos el AuthProvider (que ya existe arriba) y le inyectamos los comandos
+            // Vinculación Auth (existente)
             try {
-              final authProvider = context.read<AuthProvider>();
               authProvider.setCommandProvider(commandProvider);
-              // debugPrint('✅ [Main] CommandProvider inyectado correctamente en AuthProvider');
-            } catch (e) {
-              debugPrint('⚠️ [Main] Error vinculando AuthProvider con CommandProvider: $e');
+            } catch (e) { debugPrint('Error vinculando auth: $e'); }
+
+            // Listener para cambios de Auth (Login/Logout)
+            void authListener() {
+               // Si cambia el estado de sync, recargamos
+               if (authProvider.isCloudSyncEnabled) {
+                 Future.microtask(() => commandProvider.loadCommands(autoSync: true));
+               }
             }
+            authProvider.addListener(authListener);
+
+            // CARGA INICIAL: Fundamental para que funcione al abrir la app
+            Future.microtask(() {
+              // Pasamos el estado actual del auth, sea true o false
+              commandProvider.loadCommands(
+                autoSync: authProvider.isCloudSyncEnabled,
+              );
+            });
 
             return commandProvider;
           },
         ),
         
+        // ChatProvider - ACTUALIZADO: Vinculación con CommandManagementProvider
         ChangeNotifierProvider(
           create: (context) {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            final commandProvider = Provider.of<CommandManagementProvider>(context, listen: false);
             
             final chatProvider = ChatProvider(
               chatRepository: context.read<ChatRepository>(),
@@ -199,9 +229,13 @@ class _AppInitializerState extends State<AppInitializer> {
               aiServiceSelector: context.read<AIServiceSelector>(),
             );
             
+            // Vincular sync status
             chatProvider.setSyncStatusChecker(
               () => authProvider.isCloudSyncEnabled,
             );
+            
+            // NUEVO: Vincular CommandManagementProvider para obtener carpetas y preferencias
+            chatProvider.setCommandManagementProvider(commandProvider);
             
             return chatProvider;
           },
@@ -312,7 +346,7 @@ Future<String> _determineInitialRoute() async {
   final hasKeys = await apiKeysManager.hasAnyApiKey();
   
   if (!hasKeys) {
-    debugPrint('🔍 [Main] No hay API keys guardadas');
+    debugPrint('🔑 [Main] No hay API keys guardadas');
     
     await _migrateFromEnvIfAvailable(apiKeysManager);
     
@@ -322,7 +356,7 @@ Future<String> _determineInitialRoute() async {
       debugPrint('✅ [Main] Keys migradas correctamente → Ir al menú principal');
       return AppRoutes.startMenu;
     } else {
-      debugPrint('🔑 [Main] Sin keys → Ir a onboarding');
+      debugPrint('🔒 [Main] Sin keys → Ir a onboarding');
       return AppRoutes.apiKeysOnboarding;
     }
   } else {

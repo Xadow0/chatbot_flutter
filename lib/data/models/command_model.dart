@@ -10,6 +10,7 @@ class CommandModel extends CommandEntity {
     super.isSystem,
     super.systemType,
     super.isEditable,
+    super.folderId,
   });
 
   factory CommandModel.fromJson(Map<String, dynamic> json) {
@@ -21,7 +22,8 @@ class CommandModel extends CommandEntity {
       promptTemplate: json['promptTemplate'] as String,
       isSystem: json['isSystem'] as bool? ?? false,
       systemType: _stringToEnum(json['systemType'] as String?),
-      isEditable: json['isEditable'] as bool? ?? false, // Fallback para datos antiguos
+      isEditable: json['isEditable'] as bool? ?? false,
+      folderId: json['folderId'] as String?,
     );
   }
 
@@ -35,6 +37,7 @@ class CommandModel extends CommandEntity {
       'isSystem': isSystem,
       'systemType': systemType.name,
       'isEditable': isEditable,
+      'folderId': folderId,
     };
   }
 
@@ -48,10 +51,10 @@ class CommandModel extends CommandEntity {
       isSystem: entity.isSystem,
       systemType: entity.systemType,
       isEditable: entity.isEditable,
+      folderId: entity.folderId,
     );
   }
 
-  /// Crea una copia del modelo con algunos campos modificados
   @override
   CommandModel copyWith({
     String? id,
@@ -62,6 +65,8 @@ class CommandModel extends CommandEntity {
     bool? isSystem,
     SystemCommandType? systemType,
     bool? isEditable,
+    String? folderId,
+    bool clearFolderId = false,
   }) {
     return CommandModel(
       id: id ?? this.id,
@@ -72,6 +77,7 @@ class CommandModel extends CommandEntity {
       isSystem: isSystem ?? this.isSystem,
       systemType: systemType ?? this.systemType,
       isEditable: isEditable ?? this.isEditable,
+      folderId: clearFolderId ? null : (folderId ?? this.folderId),
     );
   }
 
@@ -102,7 +108,7 @@ class CommandModel extends CommandEntity {
         description: 'Evalúa y mejora tu prompt identificando Task, Context y Referencias.',
         isSystem: true,
         systemType: SystemCommandType.evaluarPrompt,
-        isEditable: false, // Comandos del sistema siempre NO editables
+        isEditable: false,
         promptTemplate: '''
 Actúa como un evaluador y mejorador de prompts para el prompt que adjunto como "Mensaje del usuario". No repitas tu función ni el mensaje del usuario, céntrate en mejorar el prompt. 
 El usuario mandará un prompt para que lo evalúes y mejores, para cada caso, debes identificar los tres pasos que cualquier prompt debería tener:

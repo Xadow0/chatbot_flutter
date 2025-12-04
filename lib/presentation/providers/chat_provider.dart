@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../../domain/entities/message_entity.dart';
 import '../../domain/entities/quick_response_entity.dart';
-import '../../data/models/message_model.dart';
 import '../../data/models/quick_response_model.dart';
 import '../../data/models/remote_ollama_models.dart';
 import '../../data/models/local_ollama_models.dart';
@@ -19,6 +19,7 @@ import '../../domain/repositories/chat_repository.dart';
 import '../../domain/repositories/conversation_repository.dart';
 import '../../domain/repositories/command_repository.dart'; 
 import '../../core/constants/commands_help.dart';
+import 'command_management_provider.dart';
 
 class ChatProvider extends ChangeNotifier {
   // ============================================================================
@@ -48,6 +49,9 @@ class ChatProvider extends ChangeNotifier {
   final CommandRepository _commandRepository; 
 
   bool Function()? _getSyncStatus;
+  
+  // Referencia al CommandManagementProvider para obtener carpetas y preferencias
+  CommandManagementProvider? _commandManagementProvider;
 
   // Referencias a los servicios
   late final GeminiService _geminiService;
@@ -67,6 +71,11 @@ class ChatProvider extends ChangeNotifier {
   List<OllamaModel> _availableModels = [];
   String _currentModel = 'phi3:latest';
   AIProvider _currentProvider = AIProvider.gemini;
+
+  // ==========================================================================
+  // Clave para preferencia de agrupar comandos del sistema (fallback)
+  // ==========================================================================
+  static const String _groupSystemCommandsKey = 'group_system_commands';
 
   ChatProvider({
     required ChatRepository chatRepository,
@@ -102,6 +111,66 @@ class ChatProvider extends ChangeNotifier {
     );
 
     _initializeModels();
+  }
+
+  /// Vincula el CommandManagementProvider para obtener carpetas y preferencias
+  void setCommandManagementProvider(CommandManagementProvider provider) {
+    // Si ya había uno vinculado, nos desuscribimos para evitar fugas de memoria
+    if (_commandManagementProvider != null) {
+      _commandManagementProvider!.removeListener(_onCommandDataChanged);
+    }
+
+    _commandManagementProvider = provider;
+    
+    // 1. SOLUCIÓN PROFESIONAL: Suscripción completa.
+    // Escuchamos cualquier cambio (notificación) que emita el proveedor de comandos.
+    provider.addListener(_onCommandDataChanged);
+    
+    // 2. Sincronización inicial inmediata
+    // Si el proveedor ya tiene datos cargados, los aplicamos ya mismo.
+    if (!provider.isLoading) {
+      _onCommandDataChanged();
+    }
+    
+    debugPrint('✅ [ChatProvider] Vinculado reactivamente a CommandManagementProvider');
+  }
+
+  /// Esta función se ejecuta AUTOMÁTICAMENTE cada vez que CommandManagementProvider hace notifyListeners()
+  void _onCommandDataChanged() {
+    // Evitamos actualizaciones innecesarias si el proveedor está cargando (opcional, según preferencia visual)
+    // Pero para la carga inicial, queremos que se ejecute al finalizar la carga.
+    if (_commandManagementProvider == null) return;
+
+    // Actualizamos las QuickResponses basándonos en el estado ACTUAL del proveedor de comandos
+    _updateQuickResponsesFromProvider();
+  }
+
+  /// Método síncrono y rápido para reconstruir las respuestas desde el proveedor vinculado
+  void _updateQuickResponsesFromProvider() {
+    if (_commandManagementProvider == null) return;
+
+    final provider = _commandManagementProvider!;
+    
+    // Usamos el helper estático para regenerar la lista
+    final organizedResponses = QuickResponseProvider.buildOrganizedResponses(
+      commands: provider.commands,
+      folders: provider.folders,
+      groupSystemCommands: provider.groupSystemCommands, // AQUÍ LEEMOS EL VALOR REAL ACTUALIZADO
+    );
+
+    _quickResponses = organizedResponses.map((r) => r.toEntity()).toList();
+    
+    // Notificamos a la UI del Chat para que se repinte
+    notifyListeners();
+  }
+
+  // Método para manejar las notificaciones del CommandManagementProvider
+  void _onCommandProviderUpdated() {
+    // Solo actualizamos si no está cargando, para evitar parpadeos innecesarios durante la carga
+    // Opcional: puedes quitar el if si quieres ver actualizaciones en tiempo real
+    if (_commandManagementProvider != null && !_commandManagementProvider!.isLoading) {
+       refreshQuickResponses();
+    }
   }
 
   /// Vincula el estado de sincronización desde AuthProvider
@@ -510,6 +579,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   /// Refresca los quick responses, útil cuando se crean/editan comandos de usuario
+  /// o cuando cambia la preferencia de agrupar comandos del sistema
   Future<void> refreshQuickResponses() async {
     await _updateQuickResponses();
     notifyListeners();
@@ -634,38 +704,39 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  // ============================================================================
+  // _updateQuickResponses con soporte para carpetas y CommandManagementProvider
+  // ============================================================================
   Future<void> _updateQuickResponses() async {
-    final messageModels =
-        _messages.map((entity) => Message.fromEntity(entity)).toList();
-    
-    // Obtener respuestas contextuales del sistema
-    final systemResponses =
-        QuickResponseProvider.getContextualResponsesAsEntities(messageModels);
-    
-    // Obtener comandos del usuario desde el repositorio
     try {
+      // Si tenemos CommandManagementProvider, usarlo para obtener datos actualizados
+      if (_commandManagementProvider != null) {
+      _updateQuickResponsesFromProvider();
+      return;
+    }
+      
+      // Fallback: obtener datos directamente del repositorio
       final allCommands = await _commandRepository.getAllCommands();
+      final allFolders = await _commandRepository.getAllFolders();
       
-      // Filtrar solo comandos de usuario (no del sistema)
-      final userCommands = allCommands.where((cmd) => !cmd.isSystem).toList();
+      // Obtener preferencia de agrupar comandos del sistema
+      final prefs = await SharedPreferences.getInstance();
+      final groupSystemCommands = prefs.getBool(_groupSystemCommandsKey) ?? false;
       
-      // Convertir comandos del usuario a QuickResponseEntity
-      // Ahora incluimos el promptTemplate y isEditable
-      final userQuickResponses = userCommands
-          .map((cmd) => QuickResponseEntity(
-            text: cmd.trigger,
-            description: cmd.description,
-            promptTemplate: cmd.promptTemplate, // NUEVO
-            isEditable: cmd.isEditable,          // NUEVO
-          ))
-          .toList();
+      // Usar el método estático para generar respuestas organizadas
+      final organizedResponses = QuickResponseProvider.buildOrganizedResponses(
+        commands: allCommands,
+        folders: allFolders,
+        groupSystemCommands: groupSystemCommands,
+      );
       
-      // Combinar respuestas del sistema con comandos del usuario
-      _quickResponses = [...systemResponses, ...userQuickResponses];
+      _quickResponses = organizedResponses.map((r) => r.toEntity()).toList();
+      
+      debugPrint('📦 [ChatProvider] Quick responses actualizadas (fallback): ${_quickResponses.length} items');
+      
     } catch (e) {
-      debugPrint('⚠️ [ChatProvider] Error cargando comandos de usuario para quick responses: $e');
-      // En caso de error, solo usar las respuestas del sistema
-      _quickResponses = systemResponses;
+      debugPrint('⚠️ [ChatProvider] Error cargando quick responses: $e');
+      _quickResponses = QuickResponseProvider.defaultResponsesAsEntities;
     }
   }
 
@@ -686,17 +757,13 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> clearMessages() async { // Quita el argumento saveBeforeClear, ya no hace falta aquí
+  Future<void> clearMessages() async {
     debugPrint('🗑️ [ChatProvider] Limpiando mensajes...');
-    
-    // Si el usuario limpia manualmente, podrías querer guardar la anterior o descartarla.
-    // Asumiendo que "Nueva Conversación" descarta lo actual:
     
     _messages.clear();
     _isNewConversation = true;
     _needsHistoryLoad = false;
     
-    // NUEVO: Reseteamos rastreadores
     _currentConversationFile = null;
     _hasUnsavedChanges = false;
 
@@ -714,9 +781,6 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> loadConversation(File file) async {
-    // PROTECCIÓN CRÍTICA:
-    // Si intentamos cargar el mismo archivo que ya estamos editando y tenemos cambios sin guardar,
-    // ignoramos la carga para no perder los nuevos mensajes que están en memoria.
     if (_currentConversationFile != null && 
         _currentConversationFile!.path == file.path && 
         _hasUnsavedChanges) {
@@ -736,7 +800,7 @@ class ChatProvider extends ChangeNotifier {
       _needsHistoryLoad = true;
       
       _currentConversationFile = file;
-      _hasUnsavedChanges = false; // Aquí se reseteaba el flag, lo cual era el problema
+      _hasUnsavedChanges = false;
 
       await _updateQuickResponses();
       notifyListeners();
@@ -750,6 +814,8 @@ class ChatProvider extends ChangeNotifier {
   @override
   void dispose() {
     debugPrint('🔴 [ChatProvider] Disposing...');
+    _commandManagementProvider?.removeListener(_onCommandDataChanged);
+    
     _aiSelector.removeListener(_onAiSelectorChanged);
     _aiSelector.dispose();
     super.dispose();
@@ -880,39 +946,28 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  /// Este método debe llamarse cuando el usuario sale de la pantalla de chat.
-  /// Gestiona el guardado, sobrescritura y limpieza.
   Future<void> endSession() async {
     if (_isSaving) return; 
     
-    // Validaciones básicas
     if (_messages.isEmpty) return;
     if (_messages.length == 1 && _messages.first.type == MessageTypeEntity.bot) return;
-    if (!_hasUnsavedChanges) return; // Si no hay cambios, no tocamos nada
+    if (!_hasUnsavedChanges) return;
 
     _isSaving = true;
     debugPrint('💾 [ChatProvider] Guardando sesión (Actualización)...');
 
     try {
-      // PASAMOS EL ARCHIVO ACTUAL
-      // Si _currentConversationFile tiene valor, el repo sobrescribirá ese archivo.
-      // Si es null (nueva conv), el repo creará uno nuevo.
       await _conversationRepository.saveConversation(
         _messages, 
         existingFile: _currentConversationFile
       );
       
       debugPrint('   ✅ Conversación guardada/actualizada correctamente.');
-      
-      // 🚫 ELIMINADO: Ya no necesitamos borrar nada.
-      // El archivo antiguo ES el archivo actual.
 
     } catch (e) {
       debugPrint('❌ [ChatProvider] Error al guardar sesión: $e');
     } finally {
       _hasUnsavedChanges = false;
-      // No ponemos _currentConversationFile a null aquí, por si el usuario sigue en la pantalla
-      // y hace más cambios, seguir actualizando el mismo archivo.
       _isSaving = false;
     }
   }
