@@ -26,6 +26,7 @@ class _LearningPageState extends State<LearningPage> {
         2: prefs.getBool('module_2_completed') ?? false,
         3: prefs.getBool('module_3_completed') ?? false,
         4: prefs.getBool('module_4_completed') ?? false,
+        5: prefs.getBool('module_5_completed') ?? false,
       };
     });
   }

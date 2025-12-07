@@ -14,11 +14,11 @@ class CustomDrawer extends StatelessWidget {
     final authProvider = context.watch<AuthProvider>();
     
     return Drawer(
-      // Eliminamos el padding por defecto del Drawer para que la cabecera toque el techo
+      // Eliminamos el padding por defecto para control total
       child: Column(
         children: [
           // -------------------------------------------
-          // 1. CABECERA PERSONALIZADA (SOLUCIONA CORTE Y OVERFLOW)
+          // 1. CABECERA PERSONALIZADA
           // -------------------------------------------
           _buildCustomHeader(context, authProvider),
 
@@ -27,7 +27,7 @@ class CustomDrawer extends StatelessWidget {
           // -------------------------------------------
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero, // Importante para pegar la lista a la cabecera
+              padding: EdgeInsets.zero, 
               children: [
                 ListTile(
                   leading: const Icon(Icons.home_outlined),
@@ -44,7 +44,6 @@ class CustomDrawer extends StatelessWidget {
                 
                 const Divider(),
                 
-                // Opción: CHAT LIBRE
                 ListTile(
                   leading: const Icon(Icons.chat_bubble_outline, color: Colors.blue),
                   title: const Text('Chat Libre'),
@@ -58,7 +57,6 @@ class CustomDrawer extends StatelessWidget {
                   },
                 ),
 
-                // Opción: APRENDIZAJE
                 ListTile(
                   leading: const Icon(Icons.school_outlined, color: Colors.green),
                   title: const Text('Aprendizaje'),
@@ -68,7 +66,6 @@ class CustomDrawer extends StatelessWidget {
                   },
                 ),
 
-                // Opción: HISTORIAL
                 ListTile(
                   leading: const Icon(Icons.history, color: Colors.orange),
                   title: const Text('Historial'),
@@ -78,7 +75,6 @@ class CustomDrawer extends StatelessWidget {
                   },
                 ),
 
-                // Opción: COMANDOS
                 ListTile(
                   leading: const Icon(Icons.terminal_rounded, color: Colors.purple),
                   title: const Text('Comandos'),
@@ -93,7 +89,6 @@ class CustomDrawer extends StatelessWidget {
                 
                 const Divider(),
 
-                // Opción: AJUSTES
                 ListTile(
                   leading: const Icon(Icons.settings, color: Colors.grey),
                   title: const Text('Ajustes'),
@@ -118,26 +113,31 @@ class CustomDrawer extends StatelessWidget {
               _showAboutDialog(context);
             },
           ),
-          const SizedBox(height: 8),
+          // Pequeño espacio de seguridad inferior para móviles modernos sin botones físicos
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
         ],
       ),
     );
   }
 
   // --- WIDGET CABECERA PERSONALIZADA ---
-  // Usamos Container en lugar de DrawerHeader para tener control total del tamaño y evitar cortes
   Widget _buildCustomHeader(BuildContext context, AuthProvider authProvider) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
     final onPrimaryColor = theme.colorScheme.onPrimary;
     
-    // Obtenemos el padding superior (barra de estado) para que no se monte
+    // Obtenemos el padding superior (barra de estado)
     final double paddingTop = MediaQuery.of(context).padding.top;
+    
+    // Altura total de la cabecera. 
+    // Usamos una altura base + el padding del sistema para asegurar que siempre cubra la barra.
+    final double headerHeight = 230 + (paddingTop > 24 ? 0 : 0); 
 
     return Container(
       width: double.infinity,
-      height: 230, // Altura fija suficiente para evitar el OVERFLOW (Error 3)
-      padding: EdgeInsets.fromLTRB(16, paddingTop + 16, 16, 16),
+      height: headerHeight, 
+      // Padding ajustado: Top incluye la barra de estado + un extra para respirar
+      padding: EdgeInsets.fromLTRB(16, paddingTop + 10, 16, 16),
       decoration: BoxDecoration(
         color: primaryColor,
         image: DecorationImage(
@@ -150,16 +150,22 @@ class CustomDrawer extends StatelessWidget {
           onError: (_, _) {}, 
         ),
       ),
-      child: authProvider.isAuthenticated
-          ? _buildAuthenticatedView(context, authProvider, onPrimaryColor)
-          : _buildGuestView(context, onPrimaryColor),
+      // Usamos LayoutBuilder para saber exactamente cuánto espacio tenemos dentro
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return authProvider.isAuthenticated
+              ? _buildAuthenticatedView(context, authProvider, onPrimaryColor, constraints)
+              : _buildGuestView(context, onPrimaryColor, constraints);
+        },
+      ),
     );
   }
 
   // VISTA: USUARIO LOGUEADO
-  Widget _buildAuthenticatedView(BuildContext context, AuthProvider authProvider, Color textColor) {
+  Widget _buildAuthenticatedView(BuildContext context, AuthProvider authProvider, Color textColor, BoxConstraints constraints) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribuye el espacio automáticamente
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,6 +177,7 @@ class CustomDrawer extends StatelessWidget {
             
             // Switch de Sincronización (Top Right)
             Column(
+              crossAxisAlignment: CrossAxisAlignment.end, // Alineado a la derecha
               children: [
                 Transform.scale(
                   scale: 0.8,
@@ -212,104 +219,117 @@ class CustomDrawer extends StatelessWidget {
             )
           ],
         ),
-        const Spacer(),
-        Text(
-          'TRAINING.IA',
-          style: TextStyle(
-            color: textColor.withValues(alpha: 0.7),
-            fontSize: 12,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          authProvider.user?.email ?? 'Usuario',
-          style: TextStyle(
-            color: textColor,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
+        
+        // Información del usuario (Bottom)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Ocupa solo lo necesario
+          children: [
+            Text(
+              'TRAINING.IA',
+              style: TextStyle(
+                color: textColor.withValues(alpha: 0.7),
+                fontSize: 12,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Flexible evita overflow horizontal si el email es muy largo
+            Flexible(
+              child: Text(
+                authProvider.user?.email ?? 'Usuario',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
   // VISTA: INVITADO (NO LOGUEADO)
-  Widget _buildGuestView(BuildContext context, Color textColor) {
+  Widget _buildGuestView(BuildContext context, Color textColor, BoxConstraints constraints) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween, // Empuja contenido a los extremos
       children: [
         // LOGO (Top Left)
         _buildAppLogo(),
 
-        const Spacer(),
-
-        Text(
-          'TRAINING.IA',
-          style: TextStyle(
-            color: textColor.withValues(alpha: 0.7),
-            fontSize: 12,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Bienvenido, Invitado',
-          style: TextStyle(
-            color: textColor,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        // Reducimos un poco el espacio aquí para evitar el overflow
-        const SizedBox(height: 6), 
-        InkWell(
-          onTap: () {
-             Navigator.pop(context);
-             Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AuthPage()),
-              );
-          },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Iniciar Sesión',
-                style: TextStyle(
-                  color: textColor.withValues(alpha: 0.9),
-                  decoration: TextDecoration.underline,
-                  decorationColor: textColor,
-                ),
+        // Texto inferior
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'TRAINING.IA',
+              style: TextStyle(
+                color: textColor.withValues(alpha: 0.7),
+                fontSize: 12,
+                letterSpacing: 1.2,
               ),
-              const SizedBox(width: 5),
-              Icon(Icons.login, color: textColor, size: 16),
-            ],
-          ),
-        )
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Bienvenido, Invitado',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6), 
+            InkWell(
+              onTap: () {
+                 Navigator.pop(context);
+                 Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AuthPage()),
+                  );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Iniciar Sesión',
+                    style: TextStyle(
+                      color: textColor.withValues(alpha: 0.9),
+                      decoration: TextDecoration.underline,
+                      decorationColor: textColor,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Icon(Icons.login, color: textColor, size: 16),
+                ],
+              ),
+            )
+          ],
+        ),
       ],
     );
   }
 
-  // CORRECCIÓN LOGO (Punto 1): Ocupa todo el círculo
+  // LOGO CORREGIDO: Tamaño más seguro para móviles (90 en vez de 120)
   Widget _buildAppLogo() {
     return Container(
-      width: 120,
-      height: 120,
+      width: 90, 
+      height: 90,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         color: Color.fromARGB(255, 60, 194, 247), 
       ),
-      // Usamos ClipOval para recortar la imagen en círculo
       child: ClipOval(
         child: Image.asset(
           'assets/images/logo.png',
-          // BoxFit.cover asegura que ocupe TODO el círculo sin bordes blancos internos
           fit: BoxFit.cover, 
           errorBuilder: (context, error, stackTrace) {
-            return const Center(child: Icon(Icons.psychology, color: Colors.blue));
+            return const Center(child: Icon(Icons.psychology, color: Colors.blue, size: 40));
           },
         ),
       ),

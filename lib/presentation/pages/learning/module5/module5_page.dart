@@ -31,15 +31,18 @@ class _Module5PageState extends State<Module5Page> {
     }
   }
 
-  // 1. AÑADIMOS LA FUNCIÓN PARA VOLVER AL HOME
   void _goHome() {
     Navigator.pop(context);
   }
 
+  // LÓGICA CLAVE: Guarda el estado y luego cierra la pantalla
   Future<void> _completeModule() async {
     final prefs = await SharedPreferences.getInstance();
+    // Marcamos la clave específica que 'learning_page.dart' está esperando
     await prefs.setBool('module_5_completed', true);
+    
     if (mounted) {
+      // Al hacer pop, learning_page detectará el cierre y recargará el estado
       Navigator.pop(context);
     }
   }
@@ -51,11 +54,9 @@ class _Module5PageState extends State<Module5Page> {
       body: SafeArea(
         child: Column(
           children: [
-            // 2. MODIFICAMOS EL HEADER
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
-                // Alineación para separar los botones a los extremos
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
@@ -63,7 +64,6 @@ class _Module5PageState extends State<Module5Page> {
                     onPressed: _previousPage,
                     tooltip: 'Volver',
                   ),
-                  // Nuevo botón de Casa
                   IconButton(
                     icon: const Icon(Icons.home_rounded, size: 28),
                     onPressed: _goHome,
@@ -72,7 +72,6 @@ class _Module5PageState extends State<Module5Page> {
                 ],
               ),
             ),
-            // Contenido de la página actual
             Expanded(
               child: _buildCurrentPage(),
             ),
@@ -98,6 +97,7 @@ class _Module5PageState extends State<Module5Page> {
           onNext: _nextPage,
         );
       case 3:
+        // Aquí pasamos la función _completeModule al botón de finalizar
         return Module5ConclusionPage(onFinish: _completeModule);
       default:
         return const SizedBox();
