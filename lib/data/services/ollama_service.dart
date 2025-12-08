@@ -644,4 +644,161 @@ class OllamaService {
       debugPrint('📝 [OllamaService] Mensaje del bot añadido al historial');
     }
 
+    /// Streaming SIN historial
+  Stream<String> generateContentStream({
+    required String model,
+    required String prompt,
+    Map<String, dynamic>? options,
+  }) async* {
+    debugPrint('🌊 [OllamaService] generateContentStream (sin historial)');
+    debugPrint('   🤖 Modelo: $model');
+
+    final client = http.Client();
+
+    try {
+      final request = http.Request(
+        'POST',
+        Uri.parse('$_baseUrl/api/generate'),
+      );
+      request.headers.addAll(_headers);
+      request.body = json.encode({
+        'model': model,
+        'prompt': prompt,
+        'stream': true,
+        if (options != null) 'options': options,
+      });
+
+      final response = await client.send(request).timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw OllamaException('Error HTTP ${response.statusCode}', statusCode: response.statusCode);
+      }
+
+      await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (chunk.trim().isEmpty) continue;
+
+        try {
+          final data = json.decode(chunk) as Map<String, dynamic>;
+          
+          // Formato OpenAI-compatible
+          if (data.containsKey('choices') && data['choices'] is List) {
+            final choices = data['choices'] as List;
+            if (choices.isNotEmpty) {
+              final delta = choices[0]['delta'] as Map<String, dynamic>?;
+              final content = delta?['content'] as String?;
+              if (content != null && content.isNotEmpty) {
+                yield content;
+              }
+            }
+            if (data['done'] == true || choices[0]['finish_reason'] != null) break;
+          }
+          // Formato Ollama estándar
+          else if (data.containsKey('response')) {
+            final text = data['response'] as String?;
+            if (text != null && text.isNotEmpty) {
+              yield text;
+            }
+            if (data['done'] == true) break;
+          }
+        } catch (e) {
+          debugPrint('   ⚠️ Error parseando chunk: $e');
+        }
+      }
+
+      debugPrint('✅ [OllamaService] Stream completado');
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Streaming CON historial
+  Stream<String> generateContentStreamContext({
+    required String model,
+    required String prompt,
+    Map<String, dynamic>? options,
+  }) async* {
+    debugPrint('🌊 [OllamaService] generateContentStreamContext');
+    debugPrint('   🤖 Modelo: $model');
+    debugPrint('   📚 Historial: ${_conversationHistory.length} mensajes');
+
+    // Añadir mensaje del usuario al historial
+    _conversationHistory.add(ChatMessage(role: 'user', content: prompt));
+
+    final messages = _conversationHistory.map((msg) => msg.toJson()).toList();
+
+    final client = http.Client();
+    final fullResponse = StringBuffer();
+    bool hasError = false;
+
+    try {
+      final request = http.Request(
+        'POST',
+        Uri.parse('$_baseUrl/api/chat'),
+      );
+      request.headers.addAll(_headers);
+      request.body = json.encode({
+        'model': model,
+        'messages': messages,
+        'stream': true,
+        if (options != null) 'options': options,
+      });
+
+      final response = await client.send(request).timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        hasError = true;
+        throw OllamaException('Error HTTP ${response.statusCode}', statusCode: response.statusCode);
+      }
+
+      await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (chunk.trim().isEmpty) continue;
+
+        try {
+          final data = json.decode(chunk) as Map<String, dynamic>;
+          
+          // Formato OpenAI-compatible
+          if (data.containsKey('choices') && data['choices'] is List) {
+            final choices = data['choices'] as List;
+            if (choices.isNotEmpty) {
+              final delta = choices[0]['delta'] as Map<String, dynamic>?;
+              final content = delta?['content'] as String?;
+              if (content != null && content.isNotEmpty) {
+                fullResponse.write(content);
+                yield content;
+              }
+            }
+            if (data['done'] == true || choices[0]['finish_reason'] != null) break;
+          }
+          // Formato Ollama estándar
+          else if (data.containsKey('message')) {
+            final message = data['message'] as Map<String, dynamic>?;
+            final text = message?['content'] as String?;
+            if (text != null && text.isNotEmpty) {
+              fullResponse.write(text);
+              yield text;
+            }
+            if (data['done'] == true) break;
+          }
+        } catch (e) {
+          debugPrint('   ⚠️ Error parseando chunk: $e');
+        }
+      }
+
+      // Guardar respuesta completa en historial
+      _conversationHistory.add(ChatMessage(role: 'assistant', content: fullResponse.toString()));
+
+      debugPrint('✅ [OllamaService] Stream completado: ${fullResponse.length} chars');
+    } catch (e) {
+      hasError = true;
+      debugPrint('❌ [OllamaService] Error en stream: $e');
+      rethrow;
+    } finally {
+      client.close();
+      // Si hubo error, quitar el mensaje del usuario del historial
+      if (hasError && _conversationHistory.isNotEmpty) {
+        _conversationHistory.removeLast();
+      }
+    }
+  }
+
 }

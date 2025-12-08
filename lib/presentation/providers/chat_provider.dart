@@ -29,6 +29,7 @@ class ChatProvider extends ChangeNotifier {
   List<QuickResponseEntity> _quickResponses =
       QuickResponseProvider.defaultResponsesAsEntities;
   bool _isProcessing = false;
+  bool _isStreaming = false;
   bool _isNewConversation = true;
   bool _isRetryingOllama = false;
   // Controla si el usuario puede seleccionar Ollama remoto desde la UI.
@@ -298,6 +299,7 @@ class ChatProvider extends ChangeNotifier {
   List<MessageEntity> get messages => List.unmodifiable(_messages);
   List<QuickResponseEntity> get quickResponses => _quickResponses;
   bool get isProcessing => _isProcessing;
+  bool get isStreaming => _isStreaming;
   bool get showModelSelector => _showModelSelector;
   List<OllamaModel> get availableModels => _availableModels;
   String get currentModel => _currentModel;
@@ -585,8 +587,209 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Envío con streaming (para Gemini)
+  Future<void> _sendMessageWithStreaming(String content) async {
+    debugPrint('\n🌊 [ChatProvider] === ENVIANDO CON STREAMING ===');
+    debugPrint('   💬 Contenido: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
+    debugPrint('   🤖 Proveedor: $_currentProvider');
+
+    if (_needsHistoryLoad) {
+      _loadHistoryIntoAIService(_messages);
+      _needsHistoryLoad = false;
+    }
+
+    if (_isNewConversation) _isNewConversation = false;
+    hideModelSelector();
+
+    // Generar IDs únicos garantizados
+    final now = DateTime.now();
+    final userMessageId = '${now.millisecondsSinceEpoch}_user';
+    final botMessageId = '${now.millisecondsSinceEpoch}_bot';
+
+    // Añadir mensaje del usuario
+    final userMessageEntity = MessageEntity(
+      id: userMessageId,
+      content: content,
+      type: MessageTypeEntity.user,
+      timestamp: now,
+    );
+    _messages.add(userMessageEntity);
+    notifyListeners();
+
+    // Crear mensaje del bot vacío
+    _messages.add(MessageEntity(
+      id: botMessageId,
+      content: '',
+      type: MessageTypeEntity.bot,
+      timestamp: now,
+    ));
+
+    _isProcessing = true;
+    _isStreaming = true;
+    notifyListeners();
+
+    final buffer = StringBuffer();
+
+    try {
+      final adapter = _aiSelector.getCurrentAdapter();
+      
+      await for (final chunk in adapter.generateContentStream(content)) {
+        buffer.write(chunk);
+        
+        final index = _messages.indexWhere((m) => m.id == botMessageId);
+        if (index != -1) {
+          _messages[index] = MessageEntity(
+            id: botMessageId,
+            content: buffer.toString(),
+            type: MessageTypeEntity.bot,
+            timestamp: now,
+          );
+          notifyListeners();
+        }
+      }
+
+      debugPrint('✅ [ChatProvider] Streaming completado: ${buffer.length} caracteres');
+
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error en streaming: $e');
+
+      final index = _messages.indexWhere((m) => m.id == botMessageId);
+      if (index != -1) {
+        _messages[index] = MessageEntity(
+          id: botMessageId,
+          content: buffer.isNotEmpty 
+              ? '${buffer.toString()}\n\n❌ Error: $e'
+              : '❌ Error: $e',
+          type: MessageTypeEntity.bot,
+          timestamp: now,
+        );
+      }
+    } finally {
+      _isProcessing = false;
+      _isStreaming = false;
+      _hasUnsavedChanges = true;
+      await _updateQuickResponses();
+      notifyListeners();
+    }
+  }
+
+  /// Envío de comando con streaming
+  Future<void> _sendCommandWithStreaming(String content) async {
+    debugPrint('\n🌊 [ChatProvider] === ENVIANDO COMANDO CON STREAMING ===');
+    debugPrint('   💬 Comando: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
+    debugPrint('   🤖 Proveedor: $_currentProvider');
+
+    hideModelSelector();
+
+    // Generar IDs únicos
+    final now = DateTime.now();
+    final userMessageId = '${now.millisecondsSinceEpoch}_user';
+    final botMessageId = '${now.millisecondsSinceEpoch}_bot';
+
+    // Añadir mensaje del usuario
+    final userMessageEntity = MessageEntity(
+      id: userMessageId,
+      content: content,
+      type: MessageTypeEntity.user,
+      timestamp: now,
+    );
+    _messages.add(userMessageEntity);
+    notifyListeners();
+
+    // Procesar comando para obtener el stream
+    final commandResult = await _commandProcessor.processMessageStream(content);
+
+    if (!commandResult.isCommand) {
+      // No debería pasar, pero por si acaso, usar flujo normal
+      debugPrint('   ⚠️ No es comando, redirigiendo a streaming normal');
+      return _sendMessageWithStreaming(content);
+    }
+
+    // Si hay error de validación (ej: falta contenido)
+    if (commandResult.error != null) {
+      _messages.add(MessageEntity(
+        id: botMessageId,
+        content: '⚠️ ${commandResult.error}',
+        type: MessageTypeEntity.bot,
+        timestamp: now,
+      ));
+      notifyListeners();
+      _hasUnsavedChanges = true;
+      return;
+    }
+
+    // Crear mensaje del bot vacío
+    _messages.add(MessageEntity(
+      id: botMessageId,
+      content: '',
+      type: MessageTypeEntity.bot,
+      timestamp: now,
+    ));
+
+    _isProcessing = true;
+    _isStreaming = true;
+    notifyListeners();
+
+    final buffer = StringBuffer();
+
+    try {
+      await for (final chunk in commandResult.responseStream!) {
+        buffer.write(chunk);
+        
+        final index = _messages.indexWhere((m) => m.id == botMessageId);
+        if (index != -1) {
+          _messages[index] = MessageEntity(
+            id: botMessageId,
+            content: buffer.toString(),
+            type: MessageTypeEntity.bot,
+            timestamp: now,
+          );
+          notifyListeners();
+        }
+      }
+
+      debugPrint('✅ [ChatProvider] Comando streaming completado: ${buffer.length} caracteres');
+
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error en comando streaming: $e');
+
+      final index = _messages.indexWhere((m) => m.id == botMessageId);
+      if (index != -1) {
+        _messages[index] = MessageEntity(
+          id: botMessageId,
+          content: buffer.isNotEmpty 
+              ? '${buffer.toString()}\n\n❌ Error: $e'
+              : '❌ Error: $e',
+          type: MessageTypeEntity.bot,
+          timestamp: now,
+        );
+      }
+    } finally {
+      _isProcessing = false;
+      _isStreaming = false;
+      _hasUnsavedChanges = true;
+      await _updateQuickResponses();
+      notifyListeners();
+    }
+  }
+
   Future<void> sendMessage(String content) async {
-    if (content.trim().isEmpty || _isProcessing) return;
+  if (content.trim().isEmpty || _isProcessing) return;
+
+  final isCommand = content.trim().startsWith('/');
+  
+  // Usar streaming para proveedores que lo soportan
+  final supportsStreaming = _currentProvider == AIProvider.gemini || 
+                            _currentProvider == AIProvider.localOllama || 
+                            _currentProvider == AIProvider.ollama;
+  
+  if (supportsStreaming) {
+    if (isCommand) {
+      return _sendCommandWithStreaming(content);
+    } else {
+      return _sendMessageWithStreaming(content);
+    }
+  }
 
     debugPrint('\n🚀 [ChatProvider] === ENVIANDO MENSAJE ===');
     debugPrint(

@@ -1,20 +1,43 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'api_keys_manager.dart';
 
 class GeminiService {
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-  static const String _model = 'gemini-2.5-flash';
+  static const String _modelName = 'gemini-2.5-flash';
   
   final ApiKeysManager _apiKeysManager = ApiKeysManager();
+  GenerativeModel? _model;
   String? _cachedApiKey;
-
-  /// Historial de conversación (contexto persistente por sesión)
-  final List<Map<String, dynamic>> _conversationHistory = [];
+  final List<Content> _conversationHistory = [];
 
   GeminiService() {
-    debugPrint('🔵 [GeminiService] Servicio inicializado');
+    debugPrint('🔵 [GeminiService] Servicio inicializado (SDK oficial)');
+  }
+
+  Future<void> _ensureInitialized() async {
+    if (_model != null) return;
+    
+    final apiKey = await _getApiKey();
+    
+    _model = GenerativeModel(
+      model: _modelName,
+      apiKey: apiKey,
+      generationConfig: GenerationConfig(
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 4096,
+      ),
+      safetySettings: [
+        SafetySetting(HarmCategory.harassment, HarmBlockThreshold.medium),
+        SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.medium),
+        SafetySetting(HarmCategory.sexuallyExplicit, HarmBlockThreshold.medium),
+        SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.medium),
+      ],
+    );
+    
+    debugPrint('✅ [GeminiService] Modelo inicializado: $_modelName');
   }
 
   Future<String> _getApiKey() async {
@@ -33,6 +56,7 @@ class GeminiService {
 
   void clearApiKeyCache() {
     _cachedApiKey = null;
+    _model = null;
   }
 
   Future<bool> isAvailable() async {
@@ -44,133 +68,119 @@ class GeminiService {
     }
   }
 
-  /// Petición SIN historial (prompt aislado)
+  /// Generación SIN historial
   Future<String> generateContent(String prompt) async {
-    return _sendRequest(
-      contents: [
-        {
-          'role': 'user',
-          'parts': [{'text': prompt}]
-        }
-      ],
-    );
-  }
-
-  /// NUEVO: Petición CON historial (mantiene contexto)
-  Future<String> generateContentContext(String prompt) async {
-    debugPrint('💬 [GeminiService] generateContentContext llamado');
-
-    // Añadimos el nuevo turno del usuario al historial
-    _conversationHistory.add({
-      'role': 'user',
-      'parts': [{'text': prompt}],
-    });
-
-    // Enviamos todo el historial (hasta ahora)
-    final responseText = await _sendRequest(contents: _conversationHistory);
-
-    // Añadimos la respuesta del modelo al historial
-    _conversationHistory.add({
-      'role': 'model',
-      'parts': [{'text': responseText}],
-    });
-
-    return responseText;
-  }
-
-  /// Limpiar historial de conversación
-  void clearConversation() {
-    _conversationHistory.clear();
-    debugPrint('🧹 [GeminiService] Historial de conversación limpiado');
-  }
-
-  /// --- MÉTODO INTERNO COMÚN PARA ENVIAR A LA API ---
-  Future<String> _sendRequest({required List<Map<String, dynamic>> contents}) async {
+    await _ensureInitialized();
+    
+    debugPrint('💬 [GeminiService] generateContent (sin historial)');
+    
     try {
-      final apiKey = await _getApiKey();
-      final url = Uri.parse('$_baseUrl/models/$_model:generateContent?key=$apiKey');
-
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'contents': contents,
-          // Buscar en google si es necesario
-          'tools': [
-            {
-              'googleSearch': {} 
-            }
-          ],
-          'generationConfig': {
-            'temperature': 0.7,
-            'topK': 40,
-            'topP': 0.95,
-            'maxOutputTokens': 4096,
-          },
-          'safetySettings': [
-            {
-              'category': 'HARM_CATEGORY_HARASSMENT',
-              'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
-            },
-            {
-              'category': 'HARM_CATEGORY_HATE_SPEECH',
-              'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
-            },
-            {
-              'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-              'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
-            },
-            {
-              'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
-              'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
-            },
-          ],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['candidates'] != null &&
-            data['candidates'].isNotEmpty &&
-            data['candidates'][0]['content'] != null) {
-          final parts = data['candidates'][0]['content']['parts'];
-          if (parts != null && parts.isNotEmpty) {
-            return parts[0]['text'] ?? 'Sin respuesta';
-          }
-        }
-        return 'No se pudo obtener una respuesta válida';
-      } else if (response.statusCode == 401) {
-        throw Exception('API Key de Gemini inválida o expirada.');
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception('Error de API: ${error['error']['message']}');
-      }
+      final response = await _model!.generateContent([Content.text(prompt)]);
+      final text = response.text ?? 'Sin respuesta';
+      debugPrint('✅ [GeminiService] Respuesta: ${text.length} caracteres');
+      return text;
     } catch (e) {
       debugPrint('❌ [GeminiService] Error: $e');
       throw Exception('Error al conectar con Gemini: $e');
     }
   }
 
-  /// Placeholder para streaming
-  Stream<String> generateContentStream(String prompt) async* {
-    yield await generateContent(prompt);
+  /// Generación CON historial
+  Future<String> generateContentContext(String prompt) async {
+    await _ensureInitialized();
+    
+    debugPrint('💬 [GeminiService] generateContentContext');
+    debugPrint('   📚 Historial: ${_conversationHistory.length} turnos');
+    
+    _conversationHistory.add(Content.text(prompt));
+    
+    try {
+      final response = await _model!.generateContent(_conversationHistory);
+      final text = response.text ?? 'Sin respuesta';
+      
+      _conversationHistory.add(Content.model([TextPart(text)]));
+      
+      debugPrint('✅ [GeminiService] Respuesta: ${text.length} caracteres');
+      return text;
+    } catch (e) {
+      _conversationHistory.removeLast();
+      debugPrint('❌ [GeminiService] Error: $e');
+      throw Exception('Error al conectar con Gemini: $e');
+    }
   }
 
-  /// Añadir mensaje del usuario al historial (sin enviar request)
+  /// Streaming SIN historial
+  Stream<String> generateContentStream(String prompt) async* {
+    await _ensureInitialized();
+    
+    debugPrint('🌊 [GeminiService] generateContentStream (sin historial)');
+    
+    try {
+      final responses = _model!.generateContentStream([Content.text(prompt)]);
+      
+      await for (final response in responses) {
+        final text = response.text;
+        if (text != null && text.isNotEmpty) {
+          yield text;
+        }
+      }
+      
+      debugPrint('✅ [GeminiService] Stream completado');
+    } catch (e) {
+      debugPrint('❌ [GeminiService] Error en stream: $e');
+      throw Exception('Error en streaming de Gemini: $e');
+    }
+  }
+
+  /// Streaming CON historial
+  Stream<String> generateContentStreamContext(String prompt) async* {
+    await _ensureInitialized();
+    
+    debugPrint('🌊 [GeminiService] generateContentStreamContext');
+    debugPrint('   📚 Historial: ${_conversationHistory.length} turnos');
+    
+    _conversationHistory.add(Content.text(prompt));
+    
+    final fullResponse = StringBuffer();
+    bool hasError = false;
+    
+    try {
+      final responses = _model!.generateContentStream(_conversationHistory);
+      
+      await for (final response in responses) {
+        final text = response.text;
+        if (text != null && text.isNotEmpty) {
+          fullResponse.write(text);
+          yield text;
+        }
+      }
+      
+      _conversationHistory.add(Content.model([TextPart(fullResponse.toString())]));
+      debugPrint('✅ [GeminiService] Stream completado: ${fullResponse.length} caracteres');
+      
+    } catch (e) {
+      hasError = true;
+      debugPrint('❌ [GeminiService] Error en stream: $e');
+      throw Exception('Error en streaming de Gemini: $e');
+    } finally {
+      if (hasError && _conversationHistory.isNotEmpty) {
+        _conversationHistory.removeLast();
+      }
+    }
+  }
+
+  void clearConversation() {
+    _conversationHistory.clear();
+    debugPrint('🧹 [GeminiService] Historial limpiado');
+  }
+
   void addUserMessage(String content) {
-    _conversationHistory.add({
-      'role': 'user',
-      'parts': [{'text': content}],
-    });
+    _conversationHistory.add(Content.text(content));
     debugPrint('📝 [GeminiService] Mensaje de usuario añadido al historial');
   }
 
-  /// Añadir mensaje del bot al historial (sin enviar request)
   void addBotMessage(String content) {
-    _conversationHistory.add({
-      'role': 'model',
-      'parts': [{'text': content}],
-    });
+    _conversationHistory.add(Content.model([TextPart(content)]));
     debugPrint('📝 [GeminiService] Mensaje del bot añadido al historial');
   }
 }

@@ -838,6 +838,160 @@ class OllamaManagedService {
     return responseText;
   }
 
+  /// Streaming SIN historial
+  Stream<String> generateContentStream(
+    String prompt, {
+    double? temperature,
+    int? maxTokens,
+  }) async* {
+    if (!isAvailable) {
+      throw LocalOllamaException(
+        'Modelo no disponible',
+        details: 'Estado actual: ${_status.displayText}',
+      );
+    }
+
+    _updateLastActivity();
+
+    debugPrint('🌊 [OllamaManaged] generateContentStream (sin historial)');
+    debugPrint('   🤖 Modelo: $_currentModel');
+
+    final client = http.Client();
+
+    try {
+      final request = http.Request(
+        'POST',
+        Uri.parse('${_config.fullBaseUrl}/api/generate'),
+      );
+      request.headers['Content-Type'] = 'application/json';
+      request.body = json.encode({
+        'model': _currentModel,
+        'prompt': prompt,
+        'stream': true,
+        'options': {
+          'temperature': temperature ?? _config.temperature,
+          'num_predict': maxTokens ?? _config.maxTokens,
+        },
+      });
+
+      final response = await client.send(request);
+
+      if (response.statusCode != 200) {
+        throw LocalOllamaException('Error HTTP ${response.statusCode}');
+      }
+
+      await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (chunk.trim().isEmpty) continue;
+
+        try {
+          final data = json.decode(chunk);
+          final text = data['response'] as String?;
+          if (text != null && text.isNotEmpty) {
+            yield text;
+          }
+          if (data['done'] == true) break;
+        } catch (e) {
+          debugPrint('   ⚠️ Error parseando chunk: $e');
+        }
+      }
+
+      debugPrint('✅ [OllamaManaged] Stream completado');
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Streaming CON historial
+  Stream<String> generateContentStreamContext(
+    String prompt, {
+    double? temperature,
+    int? maxTokens,
+  }) async* {
+    if (!isAvailable) {
+      throw LocalOllamaException(
+        'Modelo no disponible',
+        details: 'Estado actual: ${_status.displayText}',
+      );
+    }
+
+    _updateLastActivity();
+
+    debugPrint('🌊 [OllamaManaged] generateContentStreamContext');
+    debugPrint('   🤖 Modelo: $_currentModel');
+    debugPrint('   📚 Historial: ${_conversationHistory.length} mensajes');
+
+    // Añadir mensaje del usuario al historial
+    _conversationHistory.add({
+      'role': 'user',
+      'content': prompt,
+    });
+
+    final messages = List<Map<String, String>>.from(_conversationHistory);
+
+    final client = http.Client();
+    final fullResponse = StringBuffer();
+    bool hasError = false;
+
+    try {
+      final request = http.Request(
+        'POST',
+        Uri.parse('${_config.fullBaseUrl}/api/chat'),
+      );
+      request.headers['Content-Type'] = 'application/json';
+      request.body = json.encode({
+        'model': _currentModel,
+        'messages': messages,
+        'stream': true,
+        'options': {
+          'temperature': temperature ?? _config.temperature,
+          'num_predict': maxTokens ?? _config.maxTokens,
+        },
+      });
+
+      final response = await client.send(request);
+
+      if (response.statusCode != 200) {
+        hasError = true;
+        throw LocalOllamaException('Error HTTP ${response.statusCode}');
+      }
+
+      await for (final chunk in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (chunk.trim().isEmpty) continue;
+
+        try {
+          final data = json.decode(chunk);
+          final message = data['message'] as Map<String, dynamic>?;
+          final text = message?['content'] as String?;
+          if (text != null && text.isNotEmpty) {
+            fullResponse.write(text);
+            yield text;
+          }
+          if (data['done'] == true) break;
+        } catch (e) {
+          debugPrint('   ⚠️ Error parseando chunk: $e');
+        }
+      }
+
+      // Guardar respuesta completa en historial
+      _conversationHistory.add({
+        'role': 'assistant',
+        'content': fullResponse.toString(),
+      });
+
+      debugPrint('✅ [OllamaManaged] Stream completado: ${fullResponse.length} chars');
+    } catch (e) {
+      hasError = true;
+      debugPrint('❌ [OllamaManaged] Error en stream: $e');
+      rethrow;
+    } finally {
+      client.close();
+      // Si hubo error, quitar el mensaje del usuario del historial
+      if (hasError && _conversationHistory.isNotEmpty) {
+        _conversationHistory.removeLast();
+      }
+    }
+  }
+
   // Limpiar historial de conversación (como en Gemini/OpenAI)
   void clearConversation() {
     _conversationHistory.clear();
