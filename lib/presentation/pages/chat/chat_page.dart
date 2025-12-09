@@ -181,7 +181,9 @@ void _handleEditRequested(QuickResponse response) {
                   MessageInput(
                     key: _messageInputKey,
                     onSendMessage: chatProvider.sendMessage,
+                    onStopStreaming: chatProvider.cancelStreaming,
                     isBlocked: chatProvider.isProcessing,
+                    isStreaming: chatProvider.isStreaming,
                   ),
                 ],
               ),

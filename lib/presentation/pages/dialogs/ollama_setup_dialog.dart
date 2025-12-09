@@ -3,12 +3,20 @@ import '../../../data/models/local_ollama_models.dart';
 import '../../../data/services/local_ollama_service.dart';
 
 /// Diálogo para configurar e inicializar Ollama Local
+/// 
+/// Puede recibir un [initialModelName] para pre-seleccionar un modelo específico,
+/// útil cuando el usuario quiere instalar un modelo que no tiene descargado.
 class OllamaSetupDialog extends StatefulWidget {
   final OllamaManagedService localOllamaService;
+  
+  /// Modelo inicial a pre-seleccionar (opcional).
+  /// Si se proporciona, el diálogo iniciará con este modelo seleccionado.
+  final String? initialModelName;
 
   const OllamaSetupDialog({
     super.key,
     required this.localOllamaService,
+    this.initialModelName,
   });
 
   @override
@@ -20,13 +28,27 @@ class _OllamaSetupDialogState extends State<OllamaSetupDialog> {
   LocalOllamaStatus _currentStatus = LocalOllamaStatus.notInitialized;
   String? _errorMessage;
   LocalOllamaInstallProgress? _currentProgress;
-  String _selectedModelName = LocalOllamaModel.defaultModel;
+  late String _selectedModelName;
+  
+  /// Indica si el diálogo se abrió para instalar un modelo específico
+  bool get _isDirectModelInstall => widget.initialModelName != null;
 
   @override
   void initState() {
     super.initState();
+    
+    // Usa el modelo inicial si se proporcionó, sino usa el modelo por defecto
+    _selectedModelName = widget.initialModelName ?? LocalOllamaModel.defaultModel;
+    
     widget.localOllamaService.addStatusListener(_onStatusChanged);
     widget.localOllamaService.addInstallProgressListener(_onProgressChanged);
+    
+    // Si se proporcionó un modelo inicial, iniciar instalación automáticamente
+    if (_isDirectModelInstall) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startInitialization();
+      });
+    }
   }
 
   @override
@@ -44,6 +66,7 @@ class _OllamaSetupDialogState extends State<OllamaSetupDialog> {
     });
     
     if (status == LocalOllamaStatus.ready) {
+      // El proceso terminó exitosamente
     } else if (status == LocalOllamaStatus.error) {
       setState(() {
         _isInitializing = false;
@@ -254,12 +277,18 @@ class _OllamaSetupDialogState extends State<OllamaSetupDialog> {
         title: Row(
           children: [
             Icon(
-              Icons.smart_toy_outlined,
+              _isDirectModelInstall ? Icons.download_outlined : Icons.smart_toy_outlined,
               color: colorScheme.primary,
               size: 28,
             ),
             const SizedBox(width: 12),
-            const Expanded(child: Text('Configurar Ollama Local')),
+            Expanded(
+              child: Text(
+                _isDirectModelInstall 
+                    ? 'Instalar $_selectedModelName'
+                    : 'Configurar Ollama Local',
+              ),
+            ),
           ],
         ),
         content: SizedBox(
@@ -279,200 +308,324 @@ class _OllamaSetupDialogState extends State<OllamaSetupDialog> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Ejecuta modelos de IA directamente en tu computadora sin enviar datos a internet.',
+                  _isDirectModelInstall
+                      ? 'Se descargará e instalará el modelo seleccionado en tu computadora.'
+                      : 'Ejecuta modelos de IA directamente en tu computadora sin enviar datos a internet.',
                   style: textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                Text(
-                  'Selecciona un modelo para instalar:',
-                  style: textTheme.titleSmall,
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withAlpha(50),
-                    borderRadius: BorderRadius.circular(12),
+                // Selector de modelo (solo si no es instalación directa)
+                if (!_isDirectModelInstall) ...[
+                  Text(
+                    'Selecciona un modelo para instalar:',
+                    style: textTheme.titleSmall,
                   ),
-                  child: Column(
-                    children: LocalOllamaModel.recommendedModels.map((model) {
-                      return RadioListTile<String>(
-                        title: Text(model.displayName),
-                        subtitle: Text(
-                          '${model.description} (Tamaño: ${model.estimatedSize})',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        value: model.name,
-                        groupValue: _selectedModelName,
-                        onChanged: _isInitializing ? null : (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedModelName = value;
-                            });
-                          }
-                        },
-                        activeColor: colorScheme.primary,
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Características
-                _buildFeature(
-                  icon: Icons.privacy_tip_outlined,
-                  title: 'Privacidad total',
-                  description: 'Tus conversaciones nunca salen de tu dispositivo',
-                ),
-                _buildFeature(
-                  icon: Icons.offline_bolt_outlined,
-                  title: 'Sin internet',
-                  description: 'Funciona completamente offline',
-                ),
-                _buildFeature(
-                  icon: Icons.speed_outlined,
-                  title: 'GPU optimizada',
-                  description: 'Ollama usa automáticamente tu GPU para mejor rendimiento',
-                ),
-                _buildFeature(
-                  icon: Icons.download_outlined,
-                  title: 'Instalación automática',
-                  description: 'Se instala y configura todo automáticamente',
-                ),
-
-                const SizedBox(height: 24),
-
-                // Estado de progreso
-                if (_isInitializing) ...[
+                  const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
+                      color: colorScheme.surfaceContainerHighest.withAlpha(50),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                // Muestra el modelo que se está descargando
-                                _currentStatus == LocalOllamaStatus.downloadingModel
-                                    ? 'Descargando $_selectedModelName...'
-                                    : _currentStatus.displayText,
-                              ),
-                            ),
-                            Text(_currentStatus.emoji, style: const TextStyle(fontSize: 20)),
-                          ],
-                        ),
-                        
-                        if (_currentProgress != null) ...[
-                          const SizedBox(height: 12),
-                          LinearProgressIndicator(
-                            value: _currentProgress!.progress,
-                            backgroundColor: colorScheme.surfaceContainerHighest,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _currentProgress!.progressText,
+                      children: LocalOllamaModel.recommendedModels.map((model) {
+                        return RadioListTile<String>(
+                          title: Text(model.displayName),
+                          subtitle: Text(
+                            '${model.description} (Tamaño: ${model.estimatedSize})',
                             style: textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
-                        ],
-                      ],
+                          value: model.name,
+                          groupValue: _selectedModelName,
+                          onChanged: _isInitializing ? null : (value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedModelName = value;
+                              });
+                            }
+                          },
+                          activeColor: colorScheme.primary,
+                        );
+                      }).toList(),
                     ),
                   ),
+                  const SizedBox(height: 24),
+                ] else ...[
+                  // Info del modelo específico a instalar
+                  _buildSelectedModelInfo(colorScheme, textTheme),
+                  const SizedBox(height: 24),
+                ],
+
+                // Características (solo si no es instalación directa o no está inicializando)
+                if (!_isDirectModelInstall || !_isInitializing) ...[
+                  _buildFeature(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacidad total',
+                    description: 'Tus conversaciones nunca salen de tu dispositivo',
+                  ),
+                  _buildFeature(
+                    icon: Icons.offline_bolt_outlined,
+                    title: 'Sin internet',
+                    description: 'Funciona completamente offline',
+                  ),
+                  _buildFeature(
+                    icon: Icons.speed_outlined,
+                    title: 'GPU optimizada',
+                    description: 'Ollama usa automáticamente tu GPU para mejor rendimiento',
+                  ),
+                  _buildFeature(
+                    icon: Icons.download_outlined,
+                    title: 'Instalación automática',
+                    description: 'Se instala y configura todo automáticamente',
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Estado de progreso
+                if (_isInitializing) ...[
+                  _buildProgressSection(colorScheme, textTheme),
                   const SizedBox(height: 16),
                 ],
 
                 // Error
                 if (_errorMessage != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.errorContainer.withAlpha(128),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: colorScheme.error.withAlpha(128)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.error_outline, color: colorScheme.error),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(color: colorScheme.error),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildErrorSection(colorScheme),
                   const SizedBox(height: 16),
                 ],
 
-                // Requisitos
-                Text(
-                  'Requisitos mínimos:',
-                  style: textTheme.titleSmall,
-                ),
-                const SizedBox(height: 8),
-                _buildRequirement('💾 ~2-4 GB de espacio en disco'),
-                _buildRequirement('🧠 8 GB de RAM recomendado'),
-                _buildRequirement('⚡ Conexión inicial para descargar'),
+                // Requisitos (solo si no está inicializando)
+                if (!_isInitializing) ...[
+                  Text(
+                    'Requisitos mínimos:',
+                    style: textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildRequirement('💾 ~2-4 GB de espacio en disco'),
+                  _buildRequirement('🧠 8 GB de RAM recomendado'),
+                  _buildRequirement('⚡ Conexión inicial para descargar'),
+                ],
               ],
             ),
           ),
         ),
-        actions: [
-          if (!_isInitializing) ...[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
+        actions: _buildActions(colorScheme),
+      ),
+    );
+  }
+
+  /// Muestra información del modelo específico que se va a instalar
+  Widget _buildSelectedModelInfo(ColorScheme colorScheme, TextTheme textTheme) {
+    // Buscar el modelo en la lista de recomendados
+    final modelInfo = LocalOllamaModel.recommendedModels.firstWhere(
+      (m) => m.name == _selectedModelName,
+      orElse: () => LocalOllamaModel(
+        name: _selectedModelName,
+        displayName: _selectedModelName,
+        description: 'Modelo de IA',
+        isDownloaded: false,
+        estimatedSize: 'Desconocido',
+        parametersB: 0,
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withAlpha(50),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.primary.withAlpha(50)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.smart_toy,
+            color: colorScheme.primary,
+            size: 40,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  modelInfo.displayName,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  modelInfo.description,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.storage,
+                      size: 14,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Tamaño: ${modelInfo.estimatedSize}',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            FilledButton.icon(
-              onPressed: _startInitialization,
-              icon: const Icon(Icons.download_outlined),
-              // Si hay un error, el botón cambia a "Reintentar"
-              label: Text(_errorMessage != null 
-                  ? 'Reintentar Instalación' 
-                  : 'Instalar y Configurar'),
-            ),
-          ] else ...[
-            // Botón de Cancelar visible DURANTE la inicialización
-            TextButton(
-              onPressed: () {
-                // Llama al nuevo método de cancelación
-                widget.localOllamaService.cancelModelDownload();
-                // El listener _onStatusChanged se encargará
-                // de actualizar la UI al estado de error.
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Sección de progreso de instalación
+  Widget _buildProgressSection(ColorScheme colorScheme, TextTheme textTheme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    colorScheme.primary,
+                  ),
+                ),
               ),
-              child: const Text('Cancelar Descarga'),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _getProgressMessage(),
+                  style: textTheme.bodyMedium,
+                ),
+              ),
+              Text(_currentStatus.emoji, style: const TextStyle(fontSize: 20)),
+            ],
+          ),
+          
+          if (_currentProgress != null) ...[
+            const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: _currentProgress!.progress,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _currentProgress!.progressText,
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ],
       ),
     );
+  }
+
+  /// Obtiene el mensaje de progreso según el estado actual
+  String _getProgressMessage() {
+    switch (_currentStatus) {
+      case LocalOllamaStatus.checkingInstallation:
+        return 'Verificando instalación de Ollama...';
+      case LocalOllamaStatus.downloadingInstaller:
+        return 'Descargando instalador de Ollama...';
+      case LocalOllamaStatus.installing:
+        return 'Instalando Ollama...';
+      case LocalOllamaStatus.downloadingModel:
+        return 'Descargando $_selectedModelName...';
+      case LocalOllamaStatus.starting:
+        return 'Iniciando servidor Ollama...';
+      case LocalOllamaStatus.loading:
+        return 'Cargando...';
+      default:
+        return _currentStatus.displayText;
+    }
+  }
+
+  /// Sección de error
+  Widget _buildErrorSection(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer.withAlpha(128),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.error.withAlpha(128)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, color: colorScheme.error),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(color: colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construye los botones de acción según el estado
+  List<Widget> _buildActions(ColorScheme colorScheme) {
+    if (_isInitializing) {
+      return [
+        TextButton(
+          onPressed: () {
+            widget.localOllamaService.cancelModelDownload();
+          },
+          style: TextButton.styleFrom(
+            foregroundColor: colorScheme.error,
+          ),
+          child: const Text('Cancelar Descarga'),
+        ),
+      ];
+    }
+
+    return [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(false),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton.icon(
+        onPressed: _startInitialization,
+        icon: const Icon(Icons.download_outlined),
+        label: Text(_getActionButtonText()),
+      ),
+    ];
+  }
+
+  /// Obtiene el texto del botón de acción
+  String _getActionButtonText() {
+    if (_errorMessage != null) {
+      return 'Reintentar Instalación';
+    }
+    if (_isDirectModelInstall) {
+      return 'Instalar Modelo';
+    }
+    return 'Instalar y Configurar';
   }
 
   Widget _buildFeature({

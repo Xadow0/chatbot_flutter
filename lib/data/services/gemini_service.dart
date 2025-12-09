@@ -90,7 +90,7 @@ class GeminiService {
     await _ensureInitialized();
     
     debugPrint('💬 [GeminiService] generateContentContext');
-    debugPrint('   📚 Historial: ${_conversationHistory.length} turnos');
+    debugPrint('   📚 Historial: ${_conversationHistory.length} mensajes');
     
     _conversationHistory.add(Content.text(prompt));
     
@@ -137,7 +137,7 @@ class GeminiService {
     await _ensureInitialized();
     
     debugPrint('🌊 [GeminiService] generateContentStreamContext');
-    debugPrint('   📚 Historial: ${_conversationHistory.length} turnos');
+    debugPrint('   📚 Historial: ${_conversationHistory.length} mensajes');
     
     _conversationHistory.add(Content.text(prompt));
     

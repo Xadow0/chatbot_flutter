@@ -293,7 +293,7 @@ class LocalOllamaModel {
   final String name;
   final String displayName;
   final String description;
-  final bool isDownloaded;
+  final bool isDownloaded; // Esto se gestionará dinámicamente en la UI/Servicio
   final String estimatedSize;
   final bool isRecommended;
   final int parametersB;
@@ -308,29 +308,59 @@ class LocalOllamaModel {
     required this.parametersB,
   });
 
-  /// Modelos recomendados para uso local
+  /// Modelos recomendados para uso local (Actualizado 2025)
   static List<LocalOllamaModel> get recommendedModels => [
+    // --- LIGEROS (< 3GB) ---
     LocalOllamaModel(
-      name: 'phi3', // Nombre para 'ollama pull'
-      displayName: 'Phi-3 (Rápido y Ligero)',
-      description: 'Ideal para tareas rápidas. Menor precisión pero muy eficiente.',
+      name: 'gemma2:2b',
+      displayName: 'Google Gemma 2 (2B)',
+      description: 'Ultraligero y muy rápido. Ideal para dispositivos con poca RAM.',
       isDownloaded: false,
-      estimatedSize: '2.3 GB',
-      isRecommended: true,
-      parametersB: 4,
+      estimatedSize: '1.6 GB',
+      parametersB: 2,
     ),
     LocalOllamaModel(
-      name: 'llama3', // Nombre para 'ollama pull'
-      displayName: 'Llama 3 (Potente)',
-      description: 'Resultados de mayor calidad. Requiere más recursos y una descarga más larga.',
+      name: 'llama3.2', 
+      displayName: 'Llama 3.2 (3B)',
+      description: 'El estándar de eficiencia de Meta. Gran equilibrio velocidad/calidad.',
+      isDownloaded: false,
+      estimatedSize: '2.0 GB',
+      isRecommended: true,
+      parametersB: 3,
+    ),
+
+    // --- POTENCIA MEDIA (4GB - 6GB) ---
+    LocalOllamaModel(
+      name: 'qwen2.5:7b',
+      displayName: 'Qwen 2.5 (7B)',
+      description: 'Rey del código y lógica matemática. Excelente soporte en español.',
       isDownloaded: false,
       estimatedSize: '4.7 GB',
-      parametersB: 8,
+      isRecommended: true,
+      parametersB: 7,
+    ),
+    LocalOllamaModel(
+      name: 'gemma2:9b',
+      displayName: 'Google Gemma 2 (9B)',
+      description: 'Razonamiento superior. Compite con modelos mucho más grandes.',
+      isDownloaded: false,
+      estimatedSize: '5.4 GB',
+      parametersB: 9,
+    ),
+
+    // --- ALTA CAPACIDAD (> 7GB) ---
+    LocalOllamaModel(
+      name: 'mistral-nemo', 
+      displayName: 'Mistral Nemo (12B)',
+      description: 'Ventana de contexto grande. Ideal para textos largos y RAG.',
+      isDownloaded: false,
+      estimatedSize: '7.1 GB',
+      parametersB: 12,
     ),
   ];
 
   /// Obtener modelo por defecto
-  static String get defaultModel => 'phi3';
+  static String get defaultModel => 'llama3.2';
 
   // ============================================================================
   // CONVERSIÓN ENTRE MODELO Y ENTIDAD (Clean Architecture)

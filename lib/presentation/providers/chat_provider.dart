@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'dart:async';
 import '../../domain/entities/message_entity.dart';
 import '../../domain/entities/quick_response_entity.dart';
 import '../../data/models/quick_response_model.dart';
@@ -30,6 +31,7 @@ class ChatProvider extends ChangeNotifier {
       QuickResponseProvider.defaultResponsesAsEntities;
   bool _isProcessing = false;
   bool _isStreaming = false;
+  StreamSubscription<String>? _streamSubscription;
   bool _isNewConversation = true;
   bool _isRetryingOllama = false;
   // Controla si el usuario puede seleccionar Ollama remoto desde la UI.
@@ -587,7 +589,7 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Envío con streaming (para Gemini)
+  /// Envío con streaming (para Gemini y Ollama)
   Future<void> _sendMessageWithStreaming(String content) async {
     debugPrint('\n🌊 [ChatProvider] === ENVIANDO CON STREAMING ===');
     debugPrint('   💬 Contenido: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
@@ -629,42 +631,66 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     final buffer = StringBuffer();
+    final completer = Completer<void>();
 
     try {
       final adapter = _aiSelector.getCurrentAdapter();
+      final stream = adapter.generateContentStream(content);
       
-      await for (final chunk in adapter.generateContentStream(content)) {
-        buffer.write(chunk);
-        
-        final index = _messages.indexWhere((m) => m.id == botMessageId);
-        if (index != -1) {
-          _messages[index] = MessageEntity(
-            id: botMessageId,
-            content: buffer.toString(),
-            type: MessageTypeEntity.bot,
-            timestamp: now,
-          );
-          notifyListeners();
-        }
-      }
+      _streamSubscription = stream.listen(
+        (chunk) {
+          buffer.write(chunk);
+          
+          final index = _messages.indexWhere((m) => m.id == botMessageId);
+          if (index != -1) {
+            _messages[index] = MessageEntity(
+              id: botMessageId,
+              content: buffer.toString(),
+              type: MessageTypeEntity.bot,
+              timestamp: now,
+            );
+            notifyListeners();
+          }
+        },
+        onError: (error) {
+          debugPrint('❌ [ChatProvider] Error en streaming: $error');
+          
+          final index = _messages.indexWhere((m) => m.id == botMessageId);
+          if (index != -1) {
+            _messages[index] = MessageEntity(
+              id: botMessageId,
+              content: buffer.isNotEmpty 
+                  ? '${buffer.toString()}\n\n❌ Error: $error'
+                  : '❌ Error: $error',
+              type: MessageTypeEntity.bot,
+              timestamp: now,
+            );
+          }
+          completer.complete();
+        },
+        onDone: () {
+          debugPrint('✅ [ChatProvider] Streaming completado: ${buffer.length} caracteres');
+          completer.complete();
+        },
+        cancelOnError: true,
+      );
 
-      debugPrint('✅ [ChatProvider] Streaming completado: ${buffer.length} caracteres');
+      await completer.future;
 
     } catch (e) {
-      debugPrint('❌ [ChatProvider] Error en streaming: $e');
-
+      debugPrint('❌ [ChatProvider] Error iniciando streaming: $e');
+      
       final index = _messages.indexWhere((m) => m.id == botMessageId);
       if (index != -1) {
         _messages[index] = MessageEntity(
           id: botMessageId,
-          content: buffer.isNotEmpty 
-              ? '${buffer.toString()}\n\n❌ Error: $e'
-              : '❌ Error: $e',
+          content: '❌ Error: $e',
           type: MessageTypeEntity.bot,
           timestamp: now,
         );
       }
     } finally {
+      _streamSubscription = null;
       _isProcessing = false;
       _isStreaming = false;
       _hasUnsavedChanges = true;
@@ -700,12 +726,11 @@ class ChatProvider extends ChangeNotifier {
     final commandResult = await _commandProcessor.processMessageStream(content);
 
     if (!commandResult.isCommand) {
-      // No debería pasar, pero por si acaso, usar flujo normal
       debugPrint('   ⚠️ No es comando, redirigiendo a streaming normal');
       return _sendMessageWithStreaming(content);
     }
 
-    // Si hay error de validación (ej: falta contenido)
+    // Si hay error de validación
     if (commandResult.error != null) {
       _messages.add(MessageEntity(
         id: botMessageId,
@@ -731,40 +756,63 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     final buffer = StringBuffer();
+    final completer = Completer<void>();
 
     try {
-      await for (final chunk in commandResult.responseStream!) {
-        buffer.write(chunk);
-        
-        final index = _messages.indexWhere((m) => m.id == botMessageId);
-        if (index != -1) {
-          _messages[index] = MessageEntity(
-            id: botMessageId,
-            content: buffer.toString(),
-            type: MessageTypeEntity.bot,
-            timestamp: now,
-          );
-          notifyListeners();
-        }
-      }
+      _streamSubscription = commandResult.responseStream!.listen(
+        (chunk) {
+          buffer.write(chunk);
+          
+          final index = _messages.indexWhere((m) => m.id == botMessageId);
+          if (index != -1) {
+            _messages[index] = MessageEntity(
+              id: botMessageId,
+              content: buffer.toString(),
+              type: MessageTypeEntity.bot,
+              timestamp: now,
+            );
+            notifyListeners();
+          }
+        },
+        onError: (error) {
+          debugPrint('❌ [ChatProvider] Error en comando streaming: $error');
+          
+          final index = _messages.indexWhere((m) => m.id == botMessageId);
+          if (index != -1) {
+            _messages[index] = MessageEntity(
+              id: botMessageId,
+              content: buffer.isNotEmpty 
+                  ? '${buffer.toString()}\n\n❌ Error: $error'
+                  : '❌ Error: $error',
+              type: MessageTypeEntity.bot,
+              timestamp: now,
+            );
+          }
+          completer.complete();
+        },
+        onDone: () {
+          debugPrint('✅ [ChatProvider] Comando streaming completado: ${buffer.length} caracteres');
+          completer.complete();
+        },
+        cancelOnError: true,
+      );
 
-      debugPrint('✅ [ChatProvider] Comando streaming completado: ${buffer.length} caracteres');
+      await completer.future;
 
     } catch (e) {
-      debugPrint('❌ [ChatProvider] Error en comando streaming: $e');
-
+      debugPrint('❌ [ChatProvider] Error iniciando comando streaming: $e');
+      
       final index = _messages.indexWhere((m) => m.id == botMessageId);
       if (index != -1) {
         _messages[index] = MessageEntity(
           id: botMessageId,
-          content: buffer.isNotEmpty 
-              ? '${buffer.toString()}\n\n❌ Error: $e'
-              : '❌ Error: $e',
+          content: '❌ Error: $e',
           type: MessageTypeEntity.bot,
           timestamp: now,
         );
       }
     } finally {
+      _streamSubscription = null;
       _isProcessing = false;
       _isStreaming = false;
       _hasUnsavedChanges = true;
@@ -1146,6 +1194,20 @@ class ChatProvider extends ChangeNotifier {
         syncWasEnabled: false,
         message: 'Error eliminando conversaciones: $e',
       );
+    }
+  }
+
+  /// Cancela el streaming actual si hay uno activo
+  void cancelStreaming() {
+    if (_isStreaming && _streamSubscription != null) {
+      debugPrint('⏹️ [ChatProvider] Cancelando streaming...');
+      _streamSubscription?.cancel();
+      _streamSubscription = null;
+      _isProcessing = false;
+      _isStreaming = false;
+      _hasUnsavedChanges = true;
+      notifyListeners();
+      debugPrint('✅ [ChatProvider] Streaming cancelado');
     }
   }
 

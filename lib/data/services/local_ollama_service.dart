@@ -30,6 +30,7 @@ class OllamaManagedService {
 
   final List<ValueChanged<LocalOllamaStatus>> _statusListeners = [];
   final List<ValueChanged<LocalOllamaInstallProgress>> _installProgressListeners = [];
+  final List<VoidCallback> _modelsChangedListeners = [];
   
   Stream<LocalOllamaInstallProgress>? _currentInstallStream;
 
@@ -292,6 +293,119 @@ class OllamaManagedService {
       );
     }
   }
+
+  
+
+  /// Obtener información detallada de los modelos instalados
+  Future<List<InstalledModelInfo>> getInstalledModelsInfo() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${_config.fullBaseUrl}/api/tags'),
+      ).timeout(_config.timeout);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final models = data['models'] as List? ?? [];
+        
+        return models.map((m) {
+          final sizeBytes = m['size'] as int? ?? 0;
+          final modifiedAt = m['modified_at'] as String?;
+          
+          return InstalledModelInfo(
+            name: m['name'] as String? ?? 'unknown',
+            size: sizeBytes,
+            modifiedAt: modifiedAt != null ? DateTime.tryParse(modifiedAt) : null,
+            details: m['details'] as Map<String, dynamic>?,
+          );
+        }).toList();
+      }
+      
+      return [];
+    } catch (e) {
+      debugPrint('   ⚠️ Error obteniendo info de modelos: $e');
+      return [];
+    }
+  }
+
+   /// Eliminar un modelo descargado
+  /// 
+  /// Retorna true si se eliminó correctamente, false si hubo error.
+  /// Si el modelo eliminado es el actual, se selecciona otro automáticamente.
+  Future<DeleteModelResult> deleteModel(String modelName) async {
+    debugPrint('🗑️ [OllamaManaged] Eliminando modelo: $modelName');
+    
+    // Verificar que el servidor esté disponible
+    if (_status != LocalOllamaStatus.ready) {
+      return DeleteModelResult(
+        success: false,
+        error: 'El servicio de Ollama no está disponible',
+      );
+    }
+
+    // Verificar que no sea el único modelo
+    if (_availableModels.length <= 1) {
+      return DeleteModelResult(
+        success: false,
+        error: 'No puedes eliminar el único modelo disponible',
+      );
+    }
+
+    try {
+      final response = await http.delete(
+        Uri.parse('${_config.fullBaseUrl}/api/delete'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'name': modelName}),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        debugPrint('   ✅ Modelo eliminado: $modelName');
+        
+        // Refrescar lista de modelos
+        await _refreshAvailableModels();
+        
+        // Si el modelo eliminado era el actual, seleccionar otro
+        if (_currentModel == modelName || 
+            (_currentModel != null && _currentModel!.startsWith('$modelName:'))) {
+          if (_availableModels.isNotEmpty) {
+            _currentModel = _availableModels.first;
+            debugPrint('   🔄 Nuevo modelo activo: $_currentModel');
+          } else {
+            _currentModel = null;
+          }
+        }
+        
+        // Notificar cambios
+        _notifyModelsChanged();
+        
+        return DeleteModelResult(
+          success: true,
+          deletedModel: modelName,
+          newCurrentModel: _currentModel,
+        );
+      } else {
+        final errorBody = response.body;
+        debugPrint('   ❌ Error HTTP ${response.statusCode}: $errorBody');
+        
+        return DeleteModelResult(
+          success: false,
+          error: 'Error del servidor: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      debugPrint('   ❌ Error eliminando modelo: $e');
+      return DeleteModelResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+   /// Refrescar modelos disponibles (público)
+  Future<void> refreshModels() async {
+    await _refreshAvailableModels();
+    _notifyModelsChanged();
+  }
+
 
   /// Esperar a que el servidor de Ollama esté completamente listo
   Future<void> _waitForServerReady({int maxAttempts = 10}) async {
@@ -901,6 +1015,16 @@ class OllamaManagedService {
     }
   }
 
+    void _notifyModelsChanged() {
+    for (var listener in _modelsChangedListeners) {
+      try {
+        listener();
+      } catch (e) {
+        debugPrint('⚠️ [OllamaManaged] Error notificando cambio de modelos: $e');
+      }
+    }
+  }
+
   /// Streaming CON historial
   Stream<String> generateContentStreamContext(
     String prompt, {
@@ -1015,4 +1139,59 @@ class OllamaManagedService {
     });
     debugPrint('📝 [LocalOllamaService] Mensaje del bot añadido al historial');
   }
+}
+
+
+/// Información detallada de un modelo instalado
+class InstalledModelInfo {
+  final String name;
+  final int size;
+  final DateTime? modifiedAt;
+  final Map<String, dynamic>? details;
+
+  InstalledModelInfo({
+    required this.name,
+    required this.size,
+    this.modifiedAt,
+    this.details,
+  });
+
+  /// Tamaño formateado en GB o MB
+  String get sizeFormatted {
+    if (size >= 1024 * 1024 * 1024) {
+      return '${(size / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    } else if (size >= 1024 * 1024) {
+      return '${(size / (1024 * 1024)).toStringAsFixed(0)} MB';
+    } else {
+      return '${(size / 1024).toStringAsFixed(0)} KB';
+    }
+  }
+
+  /// Nombre limpio sin el tag
+  String get displayName {
+    final parts = name.split(':');
+    return parts.first;
+  }
+
+
+  /// Tag del modelo (latest, etc)
+  String get tag {
+    final parts = name.split(':');
+    return parts.length > 1 ? parts[1] : 'latest';
+  }
+}
+
+/// Resultado de la operación de eliminar modelo
+class DeleteModelResult {
+  final bool success;
+  final String? error;
+  final String? deletedModel;
+  final String? newCurrentModel;
+
+  DeleteModelResult({
+    required this.success,
+    this.error,
+    this.deletedModel,
+    this.newCurrentModel,
+  });
 }
