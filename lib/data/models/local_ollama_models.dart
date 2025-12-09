@@ -312,12 +312,13 @@ class LocalOllamaModel {
   static List<LocalOllamaModel> get recommendedModels => [
     // --- LIGEROS (< 3GB) ---
     LocalOllamaModel(
-      name: 'gemma2:2b',
-      displayName: 'Google Gemma 2 (2B)',
-      description: 'Ultraligero y muy rápido. Ideal para dispositivos con poca RAM.',
+      name: 'phi3', 
+      displayName: 'Phi-3 (Rápido y Ligero)',
+      description: 'Ideal para tareas rápidas. Menor precisión pero muy eficiente.',
       isDownloaded: false,
-      estimatedSize: '1.6 GB',
-      parametersB: 2,
+      estimatedSize: '2.3 GB',
+      isRecommended: true,
+      parametersB: 4,
     ),
     LocalOllamaModel(
       name: 'llama3.2', 

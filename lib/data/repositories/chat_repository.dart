@@ -1,12 +1,12 @@
-/// ============================================================================
-/// LOCAL CHAT REPOSITORY - IMPLEMENTACIÓN (DATA LAYER)
-/// ============================================================================
-/// 
-/// Implementación del repositorio de chat que gestiona los mensajes
-/// localmente y delega la generación de respuestas a AIChatService.
-/// 
-/// UBICACIÓN: lib/data/repositories/chat_repository.dart
-/// ============================================================================
+// ============================================================================
+// LOCAL CHAT REPOSITORY - IMPLEMENTACIÓN (DATA LAYER)
+// ============================================================================
+// 
+// Implementación del repositorio de chat que gestiona los mensajes
+// localmente y delega la generación de respuestas a AIChatService.
+// 
+// UBICACIÓN: lib/data/repositories/chat_repository.dart
+// ============================================================================
 
 import '../../domain/entities/message_entity.dart';
 import '../../domain/repositories/chat_repository.dart';

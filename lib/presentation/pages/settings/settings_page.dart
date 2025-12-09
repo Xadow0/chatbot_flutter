@@ -407,11 +407,16 @@ class _SettingsPageState extends State<SettingsPage> {
                         builder: (_) => const LocalModelsManagementPage(),
                       ),
                     );
+                    
+                    if (!context.mounted) return;
+
                     // Al volver, refrescar los modelos para actualizar el contador
-                    if (mounted && chatProvider.localOllamaStatus == LocalOllamaStatus.ready) {
+                    if (chatProvider.localOllamaStatus == LocalOllamaStatus.ready) {
                       await chatProvider.aiSelector.localOllamaService.refreshModels();
-                      // Forzar rebuild del widget
-                      setState(() {});
+                      // Forzar rebuild del widget de forma segura
+                      if (mounted) {
+                        setState(() {});
+                      }
                     }
                   }
                 : null,
@@ -508,7 +513,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
 
-    if (result == true && mounted) {
+    if (result == true && context.mounted) {
       // Verificar que el estado sea ready
       if (chatProvider.localOllamaStatus == LocalOllamaStatus.ready) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -525,7 +530,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         );
         // Actualizar UI
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
       }
     }
   }
@@ -588,47 +595,41 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  // Se usa ListTile manual para evitar deprecación de RadioListTile.groupValue
+  // en versiones recientes/beta de Flutter.
+  Widget _buildThemeOption(
+    BuildContext context, 
+    ThemeProvider provider, 
+    String title, 
+    ThemeMode mode
+  ) {
+    final isSelected = provider.themeMode == mode;
+    return ListTile(
+      title: Text(title),
+      leading: Icon(
+        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+        color: isSelected ? Theme.of(context).primaryColor : Colors.grey,
+      ),
+      onTap: () {
+        provider.setThemeMode(mode);
+        Navigator.pop(context);
+      },
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24.0),
+    );
+  }
+
   void _showThemeDialog(BuildContext context, ThemeProvider themeProvider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Seleccionar tema'),
+        contentPadding: const EdgeInsets.only(top: 20, bottom: 20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            RadioListTile<ThemeMode>(
-              title: const Text('Modo claro'),
-              value: ThemeMode.light,
-              groupValue: themeProvider.themeMode,
-              onChanged: (val) {
-                if (val != null) {
-                  themeProvider.setThemeMode(val);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<ThemeMode>(
-              title: const Text('Modo oscuro'),
-              value: ThemeMode.dark,
-              groupValue: themeProvider.themeMode,
-              onChanged: (val) {
-                if (val != null) {
-                  themeProvider.setThemeMode(val);
-                  Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<ThemeMode>(
-              title: const Text('Automático (sistema)'),
-              value: ThemeMode.system,
-              groupValue: themeProvider.themeMode,
-              onChanged: (val) {
-                if (val != null) {
-                  themeProvider.setThemeMode(val);
-                  Navigator.pop(context);
-                }
-              },
-            ),
+            _buildThemeOption(context, themeProvider, 'Modo claro', ThemeMode.light),
+            _buildThemeOption(context, themeProvider, 'Modo oscuro', ThemeMode.dark),
+            _buildThemeOption(context, themeProvider, 'Automático (sistema)', ThemeMode.system),
           ],
         ),
       ),
@@ -839,9 +840,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
               await authProvider.deleteAccount(password);
 
-              if (context.mounted) {
-                Navigator.of(context, rootNavigator: true).pop();
-              }
+              if (!context.mounted) return;
+              Navigator.of(context, rootNavigator: true).pop();
 
               await Future.delayed(const Duration(milliseconds: 100));
 
