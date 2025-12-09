@@ -526,11 +526,52 @@ class AnimationStep {
 }
 
 final List<AnimationStep> _descomposicionSteps = [
-  AnimationStep(title: 'La Situación', description: 'María trabaja en marketing y necesita crear una presentación de 20 diapositivas para proponer un nuevo proyecto. Tiene poco tiempo y no sabe por dónde empezar.', icon: Icons.person, color: Colors.blue),
-  AnimationStep(title: 'El Error Común ❌', description: 'María intenta pedirle todo de golpe a la IA:', example: '"Crea una presentación completa de 20 diapositivas sobre mi proyecto de app móvil. Incluye análisis de mercado, competencia, desarrollo, costos, proyecciones y marketing."', exampleLabel: 'Prompt de María', exampleIcon: Icons.error_outline, result: '❌ Resultado: La IA genera contenido genérico y superficial. María tiene que rehacerlo todo.', icon: Icons.close, color: Colors.red),
-  AnimationStep(title: 'La Solución: Paso 1 - Planificar', description: 'María decide usar la técnica de descomposición. Primero, pide ayuda para planificar:', example: '"Ayúdame a estructurar una presentación de negocio para una app móvil de productividad. Dame: 1) Secciones principales, 2) Diapositivas por sección, 3) Puntos clave de cada una."', exampleLabel: 'Planificación', exampleIcon: Icons.lightbulb, result: '✅ La IA le devuelve un plan detallado con 5 secciones y 20 diapositivas distribuidas lógicamente.', icon: Icons.account_tree, color: Colors.blue),
-  AnimationStep(title: 'La Solución: Paso 2 - Ejecutar por Partes', description: 'Ahora María genera cada sección por separado:', example: '"Genera el contenido para la Sección 1: Análisis de Mercado (diapositivas 1-5). Incluye: tamaño del mercado, tendencias actuales, oportunidad identificada y datos relevantes."', exampleLabel: 'Primera sección', exampleIcon: Icons.edit, result: '✅ Contenido detallado, específico y bien fundamentado para las primeras 5 diapositivas.', icon: Icons.content_paste, color: Colors.blue),
-  AnimationStep(title: 'El Resultado Final 🎯', description: 'María continúa el proceso con cada sección. Después de 5 prompts específicos, tiene una presentación profesional y completa.', example: '• Sección 1: Análisis de Mercado ✓\n• Sección 2: Competencia ✓\n• Sección 3: Propuesta de Valor ✓\n• Sección 4: Plan de Desarrollo ✓\n• Sección 5: Proyecciones Financieras ✓', exampleLabel: 'Presentación completa', exampleIcon: Icons.check_circle, result: '🎉 María ahorró 3 horas de trabajo y obtuvo contenido de calidad profesional. La clave: dividir la tarea compleja en pasos manejables.', icon: Icons.emoji_events, color: Colors.green),
+  AnimationStep(
+    title: 'El Desafío Académico 📚',
+    description: 'Sofía es estudiante universitaria. Debe escribir un ensayo profundo de 2,500 palabras sobre "El impacto ético de la IA en la medicina", pero se siente abrumada por la magnitud de la tarea.',
+    icon: Icons.school,
+    color: Colors.blue,
+  ),
+  AnimationStep(
+    title: 'El Error Común ❌',
+    description: 'Sofía intenta resolverlo pidiendo todo de una sola vez:',
+    example: '"Escribe un ensayo académico completo de 2,500 palabras sobre ética en IA médica. Incluye introducción, antecedentes, 4 argumentos principales, contraargumentos y conclusión."',
+    exampleLabel: 'El "Mega-Prompt" fallido',
+    exampleIcon: Icons.warning_amber_rounded,
+    result: '❌ Resultado: La IA se satura. Genera solo 600 palabras genéricas, pierde el hilo a la mitad, repite ideas y el tono es superficial. No sirve para un nivel universitario.',
+    icon: Icons.close,
+    color: Colors.red,
+  ),
+  AnimationStep(
+    title: 'Fase 1: La Estructura (El Esqueleto)',
+    description: 'Sofía aplica la técnica de descomposición. Primero, ignora el contenido y se centra solo en el esquema:',
+    example: '"Actúa como tutor de tesis. Ayúdame a planificar la estructura de mi ensayo. Dame un índice detallado con:\n1. Tesis central\n2. Los 4 argumentos principales a desarrollar\n3. Puntos clave para la conclusión"',
+    exampleLabel: 'Prompt de Planificación',
+    exampleIcon: Icons.account_tree,
+    result: '✅ La IA entrega un "mapa de ruta" sólido y lógico. Sofía valida la estructura antes de que se escriba una sola palabra del texto final.',
+    icon: Icons.map,
+    color: Colors.blue,
+  ),
+  AnimationStep(
+    title: 'Fase 2: Ejecución Secuencial',
+    description: 'Con el índice aprobado, Sofía pide el contenido sección por sección (Divide y Vencerás):',
+    example: '"Basándote en el Punto 2 del índice (Sesgo en diagnósticos automatizados), redacta 500 palabras. Enfócate en grupos demográficos vulnerables. Usa un tono formal y analítico."',
+    exampleLabel: 'Prompt para Sección 2',
+    exampleIcon: Icons.edit_note,
+    result: '✅ Al pedir solo una sección, la IA mantiene el foco ("Atención plena"). El texto resultante es rico en detalles, profundo y cumple con la longitud requerida.',
+    icon: Icons.article,
+    color: Colors.indigo,
+  ),
+  AnimationStep(
+    title: 'El Resultado: Excelencia Académica 🎓',
+    description: 'Sofía repite el proceso con cada punto del índice y une las partes. El resultado final es muy superior:',
+    example: '📄 Ensayo Final Compilado:\n\n• Introducción (300 p.) [Listo] ✅\n• Antecedentes (400 p.) [Listo] ✅\n• Desarrollo (1500 p.) [Listo] ✅\n• Conclusión (300 p.) [Listo] ✅',
+    exampleLabel: 'Trabajo Terminado',
+    exampleIcon: Icons.check_circle,
+    result: '🎉 Sofía obtuvo un documento coherente y profundo. Al descomponer el problema, transformó una tarea imposible en 5 tareas sencillas que la IA pudo manejar perfectamente.',
+    icon: Icons.emoji_events,
+    color: Colors.teal,
+  ),
 ];
 
 final List<AnimationStep> _metaPreguntasSteps = [
