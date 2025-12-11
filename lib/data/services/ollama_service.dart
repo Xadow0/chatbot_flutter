@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -51,7 +50,7 @@ class OllamaService {
     _updateConnectionStatus(ConnectionStatus.connecting, _tailscaleUrl);
 
     final connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult == ConnectivityResult.none) {
+    if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
       debugPrint('❌ [OllamaService] Sin conexión a internet');
       _updateConnectionStatus(
         ConnectionStatus.error,

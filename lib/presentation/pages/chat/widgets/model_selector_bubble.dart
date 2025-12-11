@@ -304,6 +304,7 @@ class _GeminiOption extends StatelessWidget {
     try {
       await chatProvider.selectProvider(provider);
     } catch (e) {
+      if (!context.mounted) return;
       _showError(context, 'Error cambiando proveedor: $e');
     }
   }
@@ -361,6 +362,7 @@ class _OpenAISection extends StatelessWidget {
     try {
       await chatProvider.selectProvider(provider);
     } catch (e) {
+      if (!context.mounted) return;
       _showError(context, 'Error cambiando proveedor: $e');
     }
   }
@@ -369,6 +371,7 @@ class _OpenAISection extends StatelessWidget {
     try {
       await chatProvider.selectOpenAIModel(modelName);
     } catch (e) {
+      if (!context.mounted) return;
       _showError(context, 'Error cambiando modelo: $e');
     }
   }
@@ -636,6 +639,7 @@ class _OllamaRemoteSection extends StatelessWidget {
       await chatProvider.selectProvider(AIProvider.ollama);
       await chatProvider.selectModel(modelName);
     } catch (e) {
+      if (!context.mounted) return;
       _showError(context, 'Error seleccionando modelo: $e');
     }
   }
@@ -1041,6 +1045,7 @@ class _LocalOllamaSection extends StatelessWidget {
     try {
       await chatProvider.selectProvider(provider);
     } catch (e) {
+      if (!context.mounted) return;
       _showError(context, 'Error seleccionando proveedor: $e');
     }
   }

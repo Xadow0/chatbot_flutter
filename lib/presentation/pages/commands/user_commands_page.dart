@@ -24,6 +24,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
   void initState() {
     super.initState();
     Future.microtask(() async {
+      if (!mounted) return;
       final authProvider = context.read<AuthProvider>();
       final commandProvider = context.read<CommandManagementProvider>();
 
@@ -77,6 +78,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await context.read<CommandManagementProvider>().deleteCommand(command.id);
+              if (!context.mounted) return;
               _refreshQuickResponses();
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
@@ -105,6 +107,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await context.read<CommandManagementProvider>().deleteFolder(folder.id);
+              if (!context.mounted) return;
               _refreshQuickResponses();
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
@@ -198,6 +201,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
               onDeleteFolder: () => _confirmDeleteFolder(context, folder, commandsInFolder.length),
               onMoveCommand: (cmdId, folderId) async {
                 await provider.moveCommandToFolder(cmdId, folderId);
+                if (!context.mounted) return;
                 _refreshQuickResponses();
               },
             );
@@ -213,6 +217,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
             onDeleteCommand: (cmd) => _confirmDeleteCommand(context, cmd),
             onDropCommand: (cmdId) async {
               await provider.moveCommandToFolder(cmdId, null);
+              if (!context.mounted) return;
               _refreshQuickResponses();
             },
             commandBuilder: (cmd) => DraggableCommandCard(
@@ -464,6 +469,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
         );
 
         if (shouldContinue != true) return;
+        if (!mounted) return;
       }
 
       final isEditing = widget.existingCommand != null;
@@ -485,6 +491,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
       );
 
       await context.read<CommandManagementProvider>().saveCommand(newCommand);
+      if (!mounted) return;
 
       try {
         await context.read<ChatProvider>().refreshQuickResponses();
