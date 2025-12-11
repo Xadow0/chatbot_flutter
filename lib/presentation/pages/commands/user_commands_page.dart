@@ -556,7 +556,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
 
               // --- Selector de Carpeta ---
               DropdownButtonFormField<String?>(
-                value: _selectedFolderId,
+                initialValue: _selectedFolderId,
                 decoration: const InputDecoration(
                   labelText: 'Carpeta',
                   border: OutlineInputBorder(),
@@ -642,7 +642,7 @@ class _CommandEditorDialogState extends State<_CommandEditorDialog> {
                   ),
                   value: _isEditable,
                   onChanged: (value) => setState(() => _isEditable = value),
-                  activeColor: Colors.green,
+                  activeThumbColor: Colors.green,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 ),
               ),

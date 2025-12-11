@@ -1029,7 +1029,7 @@ class _LocalOllamaSection extends StatelessWidget {
             const SnackBar(
               content: Text('IA Local configurada y lista'),
               backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
+              duration: Duration(seconds: 2),
             ),
           );
         }

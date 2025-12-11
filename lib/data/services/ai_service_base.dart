@@ -8,6 +8,7 @@
 /// 
 /// UBICACIÓN: lib/data/services/ai_service_base.dart
 /// ============================================================================
+library;
 
 /// Interfaz base para todos los servicios de IA
 /// 

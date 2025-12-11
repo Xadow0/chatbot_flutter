@@ -7,6 +7,7 @@
 /// 
 /// UBICACIÓN: lib/domain/repositories/chat_repository.dart
 /// ============================================================================
+library;
 
 import '../entities/message_entity.dart';
 

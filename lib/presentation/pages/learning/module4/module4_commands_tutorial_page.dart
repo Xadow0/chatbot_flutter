@@ -896,7 +896,7 @@ Genera únicamente el prompt, sin explicaciones adicionales.
               ),
               value: _isEditable,
               onChanged: (value) => setState(() => _isEditable = value),
-              activeColor: Colors.green,
+              activeThumbColor: Colors.green,
             ),
           ),
           const SizedBox(height: 20),
