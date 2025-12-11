@@ -8,122 +8,107 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/remote_ollama_models.dart';
 
 class OllamaService {
-  // URLs desde .env
   late final String _tailscaleUrl;
   late final String _fallbackUrl;
-  
+
   late String _baseUrl;
   final String? _apiKey;
   final Duration _timeout = const Duration(seconds: 60);
   final List<ChatMessage> _conversationHistory = [];
-  
-  // Estado de conexión
+
   ConnectionInfo _connectionInfo = ConnectionInfo(
     status: ConnectionStatus.disconnected,
     url: '',
     isHealthy: false,
   );
-  
-  // Stream controller para notificar cambios de estado
+
   final _connectionController = StreamController<ConnectionInfo>.broadcast();
-  
+
   OllamaService({String? apiKey}) : _apiKey = apiKey {
-    // Leer URLs desde .env
     _tailscaleUrl = dotenv.env['TAILSCALE_URL'] ?? 'http://100.125.201.64:3001';
     _fallbackUrl = dotenv.env['FALLBACK_URL'] ?? 'http://192.168.1.100:3001';
-    
+
     _baseUrl = _tailscaleUrl;
-    
+
     debugPrint('🔧 [OllamaService] Configuración de URLs:');
     debugPrint('   📍 Tailscale: $_tailscaleUrl');
     debugPrint('   📍 Fallback: $_fallbackUrl');
-    
+
     _initializeConnectionAsync();
   }
-  
-  // Getters
+
   ConnectionInfo get connectionInfo => _connectionInfo;
   Stream<ConnectionInfo> get connectionStream => _connectionController.stream;
   String get baseUrl => _baseUrl;
-  
-  // Inicializar conexión de forma asíncrona sin bloquear
+
   void _initializeConnectionAsync() {
     debugPrint('🔷 [OllamaService] Iniciando conexión...');
-    // Ejecutar en el próximo tick del event loop
     Future.microtask(() => _detectBestConnection());
   }
-  
-  // Auto-detectar mejor conexión
+
   Future<void> _detectBestConnection() async {
     debugPrint('🔍 [OllamaService] Detectando mejor conexión...');
     _updateConnectionStatus(ConnectionStatus.connecting, _tailscaleUrl);
-    
-    // Verificar conectividad de red
+
     final connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
       debugPrint('❌ [OllamaService] Sin conexión a internet');
       _updateConnectionStatus(
-        ConnectionStatus.error, 
+        ConnectionStatus.error,
         _tailscaleUrl,
-        errorMessage: 'Sin conexión a internet'
+        errorMessage: 'Sin conexión a internet',
       );
       return;
     }
-    
+
     debugPrint('📶 [OllamaService] Conectividad: $connectivityResult');
-    
-    // Intentar Tailscale primero
+
     debugPrint('🔗 [OllamaService] Probando conexión Tailscale: $_tailscaleUrl');
     if (await _testConnection(_tailscaleUrl)) {
       _baseUrl = _tailscaleUrl;
       debugPrint('✅ [OllamaService] Conexión Tailscale establecida');
       final health = await _getHealthData(_tailscaleUrl);
       _updateConnectionStatus(
-        ConnectionStatus.connected, 
+        ConnectionStatus.connected,
         _tailscaleUrl,
         isHealthy: true,
-        healthData: health
+        healthData: health,
       );
       return;
     }
-    
-    // Intentar conexión local como backup
+
     debugPrint('🔗 [OllamaService] Probando conexión local: $_fallbackUrl');
     if (await _testConnection(_fallbackUrl)) {
       _baseUrl = _fallbackUrl;
       debugPrint('✅ [OllamaService] Conexión local establecida');
       final health = await _getHealthData(_fallbackUrl);
       _updateConnectionStatus(
-        ConnectionStatus.connected, 
+        ConnectionStatus.connected,
         _fallbackUrl,
         isHealthy: true,
-        healthData: health
+        healthData: health,
       );
       return;
     }
-    
-    // No hay conexión disponible
+
     debugPrint('❌ [OllamaService] No se puede conectar al servidor');
-    debugPrint('💡 [OllamaService] Solución: Verifica que:');
-    debugPrint('   1. El servidor esté ejecutándose en la torre');
-    debugPrint('   2. Tailscale esté activo en ambos dispositivos');
-    debugPrint('   3. La IP $_tailscaleUrl sea correcta');
     _updateConnectionStatus(
-      ConnectionStatus.error, 
+      ConnectionStatus.error,
       _tailscaleUrl,
-      errorMessage: 'No se puede conectar al servidor'
+      errorMessage: 'No se puede conectar al servidor',
     );
   }
-  
-  // Probar conexión a una URL
+
   Future<bool> _testConnection(String url) async {
     try {
       debugPrint('   🔌 Probando: $url/api/health');
-      final response = await http.get(
-        Uri.parse('$url/api/health'),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 3));
-      
+      final response = await http
+          .get(
+            Uri.parse('$url/api/health'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 3));
+
       final success = response.statusCode == 200;
       debugPrint('   ${success ? "✓" : "✗"} Estado: ${response.statusCode}');
       return success;
@@ -132,18 +117,18 @@ class OllamaService {
       return false;
     }
   }
-  
-  // Obtener datos de salud
+
   Future<OllamaHealthResponse?> _getHealthData(String url) async {
     try {
-      final response = await http.get(
-        Uri.parse('$url/api/health'),
-        headers: _headers,
-      ).timeout(const Duration(seconds: 3));
-      
+      final response = await http
+          .get(
+            Uri.parse('$url/api/health'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 3));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        debugPrint('   💚 Health data: ${data.toString().substring(0, data.toString().length > 100 ? 100 : data.toString().length)}');
         return OllamaHealthResponse.fromJson(data);
       }
     } catch (e) {
@@ -151,10 +136,9 @@ class OllamaService {
     }
     return null;
   }
-  
-  // Actualizar estado de conexión
+
   void _updateConnectionStatus(
-    ConnectionStatus status, 
+    ConnectionStatus status,
     String url, {
     bool isHealthy = false,
     String? errorMessage,
@@ -170,8 +154,7 @@ class OllamaService {
     _connectionController.add(_connectionInfo);
     debugPrint('📊 [OllamaService] Estado: $status | URL: $url | Healthy: $isHealthy');
   }
-  
-  // Headers para requests
+
   Map<String, String> get _headers {
     final headers = {
       'Content-Type': 'application/json',
@@ -180,8 +163,7 @@ class OllamaService {
     if (_apiKey != null) headers['X-API-Key'] = _apiKey;
     return headers;
   }
-  
-  // Manejar respuesta HTTP (para endpoints que usan formato estándar)
+
   T _handleResponse<T>(http.Response response, T Function(Map<String, dynamic>) parser) {
     if (response.statusCode == 200) {
       try {
@@ -205,446 +187,118 @@ class OllamaService {
       );
     }
   }
-  
-  // Health Check
+
   Future<OllamaHealthResponse> checkHealth() async {
     try {
       debugPrint('💓 [OllamaService] Verificando salud del servidor...');
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/health'),
-        headers: _headers,
-      ).timeout(_timeout);
-      
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/api/health'),
+            headers: _headers,
+          )
+          .timeout(_timeout);
+
       debugPrint('   📥 Status: ${response.statusCode}');
       return _handleResponse(response, (data) => OllamaHealthResponse.fromJson(data));
     } catch (e) {
       debugPrint('❌ [OllamaService] Health check falló: $e');
-      // Si falla, intentar reconectar
       await _detectBestConnection();
       rethrow;
     }
   }
-  
- // Listar modelos disponibles
+
   Future<List<OllamaModel>> getModels() async {
     try {
       debugPrint('📋 [OllamaService] Obteniendo lista de modelos...');
-      
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/models'), 
-        headers: _headers,
-      ).timeout(_timeout);
-      
+
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/api/models'),
+            headers: _headers,
+          )
+          .timeout(_timeout);
+
       debugPrint('   📥 Status: ${response.statusCode}');
-      
+
       if (response.statusCode == 200) {
         try {
           final data = json.decode(response.body) as Map<String, dynamic>;
-          
-          // Función interna para parsear la lista de modelos
+
           List<OllamaModel> parseModelsList(Map<String, dynamic> dataMap) {
             if (dataMap.containsKey('models') && dataMap['models'] is List) {
               final modelsList = dataMap['models'] as List;
-              if (modelsList.isEmpty) {
-                 debugPrint('      -> Lista "models" encontrada, pero está vacía.');
-              }
-              return modelsList
-                  .map((model) => OllamaModel.fromJson(model))
-                  .toList();
+              return modelsList.map((model) => OllamaModel.fromJson(model)).toList();
             }
-            debugPrint('   ❌ La clave "models" no se encontró o no es una lista en el mapa: ${dataMap.keys.join(', ')}');
             throw OllamaException('La clave "models" no se encontró o no es una lista');
           }
 
           List<OllamaModel> models;
 
-          // Opción 1: Detectar formato wrapper (como el tuyo)
           if (data.containsKey('success') && data['success'] == true) {
-            debugPrint('   ✓ Formato detectado: Wrapper (success: true)');
-            
             if (data.containsKey('models')) {
-              debugPrint('      -> Clave "models" encontrada en la raíz del wrapper');
               models = parseModelsList(data);
             } else if (data.containsKey('data') && data['data'] is Map<String, dynamic>) {
-              debugPrint('      -> Buscando en la clave "data"');
               models = parseModelsList(data['data'] as Map<String, dynamic>);
             } else if (data.containsKey('ollama') && data['ollama'] is Map<String, dynamic>) {
-              debugPrint('      -> Buscando en la clave "ollama"');
               models = parseModelsList(data['ollama'] as Map<String, dynamic>);
             } else {
-               debugPrint('   ❌ Wrapper detectado, pero no se encontró la clave "models", "data", ni "ollama"');
-               throw OllamaException('Formato wrapper no reconocido');
+              throw OllamaException('Formato wrapper no reconocido');
             }
-          } 
-          // Opción 2: Detectar formato estándar de Ollama (solo la clave 'models')
-          else if (data.containsKey('models')) {
-            debugPrint('   ✓ Formato detectado: Ollama Estándar');
+          } else if (data.containsKey('models')) {
             models = parseModelsList(data);
-          } 
-          // Si no es ninguno
-          else {
-            debugPrint('   ❌ Formato de respuesta no reconocido para getModels');
-            debugPrint('   📄 Response body: ${response.body}');
-            throw OllamaException('Formato de respuesta de modelos no reconocido. Keys: ${data.keys.join(", ")}');
+          } else {
+            throw OllamaException('Formato de respuesta de modelos no reconocido');
           }
-          
-          debugPrint('   ✅ ${models.length} modelos encontrados');
-          for (var model in models) {
-            debugPrint('      • ${model.name}');
-          }
-          return models;
 
+          debugPrint('   ✅ ${models.length} modelos encontrados');
+          return models;
         } catch (e) {
-          debugPrint('   ❌ Error parseando JSON en getModels: $e');
-          debugPrint('   📄 Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
           if (e is OllamaException) rethrow;
           throw OllamaException('Error procesando respuesta de modelos: $e');
         }
       } else {
-        // Error HTTP
-        debugPrint('   ❌ Error HTTP ${response.statusCode} en getModels');
-        debugPrint('   📄 Response: ${response.body}');
         throw OllamaException(
           'Error del servidor obteniendo modelos: ${response.statusCode}',
           statusCode: response.statusCode,
         );
       }
-      
     } catch (e) {
       debugPrint('❌ [OllamaService] Error obteniendo modelos: $e');
       if (e is OllamaException) rethrow;
       throw OllamaException('Error obteniendo modelos: $e');
     }
   }
-  
-  // Verificar si un modelo está disponible
+
   Future<bool> isModelAvailable(String modelName) async {
     try {
-      debugPrint('🔍 [OllamaService] Verificando disponibilidad de modelo: $modelName');
-      
-      // En lugar de hacer petición individual, obtener lista de modelos
       final models = await getModels();
-      final available = models.any((model) => model.name == modelName);
-      
-      debugPrint('   ${available ? "✅" : "❌"} Modelo $modelName ${available ? "disponible" : "no disponible"}');
-      return available;
+      return models.any((model) => model.name == modelName);
     } catch (e) {
-      debugPrint('   ⚠️ Error verificando modelo: $e');
       return false;
     }
   }
-  
-  // Generar respuesta simple
-  Future<String> generateResponse({
-    required String model,
-    required String prompt,
-    String? systemPrompt,
-    Map<String, dynamic>? options,
-  }) async {
-    try {
-      debugPrint('🔵 [OllamaService] === INICIANDO GENERACIÓN ===');
-      debugPrint('   📍 URL: $_baseUrl/api/generate');
-      debugPrint('   🤖 Modelo: $model');
-      debugPrint('   💬 Prompt: ${prompt.length > 50 ? "${prompt.substring(0, 50)}..." : prompt}');
-      if (systemPrompt != null) {
-        debugPrint('   🎯 System: ${systemPrompt.length > 50 ? "${systemPrompt.substring(0, 50)}..." : systemPrompt}');
-      }
-      
-      final requestBody = {
-        'model': model,
-        'prompt': prompt,
-        'stream': false,
-        if (systemPrompt != null) 'system': systemPrompt,
-        if (options != null) 'options': options,
-      };
-      
-      final requestBodyStr = json.encode(requestBody);
-      debugPrint('   📤 Request size: ${requestBodyStr.length} bytes');
-      
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/generate'),
-        headers: _headers,
-        body: requestBodyStr,
-      ).timeout(_timeout);
-      
-      debugPrint('   📥 Response status: ${response.statusCode}');
-      debugPrint('   📊 Response size: ${response.body.length} bytes');
-      
-      if (response.statusCode == 200) {
-        try {
-          final data = json.decode(response.body) as Map<String, dynamic>;
-          debugPrint('   🔍 Analizando formato de respuesta...');
-          debugPrint('   📋 Keys disponibles: ${data.keys.join(", ")}');
-          
-          // Formato OpenAI-compatible (como tu servidor)
-          // {"id":"ollama-xxx","object":"text_completion","model":"mistral","created":xxx,"choices":[{"index":0,"message":{"role":"assistant","content":"..."},"finish_reason":"stop"}]}
-          if (data.containsKey('choices') && data['choices'] is List && (data['choices'] as List).isNotEmpty) {
-            debugPrint('   ✓ Formato detectado: OpenAI-compatible');
-            final choice = (data['choices'] as List)[0];
-            
-            if (choice['message'] != null && choice['message']['content'] != null) {
-              final content = choice['message']['content'] as String;
-              debugPrint('   ✅ Respuesta extraída: ${content.length} caracteres');
-              debugPrint('   📝 Primeros 100 chars: ${content.length > 100 ? "${content.substring(0, 100)}..." : content}');
-              debugPrint('🟢 [OllamaService] === GENERACIÓN EXITOSA ===\n');
-              return content;
-            } else {
-              debugPrint('   ⚠️ Estructura de mensaje no válida en choice');
-            }
-          }
-          
-          // Fallback para formato estándar de Ollama
-          if (data.containsKey('response')) {
-            debugPrint('   ✓ Formato detectado: Ollama estándar');
-            final content = data['response'] as String;
-            debugPrint('   ✅ Respuesta extraída: ${content.length} caracteres');
-            debugPrint('🟢 [OllamaService] === GENERACIÓN EXITOSA ===\n');
-            return content;
-          }
-          
-          // Si llegamos aquí, el formato no es reconocido
-          debugPrint('   ❌ Formato de respuesta no reconocido');
-          debugPrint('   📄 Response body completo: ${response.body}');
-          debugPrint('🔴 [OllamaService] === ERROR: FORMATO DESCONOCIDO ===\n');
-          debugPrint('💡 SOLUCIÓN: Verifica que el servidor esté devolviendo el formato correcto');
-          throw OllamaException('Formato de respuesta no reconocido. Keys disponibles: ${data.keys.join(", ")}');
-          
-        } catch (e) {
-          debugPrint('   ❌ Error parseando JSON: $e');
-          debugPrint('   📄 Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
-          debugPrint('🔴 [OllamaService] === ERROR DE PARSING ===\n');
-          throw OllamaException('Error procesando respuesta del servidor: $e');
-        }
-      } else {
-        debugPrint('   ❌ Error HTTP ${response.statusCode}');
-        debugPrint('   📄 Response: ${response.body}');
-        debugPrint('🔴 [OllamaService] === ERROR HTTP ===\n');
-        debugPrint('💡 SOLUCIÓN:');
-        debugPrint('   - Status 404: Endpoint no encontrado, verifica la URL');
-        debugPrint('   - Status 500: Error interno del servidor');
-        debugPrint('   - Status 503: Servidor no disponible o modelo no cargado');
-        throw OllamaException(
-          'Error del servidor: ${response.statusCode}',
-          statusCode: response.statusCode,
-        );
-      }
-    } on TimeoutException {
-      debugPrint('⏱️ [OllamaService] Timeout después de $_timeout');
-      debugPrint('💡 SOLUCIÓN: El modelo puede estar cargándose o la consulta es muy compleja');
-      throw OllamaException('Timeout: El servidor tardó demasiado en responder');
-    } on SocketException catch (e) {
-      debugPrint('🔌 [OllamaService] Error de conexión: $e');
-      debugPrint('💡 SOLUCIÓN:');
-      debugPrint('   1. Verifica que Tailscale esté activo');
-      debugPrint('   2. Verifica que el servidor esté corriendo en la torre');
-      debugPrint('   3. Prueba con: curl http://100.125.201.64:3001/api/health');
-      throw OllamaException('Error de conexión: Verifica que el servidor esté accesible via Tailscale');
-    } catch (e) {
-      debugPrint('❌ [OllamaService] Error inesperado: $e');
-      debugPrint('🔴 [OllamaService] === ERROR INESPERADO ===\n');
-      if (e is OllamaException) rethrow;
-      throw OllamaException('Error generando respuesta: $e');
-    }
-  }
-  
-  // Chat con historial de mensajes
-  Future<String> chatWithHistory({
-    required String model,
-    required List<ChatMessage> messages,
-    Map<String, dynamic>? options,
-  }) async {
-    try {
-      debugPrint('💬 [OllamaService] === INICIANDO CHAT ===');
-      debugPrint('   📍 URL: $_baseUrl/api/chat');
-      debugPrint('   🤖 Modelo: $model');
-      debugPrint('   📝 Mensajes: ${messages.length}');
-      
-      final requestBody = {
-        'model': model,
-        'messages': messages.map((msg) => msg.toJson()).toList(),
-        'stream': false,
-        if (options != null) 'options': options,
-      };
-      
-      debugPrint('   📤 Request preparado con ${messages.length} mensajes');
-      
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/chat'),
-        headers: _headers,
-        body: json.encode(requestBody),
-      ).timeout(_timeout);
-      
-      debugPrint('   📥 Response status: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        try {
-          final data = json.decode(response.body) as Map<String, dynamic>;
-          debugPrint('   🔍 Keys disponibles: ${data.keys.join(", ")}');
-          
-          // Formato OpenAI-compatible
-          if (data.containsKey('choices') && data['choices'] is List && (data['choices'] as List).isNotEmpty) {
-            debugPrint('   ✓ Formato: OpenAI-compatible');
-            final choice = (data['choices'] as List)[0];
-            if (choice['message'] != null && choice['message']['content'] != null) {
-              final content = choice['message']['content'] as String;
-              debugPrint('   ✅ Chat exitoso: ${content.length} caracteres');
-              debugPrint('🟢 [OllamaService] === CHAT EXITOSO ===\n');
-              return content;
-            }
-          }
-          
-          // Formato estándar Ollama
-          if (data['message'] != null && data['message']['content'] != null) {
-            debugPrint('   ✓ Formato: Ollama estándar (message.content)');
-            final content = data['message']['content'] as String;
-            debugPrint('   ✅ Chat exitoso: ${content.length} caracteres');
-            debugPrint('🟢 [OllamaService] === CHAT EXITOSO ===\n');
-            return content;
-          }
-          
-          if (data.containsKey('response')) {
-            debugPrint('   ✓ Formato: Ollama alternativo (response)');
-            final content = data['response'] as String;
-            debugPrint('   ✅ Chat exitoso: ${content.length} caracteres');
-            debugPrint('🟢 [OllamaService] === CHAT EXITOSO ===\n');
-            return content;
-          }
-          
-          debugPrint('   ❌ Formato no reconocido');
-          debugPrint('   📄 Response: ${response.body}');
-          debugPrint('🔴 [OllamaService] === ERROR: FORMATO DESCONOCIDO ===\n');
-          throw OllamaException('Formato de respuesta no reconocido en chat');
-        } catch (e) {
-          debugPrint('   ❌ Error parseando respuesta: $e');
-          debugPrint('🔴 [OllamaService] === ERROR DE PARSING ===\n');
-          throw OllamaException('Error procesando respuesta de chat: $e');
-        }
-      } else {
-        debugPrint('   ❌ Error HTTP ${response.statusCode}');
-        debugPrint('   📄 Response: ${response.body}');
-        debugPrint('🔴 [OllamaService] === ERROR HTTP ===\n');
-        throw OllamaException(
-          'Error del servidor en chat: ${response.statusCode}',
-          statusCode: response.statusCode,
-        );
-      }
-    } on TimeoutException {
-      debugPrint('⏱️ [OllamaService] Chat timeout después de $_timeout');
-      throw OllamaException('Timeout en chat: El servidor tardó demasiado');
-    } on SocketException catch (e) {
-      debugPrint('🔌 [OllamaService] Error de conexión en chat: $e');
-      throw OllamaException('Error de conexión en chat');
-    } catch (e) {
-      debugPrint('❌ [OllamaService] Error inesperado en chat: $e');
-      if (e is OllamaException) rethrow;
-      throw OllamaException('Error en chat: $e');
-    }
-  }
-  
-  // Reconectar manualmente
-  Future<void> reconnect() async {
-    debugPrint('🔄 [OllamaService] Reconectando...');
-    await _detectBestConnection();
-  }
-  
-  // Forzar uso de URL específica
-  Future<void> setCustomUrl(String url) async {
-    debugPrint('🔧 [OllamaService] Configurando URL personalizada: $url');
-    _baseUrl = url;
-    await _detectBestConnection();
-  }
-  
-  // Limpiar recursos
-  void dispose() {
-      debugPrint('🔴 [OllamaService] Cerrando conexión...');
-      _connectionController.close();
-    }
 
-    Future<String> generateContent(
-    String prompt, {
-    String? model,
-    double temperature = 0.7,
-    int maxTokens = 2048,
-  }) async {
-    // Si no se proporciona modelo, usar uno por defecto
-    final selectedModel = model ?? 'phi3:latest';
-    
-    debugPrint('📝 [OllamaService] generateContent llamado');
-    debugPrint('   🤖 Modelo: $selectedModel');
-    debugPrint('   💬 Prompt: ${prompt.length > 50 ? "${prompt.substring(0, 50)}..." : prompt}');
-    
-    // Usar el método generate existente
-    return await generateResponse(
-      model: selectedModel,
-      prompt: prompt,
-      options: {
-        'temperature': temperature,
-        'num_predict': maxTokens,
-      },
-    );
-  }
-    /// Limpiar historial de conversación
   void clearConversation() {
     _conversationHistory.clear();
     debugPrint('🧹 [OllamaService] Historial de conversación limpiado');
   }
 
-  /// Genera contenido con historial (chat contextual)
-  Future<String> generateContentContext(
-    String prompt, {
-    String model = 'phi3:latest',
-    double temperature = 0.7,
-    int maxTokens = 2048,
-  }) async {
-    debugPrint('💬 [OllamaService] generateContentContext llamado');
-    debugPrint('   🤖 Modelo: $model');
-    debugPrint('   🧠 Mensajes previos: ${_conversationHistory.length}');
-    debugPrint('   💬 Prompt actual: $prompt');
-
-    // Agregar nuevo mensaje del usuario al historial
-    _conversationHistory.add(ChatMessage(role: 'user', content: prompt));
-
-    try {
-      final responseText = await chatWithHistory(
-        model: model,
-        messages: _conversationHistory,
-        options: {
-          'temperature': temperature,
-          'num_predict': maxTokens,
-        },
-      );
-
-      // Agregar respuesta del modelo al historial
-      _conversationHistory.add(ChatMessage(role: 'assistant', content: responseText));
-
-      debugPrint('🧠 [OllamaService] Historial actualizado: ${_conversationHistory.length} mensajes');
-      return responseText;
-    } catch (e) {
-      debugPrint('❌ [OllamaService] Error en generateContentContext: $e');
-      throw OllamaException('Error generando contenido con historial: $e');
-    }
+  void addUserMessage(String content) {
+    _conversationHistory.add(ChatMessage(
+      role: 'user',
+      content: content,
+    ));
+    debugPrint('📝 [OllamaService] Mensaje de usuario añadido al historial');
   }
 
+  void addBotMessage(String content) {
+    _conversationHistory.add(ChatMessage(
+      role: 'assistant',
+      content: content,
+    ));
+    debugPrint('📝 [OllamaService] Mensaje del bot añadido al historial');
+  }
 
-    /// Añadir mensaje del usuario al historial
-    void addUserMessage(String content) {
-      _conversationHistory.add(ChatMessage(
-        role: 'user',
-        content: content,
-      ));
-      debugPrint('📝 [OllamaService] Mensaje de usuario añadido al historial');
-    }
-
-    /// Añadir mensaje del bot al historial
-    void addBotMessage(String content) {
-      _conversationHistory.add(ChatMessage(
-        role: 'assistant',
-        content: content,
-      ));
-      debugPrint('📝 [OllamaService] Mensaje del bot añadido al historial');
-    }
-
-    /// Streaming SIN historial
   Stream<String> generateContentStream({
     required String model,
     required String prompt,
@@ -679,8 +333,7 @@ class OllamaService {
 
         try {
           final data = json.decode(chunk) as Map<String, dynamic>;
-          
-          // Formato OpenAI-compatible
+
           if (data.containsKey('choices') && data['choices'] is List) {
             final choices = data['choices'] as List;
             if (choices.isNotEmpty) {
@@ -691,9 +344,7 @@ class OllamaService {
               }
             }
             if (data['done'] == true || choices[0]['finish_reason'] != null) break;
-          }
-          // Formato Ollama estándar
-          else if (data.containsKey('response')) {
+          } else if (data.containsKey('response')) {
             final text = data['response'] as String?;
             if (text != null && text.isNotEmpty) {
               yield text;
@@ -711,7 +362,6 @@ class OllamaService {
     }
   }
 
-  /// Streaming CON historial
   Stream<String> generateContentStreamContext({
     required String model,
     required String prompt,
@@ -721,7 +371,6 @@ class OllamaService {
     debugPrint('   🤖 Modelo: $model');
     debugPrint('   📚 Historial: ${_conversationHistory.length} mensajes');
 
-    // Añadir mensaje del usuario al historial
     _conversationHistory.add(ChatMessage(role: 'user', content: prompt));
 
     final messages = _conversationHistory.map((msg) => msg.toJson()).toList();
@@ -755,8 +404,7 @@ class OllamaService {
 
         try {
           final data = json.decode(chunk) as Map<String, dynamic>;
-          
-          // Formato OpenAI-compatible
+
           if (data.containsKey('choices') && data['choices'] is List) {
             final choices = data['choices'] as List;
             if (choices.isNotEmpty) {
@@ -768,9 +416,7 @@ class OllamaService {
               }
             }
             if (data['done'] == true || choices[0]['finish_reason'] != null) break;
-          }
-          // Formato Ollama estándar
-          else if (data.containsKey('message')) {
+          } else if (data.containsKey('message')) {
             final message = data['message'] as Map<String, dynamic>?;
             final text = message?['content'] as String?;
             if (text != null && text.isNotEmpty) {
@@ -784,7 +430,6 @@ class OllamaService {
         }
       }
 
-      // Guardar respuesta completa en historial
       _conversationHistory.add(ChatMessage(role: 'assistant', content: fullResponse.toString()));
 
       debugPrint('✅ [OllamaService] Stream completado: ${fullResponse.length} chars');
@@ -794,11 +439,25 @@ class OllamaService {
       rethrow;
     } finally {
       client.close();
-      // Si hubo error, quitar el mensaje del usuario del historial
       if (hasError && _conversationHistory.isNotEmpty) {
         _conversationHistory.removeLast();
       }
     }
   }
 
+  Future<void> reconnect() async {
+    debugPrint('🔄 [OllamaService] Reconectando...');
+    await _detectBestConnection();
+  }
+
+  Future<void> setCustomUrl(String url) async {
+    debugPrint('🔧 [OllamaService] Configurando URL personalizada: $url');
+    _baseUrl = url;
+    await _detectBestConnection();
+  }
+
+  void dispose() {
+    debugPrint('🔴 [OllamaService] Cerrando conexión...');
+    _connectionController.close();
+  }
 }

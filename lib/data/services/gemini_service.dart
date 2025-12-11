@@ -5,7 +5,7 @@ import 'api_keys_manager.dart';
 
 class GeminiService {
   static const String _modelName = 'gemini-2.5-flash';
-  
+
   final ApiKeysManager _apiKeysManager = ApiKeysManager();
   GenerativeModel? _model;
   String? _cachedApiKey;
@@ -17,9 +17,9 @@ class GeminiService {
 
   Future<void> _ensureInitialized() async {
     if (_model != null) return;
-    
+
     final apiKey = await _getApiKey();
-    
+
     _model = GenerativeModel(
       model: _modelName,
       apiKey: apiKey,
@@ -36,7 +36,7 @@ class GeminiService {
         SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.medium),
       ],
     );
-    
+
     debugPrint('✅ [GeminiService] Modelo inicializado: $_modelName');
   }
 
@@ -68,63 +68,21 @@ class GeminiService {
     }
   }
 
-  /// Generación SIN historial
-  Future<String> generateContent(String prompt) async {
-    await _ensureInitialized();
-    
-    debugPrint('💬 [GeminiService] generateContent (sin historial)');
-    
-    try {
-      final response = await _model!.generateContent([Content.text(prompt)]);
-      final text = response.text ?? 'Sin respuesta';
-      debugPrint('✅ [GeminiService] Respuesta: ${text.length} caracteres');
-      return text;
-    } catch (e) {
-      debugPrint('❌ [GeminiService] Error: $e');
-      throw Exception('Error al conectar con Gemini: $e');
-    }
-  }
-
-  /// Generación CON historial
-  Future<String> generateContentContext(String prompt) async {
-    await _ensureInitialized();
-    
-    debugPrint('💬 [GeminiService] generateContentContext');
-    debugPrint('   📚 Historial: ${_conversationHistory.length} mensajes');
-    
-    _conversationHistory.add(Content.text(prompt));
-    
-    try {
-      final response = await _model!.generateContent(_conversationHistory);
-      final text = response.text ?? 'Sin respuesta';
-      
-      _conversationHistory.add(Content.model([TextPart(text)]));
-      
-      debugPrint('✅ [GeminiService] Respuesta: ${text.length} caracteres');
-      return text;
-    } catch (e) {
-      _conversationHistory.removeLast();
-      debugPrint('❌ [GeminiService] Error: $e');
-      throw Exception('Error al conectar con Gemini: $e');
-    }
-  }
-
-  /// Streaming SIN historial
   Stream<String> generateContentStream(String prompt) async* {
     await _ensureInitialized();
-    
+
     debugPrint('🌊 [GeminiService] generateContentStream (sin historial)');
-    
+
     try {
       final responses = _model!.generateContentStream([Content.text(prompt)]);
-      
+
       await for (final response in responses) {
         final text = response.text;
         if (text != null && text.isNotEmpty) {
           yield text;
         }
       }
-      
+
       debugPrint('✅ [GeminiService] Stream completado');
     } catch (e) {
       debugPrint('❌ [GeminiService] Error en stream: $e');
@@ -132,21 +90,20 @@ class GeminiService {
     }
   }
 
-  /// Streaming CON historial
   Stream<String> generateContentStreamContext(String prompt) async* {
     await _ensureInitialized();
-    
+
     debugPrint('🌊 [GeminiService] generateContentStreamContext');
     debugPrint('   📚 Historial: ${_conversationHistory.length} mensajes');
-    
+
     _conversationHistory.add(Content.text(prompt));
-    
+
     final fullResponse = StringBuffer();
     bool hasError = false;
-    
+
     try {
       final responses = _model!.generateContentStream(_conversationHistory);
-      
+
       await for (final response in responses) {
         final text = response.text;
         if (text != null && text.isNotEmpty) {
@@ -154,10 +111,9 @@ class GeminiService {
           yield text;
         }
       }
-      
+
       _conversationHistory.add(Content.model([TextPart(fullResponse.toString())]));
       debugPrint('✅ [GeminiService] Stream completado: ${fullResponse.length} caracteres');
-      
     } catch (e) {
       hasError = true;
       debugPrint('❌ [GeminiService] Error en stream: $e');

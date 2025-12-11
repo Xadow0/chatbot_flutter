@@ -223,7 +223,6 @@ class _AppInitializerState extends State<AppInitializer> {
             final commandProvider = Provider.of<CommandManagementProvider>(context, listen: false);
             
             final chatProvider = ChatProvider(
-              chatRepository: context.read<ChatRepository>(),
               conversationRepository: context.read<ConversationRepository>(),
               commandRepository: context.read<CommandRepository>(),
               aiServiceSelector: context.read<AIServiceSelector>(),

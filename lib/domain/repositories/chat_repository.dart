@@ -3,7 +3,7 @@
 /// ============================================================================
 /// 
 /// Define el contrato que la capa de datos debe implementar.
-/// Incluye métodos tanto para envío tradicional como con streaming.
+/// Solo métodos de streaming para generación de respuestas.
 /// 
 /// UBICACIÓN: lib/domain/repositories/chat_repository.dart
 /// ============================================================================
@@ -11,13 +11,7 @@ library;
 
 import '../entities/message_entity.dart';
 
-/// Interfaz del repositorio para manejar operaciones de chat.
 abstract class ChatRepository {
-  /// Envía un mensaje y recibe la respuesta completa del bot.
-  /// 
-  /// Método tradicional que espera a que la respuesta esté completa.
-  Future<MessageEntity> sendMessage(String content);
-
   /// Envía un mensaje y recibe la respuesta con streaming.
   /// 
   /// El Stream emite MessageEntity actualizados conforme llegan

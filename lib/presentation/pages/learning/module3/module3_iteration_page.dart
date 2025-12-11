@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -9,10 +10,8 @@ import 'package:markdown_widget/markdown_widget.dart';
 enum IterationType { reformular, aclarar, ejemplificar, acotar }
 
 class Module3IterationPage extends StatefulWidget {
-  /// If [iterationSequence] is provided the page will run through each IterationType
-  /// in order within the same chat interface. By default it runs all four types.
   final List<IterationType>? iterationSequence;
-  final VoidCallback onNext; // called when the entire sequence finishes
+  final VoidCallback onNext;
 
   const Module3IterationPage({
     super.key,
@@ -38,11 +37,13 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
 
   String? _conversationId;
   String? _originalPrompt;
+  StreamSubscription<String>? _streamSubscription;
 
   @override
   void initState() {
     super.initState();
-    _sequence = widget.iterationSequence ?? [IterationType.reformular, IterationType.aclarar, IterationType.ejemplificar, IterationType.acotar];
+    _sequence = widget.iterationSequence ??
+        [IterationType.reformular, IterationType.aclarar, IterationType.ejemplificar, IterationType.acotar];
     _conversationId = 'modulo3_${_sequence.map((e) => e.name).join('_')}_${DateTime.now().millisecondsSinceEpoch}';
     _startExercise();
   }
@@ -51,6 +52,7 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _streamSubscription?.cancel();
     super.dispose();
   }
 
@@ -115,8 +117,7 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
       case IterationType.reformular:
         return {
           'userPrompt': 'Realiza un texto corto sobre el cambio climático',
-          'botResponse':
-              'El cambio climático es un fenómeno global que afecta a nuestro planeta. '
+          'botResponse': 'El cambio climático es un fenómeno global que afecta a nuestro planeta. '
               'Las temperaturas están aumentando debido a las emisiones de gases de efecto invernadero. '
               'Los océanos se están calentando y el nivel del mar está subiendo. '
               'Los patrones climáticos están cambiando, causando eventos extremos más frecuentes. '
@@ -128,28 +129,24 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
               'El futuro del planeta depende de las decisiones que tomemos hoy.',
           'userObservation':
               'No es un mal texto, pero esto no me sirve para mi presentación, necesito algo más directo. '
-              'Debo indicar a la IA que mi texto es para una presentación y el tono que debe tener.',
+                  'Debo indicar a la IA que mi texto es para una presentación y el tono que debe tener.',
         };
       case IterationType.aclarar:
         return {
           'userPrompt': 'Explícame qué es la inteligencia artificial',
-          'botResponse':
-              'La inteligencia artificial es un campo de la informática que se enfoca en crear sistemas '
+          'botResponse': 'La inteligencia artificial es un campo de la informática que se enfoca en crear sistemas '
               'capaces de realizar tareas que normalmente requieren inteligencia humana. Utiliza algoritmos '
               'y modelos para procesar información y tomar decisiones.',
-          'userObservation':
-              'Entiendo la idea general, pero es demasiado técnico. Necesito que me lo expliques '
+          'userObservation': 'Entiendo la idea general, pero es demasiado técnico. Necesito que me lo expliques '
               'de manera más simple, como si se lo explicaras a un niño de 10 años.',
         };
       case IterationType.ejemplificar:
         return {
           'userPrompt': 'Cuéntame sobre la fotosíntesis',
-          'botResponse':
-              'La fotosíntesis es el proceso mediante el cual las plantas convierten la luz solar, '
+          'botResponse': 'La fotosíntesis es el proceso mediante el cual las plantas convierten la luz solar, '
               'el dióxido de carbono y el agua en glucosa y oxígeno. Es fundamental para la vida '
               'en la Tierra ya que produce el oxígeno que respiramos.',
-          'userObservation':
-              'Está bien explicado, pero me gustaría que lo acompañaras con un ejemplo concreto '
+          'userObservation': 'Está bien explicado, pero me gustaría que lo acompañaras con un ejemplo concreto '
               'de cómo sucede esto en una planta común, como un girasol.',
         };
       case IterationType.acotar:
@@ -157,18 +154,16 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
           'userPrompt': 'Háblame sobre la historia de la música',
           'botResponse':
               'La historia de la música es vastísima y abarca miles de años. Desde los primeros instrumentos '
-              'prehistóricos hasta la música electrónica moderna, ha evolucionado constantemente. Cada cultura '
-              'ha desarrollado sus propios estilos, instrumentos y teorías musicales. La música clásica europea, '
-              'el jazz americano, las músicas tradicionales de Asia y África, el rock, el pop, el hip-hop... '
-              'cada género tiene su propia historia fascinante.',
-          'userObservation':
-              'Es demasiado amplio. Necesito que te centres específicamente en la música clásica europea '
+                  'prehistóricos hasta la música electrónica moderna, ha evolucionado constantemente. Cada cultura '
+                  'ha desarrollado sus propios estilos, instrumentos y teorías musicales. La música clásica europea, '
+                  'el jazz americano, las músicas tradicionales de Asia y África, el rock, el pop, el hip-hop... '
+                  'cada género tiene su propia historia fascinante.',
+          'userObservation': 'Es demasiado amplio. Necesito que te centres específicamente en la música clásica europea '
               'del periodo barroco, entre 1600 y 1750.',
         };
     }
   }
 
-  /// Adds a message and waits for its animation to complete if animated.
   Future<void> _addMessage(_ChatMessage message) async {
     if (!mounted) return;
 
@@ -197,7 +192,8 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 60), () {
       if (_scrollController.hasClients && mounted) {
-        _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        _scrollController.animateTo(_scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       }
     });
   }
@@ -218,21 +214,42 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
 
     try {
       final completePrompt = '$_originalPrompt. $text';
-      final response = await _geminiService.generateContent(completePrompt);
+      final buffer = StringBuffer();
 
-      if (!mounted) return;
-      setState(() => _generatingResponse = false);
+      _streamSubscription = _geminiService.generateContentStream(completePrompt).listen(
+        (chunk) {
+          buffer.write(chunk);
+        },
+        onDone: () async {
+          if (!mounted) return;
+          setState(() => _generatingResponse = false);
 
-      if (_messages.isNotEmpty) {
-        _messages.removeLast();
-        setState(() {});
-      }
+          if (_messages.isNotEmpty) {
+            _messages.removeLast();
+            setState(() {});
+          }
 
-      await _addMessage(_ChatMessage(text: response, isUser: false, isAnimated: true));
-      if (mounted) {
-        // marca esta iteracion como completa
-        setState(() => _exerciseComplete = true);
-      }
+          await _addMessage(_ChatMessage(text: buffer.toString(), isUser: false, isAnimated: true));
+          if (mounted) {
+            setState(() => _exerciseComplete = true);
+          }
+        },
+        onError: (e) async {
+          if (!mounted) return;
+          setState(() => _generatingResponse = false);
+          if (_messages.isNotEmpty) {
+            _messages.removeLast();
+            setState(() {});
+          }
+          await _addMessage(
+              _ChatMessage(text: 'Error al generar respuesta: $e\n\nPor favor, intenta de nuevo.', isUser: false, isAnimated: false));
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red, duration: const Duration(seconds: 5)));
+          }
+          setState(() => _waitingForUserInput = true);
+        },
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _generatingResponse = false);
@@ -240,8 +257,12 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
         _messages.removeLast();
         setState(() {});
       }
-      await _addMessage(_ChatMessage(text: 'Error al generar respuesta: $e\n\nPor favor, intenta de nuevo.', isUser: false, isAnimated: false));
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red, duration: const Duration(seconds: 5)));
+      await _addMessage(
+          _ChatMessage(text: 'Error al generar respuesta: $e\n\nPor favor, intenta de nuevo.', isUser: false, isAnimated: false));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red, duration: const Duration(seconds: 5)));
+      }
       setState(() => _waitingForUserInput = true);
     }
   }
@@ -262,7 +283,7 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
       };
       await file.writeAsString(jsonEncode(conversationData));
     } catch (e) {
-      print('Error al guardar conversación: $e');
+      debugPrint('Error al guardar conversación: $e');
     }
   }
 
@@ -288,19 +309,16 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
             padding: const EdgeInsets.all(16),
             child: ElevatedButton(
               onPressed: () async {
-                // Ir a la siguiente iteración si hay más o finalizar módulo
                 if (_currentIterationIndex < _sequence.length - 1) {
                   setState(() {
                     _currentIterationIndex++;
                     _exerciseComplete = false;
                     _waitingForUserInput = false;
                   });
-                  // añadir el siguiente título e iniciar flujo
                   await _addMessage(_ChatMessage(text: _getTitleText(), isUser: false, isAnimated: true, isTitle: true));
                   await Future.delayed(const Duration(milliseconds: 300));
                   await _startConversationFlow();
                 } else {
-                  // última iteracion acabada, finalizar módulo
                   widget.onNext();
                 }
               },
@@ -308,28 +326,37 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
               child: Text(_currentIterationIndex < _sequence.length - 1 ? 'Siguiente paso' : 'Finalizar módulo'),
             ),
           ),
-          if (_waitingForUserInput && !_exerciseComplete)
+        if (_waitingForUserInput && !_exerciseComplete)
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, boxShadow: [BoxShadow(color: Colors.black.withAlpha((0.1 * 255).round()), blurRadius: 4, offset: const Offset(0, -2))]),
+            decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                boxShadow: [BoxShadow(color: Colors.black.withAlpha((0.1 * 255).round()), blurRadius: 4, offset: const Offset(0, -2))]),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Tu turno: ${_getPromptHint()}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                Text('Tu turno: ${_getPromptHint()}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _messageController,
-                        decoration: InputDecoration(hintText: 'Escribe tu mensaje...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
+                        decoration: InputDecoration(
+                            hintText: 'Escribe tu mensaje...',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
                         maxLines: null,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _sendUserMessage(),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    IconButton(onPressed: _sendUserMessage, icon: Icon(Icons.send, color: theme.colorScheme.primary), style: IconButton.styleFrom(backgroundColor: theme.colorScheme.primaryContainer, padding: const EdgeInsets.all(12))),
+                    IconButton(
+                        onPressed: _sendUserMessage,
+                        icon: Icon(Icons.send, color: theme.colorScheme.primary),
+                        style: IconButton.styleFrom(backgroundColor: theme.colorScheme.primaryContainer, padding: const EdgeInsets.all(12))),
                   ],
                 ),
               ],
@@ -359,13 +386,14 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
       child: Center(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          decoration: BoxDecoration(gradient: LinearGradient(colors: [theme.colorScheme.primary, theme.colorScheme.secondary]), borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [theme.colorScheme.primary, theme.colorScheme.secondary]),
+              borderRadius: BorderRadius.circular(20)),
           child: message.isAnimated
               ? _AnimatedText(
                   text: message.text,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                   onComplete: () {
-                    // marcar completa la animación para que no se repita al hacer scroll
                     message.animationCompleter?.complete();
                     if (mounted) setState(() => message.isAnimated = false);
                   },
@@ -383,23 +411,35 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
         mainAxisAlignment: message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!message.isUser) ...[CircleAvatar(backgroundColor: theme.colorScheme.secondaryContainer, radius: 16, child: Icon(Icons.smart_toy, size: 18, color: theme.colorScheme.onSecondaryContainer)), const SizedBox(width: 8)],
+          if (!message.isUser) ...[
+            CircleAvatar(
+                backgroundColor: theme.colorScheme.secondaryContainer,
+                radius: 16,
+                child: Icon(Icons.smart_toy, size: 18, color: theme.colorScheme.onSecondaryContainer)),
+            const SizedBox(width: 8)
+          ],
           Flexible(
             child: Container(
               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: message.isUser ? theme.colorScheme.primaryContainer : theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                  color: message.isUser ? theme.colorScheme.primaryContainer : theme.colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12)),
               child: _buildMessageContent(theme, message),
             ),
           ),
-          if (message.isUser) ...[const SizedBox(width: 8), CircleAvatar(backgroundColor: theme.colorScheme.primaryContainer, radius: 16, child: Icon(Icons.person, size: 18, color: theme.colorScheme.onPrimaryContainer))],
+          if (message.isUser) ...[
+            const SizedBox(width: 8),
+            CircleAvatar(
+                backgroundColor: theme.colorScheme.primaryContainer,
+                radius: 16,
+                child: Icon(Icons.person, size: 18, color: theme.colorScheme.onPrimaryContainer))
+          ],
         ],
       ),
     );
   }
 
-  // Decide how to render the message content: animated plain text, selectable plain text,
-  // or a Markdown widget if the text looks like markdown/code (for Gemini responses).
   Widget _buildMessageContent(ThemeData theme, _ChatMessage message) {
     final text = message.text;
 
@@ -417,9 +457,7 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
       return cleaned;
     }
 
-    // If the message is from the AI and it looks like markdown, render with MarkdownWidget
     if (!message.isUser && looksLikeMarkdown(text)) {
-      // If this message was animating, stop animation and persist it as static markdown
       if (message.isAnimated) {
         message.animationCompleter?.complete();
         message.isAnimated = false;
@@ -437,7 +475,6 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
         text: text,
         style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
         onComplete: () {
-          // mark animation complete so it won't re-animate when scrolled
           message.animationCompleter?.complete();
           if (mounted) setState(() => message.isAnimated = false);
         },
@@ -456,7 +493,7 @@ class _Module3IterationPageState extends State<Module3IterationPage> {
 class _ChatMessage {
   final String text;
   final bool isUser;
-  bool isAnimated; // mutable so we can mark it completed
+  bool isAnimated;
   final bool isTitle;
 
   Completer<void>? animationCompleter;
