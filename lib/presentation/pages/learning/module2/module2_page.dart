@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/gemini_service.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import '../../../../domain/entities/message_entity.dart';
-import '../../../../domain/repositories/conversation_repository.dart';
+import '../../../../domain/repositories/iconversation_repository.dart';
 import 'package:provider/provider.dart';
 
 class Module2Page extends StatefulWidget {
@@ -16,12 +16,12 @@ class Module2Page extends StatefulWidget {
 
 class _Module2PageState extends State<Module2Page> {
   int _currentPage = 0;
-  late final ConversationRepository _conversationRepository;
+  late final IConversationRepository _conversationRepository;
 
   @override
   void initState() {
     super.initState();
-    _conversationRepository = Provider.of<ConversationRepository>(context, listen: false);
+    _conversationRepository = Provider.of<IConversationRepository>(context, listen: false);
   }
 
   void _nextPage() {
@@ -516,7 +516,7 @@ class _ComparisonPageState extends State<_ComparisonPage> {
 
 class _PromptBuilderPage extends StatefulWidget {
   final VoidCallback onComplete;
-  final ConversationRepository conversationRepository;
+  final IConversationRepository conversationRepository;
 
   const _PromptBuilderPage({
     required this.onComplete,

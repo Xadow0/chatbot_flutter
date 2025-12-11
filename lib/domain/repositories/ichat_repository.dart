@@ -11,7 +11,7 @@ library;
 
 import '../entities/message_entity.dart';
 
-abstract class ChatRepository {
+abstract class IChatRepository {
   /// Envía un mensaje y recibe la respuesta con streaming.
   /// 
   /// El Stream emite MessageEntity actualizados conforme llegan

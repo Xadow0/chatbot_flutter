@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/command_entity.dart';
-import '../../domain/repositories/command_repository.dart';
+import '../repositories/icommand_repository.dart';
 import '../../core/utils/language_detector.dart';
 
 class CommandStreamResult {
@@ -44,7 +44,7 @@ abstract class AIServiceBase {
 
 class CommandProcessor {
   final AIServiceBase _aiService;
-  final CommandRepository _commandRepository;
+  final ICommandRepository _commandRepository;
 
   CommandProcessor(this._aiService, this._commandRepository);
 

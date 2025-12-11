@@ -15,8 +15,8 @@ import '../../data/services/ai_service_selector.dart';
 import '../../data/services/preferences_service.dart';
 import '../../data/services/ai_service_adapters.dart';
 import '../../domain/usecases/command_processor.dart';
-import '../../domain/repositories/conversation_repository.dart';
-import '../../domain/repositories/command_repository.dart';
+import '../../domain/repositories/iconversation_repository.dart';
+import '../../domain/repositories/icommand_repository.dart';
 import '../../core/constants/commands_help.dart';
 import 'command_management_provider.dart';
 
@@ -38,8 +38,8 @@ class ChatProvider extends ChangeNotifier {
   late final AIServiceSelector _aiSelector;
   late final PreferencesService _preferencesService;
 
-  final ConversationRepository _conversationRepository;
-  final CommandRepository _commandRepository;
+  final IConversationRepository _conversationRepository;
+  final ICommandRepository _commandRepository;
 
   bool Function()? _getSyncStatus;
 
@@ -65,8 +65,8 @@ class ChatProvider extends ChangeNotifier {
   static const String _groupSystemCommandsKey = 'group_system_commands';
 
   ChatProvider({
-    required ConversationRepository conversationRepository,
-    required CommandRepository commandRepository,
+    required IConversationRepository conversationRepository,
+    required ICommandRepository commandRepository,
     required AIServiceSelector aiServiceSelector,
   })  : _conversationRepository = conversationRepository,
         _commandRepository = commandRepository,

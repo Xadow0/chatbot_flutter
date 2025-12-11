@@ -2,7 +2,7 @@ import 'dart:io';
 import '../entities/message_entity.dart';
 
 /// Interfaz del repositorio para gestionar el guardado y carga de conversaciones.
-abstract class ConversationRepository {
+abstract class IConversationRepository {
   /// Guarda una conversación completa (lista de entidades)
   Future<void> saveConversation(List<MessageEntity> messages, {File? existingFile, String? suffix});
 

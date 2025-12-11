@@ -9,11 +9,11 @@
 // ============================================================================
 
 import '../../domain/entities/message_entity.dart';
-import '../../domain/repositories/chat_repository.dart';
+import '../../domain/repositories/ichat_repository.dart';
 import '../../data/services/ai_chat_service.dart';
 import '../models/message_model.dart';
 
-class LocalChatRepository implements ChatRepository {
+class LocalChatRepository implements IChatRepository {
   final List<Message> _localMessages = [];
   final AIChatService _aiChatService;
 

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../../domain/entities/message_entity.dart';
-import '../../domain/repositories/conversation_repository.dart';
+import '../../domain/repositories/iconversation_repository.dart';
 import '../models/message_model.dart';
 import '../services/firebase_sync_service.dart';
 
@@ -12,7 +12,7 @@ import '../services/firebase_sync_service.dart';
 /// y usa modelos (data layer) solo para persistencia JSON.
 /// 
 /// NUEVO: Integra sincronización con Firebase cuando está habilitada
-class ConversationRepositoryImpl implements ConversationRepository {
+class ConversationRepositoryImpl implements IConversationRepository {
   final FirebaseSyncService _syncService;
   final bool Function() _isSyncEnabled;
 
