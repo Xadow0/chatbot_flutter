@@ -1,36 +1,35 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/command_entity.dart';
-import '../../domain/repositories/command_repository.dart';
+import '../repositories/icommand_repository.dart';
 import '../../core/utils/language_detector.dart';
 
-/// Resultado del procesamiento de un comando
-class CommandResult {
+class CommandStreamResult {
   final bool isCommand;
   final CommandEntity? command;
-  final String? processedMessage;
+  final Stream<String>? responseStream;
   final String? error;
 
-  CommandResult({
+  CommandStreamResult({
     required this.isCommand,
     this.command,
-    this.processedMessage,
+    this.responseStream,
     this.error,
   });
 
-  factory CommandResult.notCommand() {
-    return CommandResult(isCommand: false);
+  factory CommandStreamResult.notCommand() {
+    return CommandStreamResult(isCommand: false);
   }
 
-  factory CommandResult.success(CommandEntity command, String message) {
-    return CommandResult(
+  factory CommandStreamResult.success(CommandEntity command, Stream<String> stream) {
+    return CommandStreamResult(
       isCommand: true,
       command: command,
-      processedMessage: message,
+      responseStream: stream,
     );
   }
 
-  factory CommandResult.error(CommandEntity? command, String error) {
-    return CommandResult(
+  factory CommandStreamResult.error(CommandEntity? command, String error) {
+    return CommandStreamResult(
       isCommand: true,
       command: command,
       error: error,
@@ -39,166 +38,127 @@ class CommandResult {
 }
 
 abstract class AIServiceBase {
-  Future<String> generateContent(String prompt);
-  Future<String> generateContentWithoutHistory(String prompt);
+  Stream<String> generateContentStream(String prompt);
+  Stream<String> generateContentStreamWithoutHistory(String prompt);
 }
 
 class CommandProcessor {
   final AIServiceBase _aiService;
-  final CommandRepository _commandRepository;
+  final ICommandRepository _commandRepository;
 
   CommandProcessor(this._aiService, this._commandRepository);
 
-  /// Detecta si el mensaje es un comando buscando en la base de datos/repositorio
-  Future<CommandResult> processMessage(String message) async {
+  Future<CommandStreamResult> processMessageStream(String message) async {
     final normalizedMessage = message.trim();
     if (!normalizedMessage.startsWith('/')) {
-      return CommandResult.notCommand();
+      return CommandStreamResult.notCommand();
     }
 
-    debugPrint('🔍 [CommandProcessor] Analizando mensaje: $normalizedMessage');
+    debugPrint('🌊 [CommandProcessor] Analizando comando para streaming: $normalizedMessage');
 
     try {
-      // 1. Obtener todos los comandos disponibles (Sistema + Usuario)
       final commands = await _commandRepository.getAllCommands();
-      
-      // 2. Buscar coincidencia con el trigger
-      // Ordenamos por longitud desc (para que /traduciringles no coincida con /traducir por error si existieran ambos)
       commands.sort((a, b) => b.trigger.length.compareTo(a.trigger.length));
-      
+
       final matchingCommand = commands.firstWhere(
         (cmd) => normalizedMessage.toLowerCase().startsWith(cmd.trigger.toLowerCase()),
-        orElse: () => throw Exception('No match'), // Usamos try/catch para el flujo
+        orElse: () => throw Exception('No match'),
       );
 
       debugPrint('   ✅ Comando detectado: ${matchingCommand.trigger} (${matchingCommand.title})');
 
-      // 3. Enrutar según el tipo de sistema
       switch (matchingCommand.systemType) {
         case SystemCommandType.none:
-          return await _processUserCommand(matchingCommand, message);
-        
-        case SystemCommandType.traducir:
-          return await _processTraducir(matchingCommand, message);
+          return _processUserCommandStream(matchingCommand, message);
 
-        // Los siguientes comparten lógica simple (Template + Contenido),
-        // pero mantenemos el switch por si quieres añadir lógica específica a futuro.
+        case SystemCommandType.traducir:
+          return _processTraducirStream(matchingCommand, message);
+
         case SystemCommandType.evaluarPrompt:
         case SystemCommandType.resumir:
         case SystemCommandType.codigo:
         case SystemCommandType.corregir:
         case SystemCommandType.explicar:
         case SystemCommandType.comparar:
-          return await _processStandardSystemCommand(matchingCommand, message);
+          return _processStandardSystemCommandStream(matchingCommand, message);
       }
-
     } catch (e) {
-      // Si no se encontró comando o hubo error en repositorio
       if (e.toString().contains('No match')) {
-         debugPrint('   ℹ️ No es un comando registrado.');
-         return CommandResult.notCommand();
+        debugPrint('   ℹ️ No es un comando registrado.');
+        return CommandStreamResult.notCommand();
       }
       debugPrint('   ❌ Error recuperando comandos: $e');
-      return CommandResult.notCommand();
+      return CommandStreamResult.notCommand();
     }
   }
 
-  /// Procesa comandos personalizados del usuario (Simples)
-  /// Concatena el Prompt del usuario + el Input actual
-  Future<CommandResult> _processUserCommand(CommandEntity command, String message) async {
-    try {
-      final content = _extractContentAfterCommand(message, command.trigger);
-      
-      // Si el usuario definió un placeholder {{content}}, lo usamos. Si no, concatenamos.
-      String finalPrompt;
-      if (command.promptTemplate.contains('{{content}}')) {
-        finalPrompt = command.promptTemplate.replaceAll('{{content}}', content);
-      } else {
-        finalPrompt = '${command.promptTemplate}\n\n$content';
-      }
+  CommandStreamResult _processUserCommandStream(CommandEntity command, String message) {
+    final content = _extractContentAfterCommand(message, command.trigger);
 
-      debugPrint('   🤖 Enviando Prompt Usuario a IA...');
-      final response = await _aiService.generateContentWithoutHistory(finalPrompt);
-      return CommandResult.success(command, response);
-    } catch (e) {
-      return CommandResult.error(command, 'Error ejecutando comando: $e');
+    String finalPrompt;
+    if (command.promptTemplate.contains('{{content}}')) {
+      finalPrompt = command.promptTemplate.replaceAll('{{content}}', content);
+    } else {
+      finalPrompt = '${command.promptTemplate}\n\n$content';
     }
+
+    debugPrint('   🌊 Enviando Prompt Usuario a IA (streaming)...');
+    final stream = _aiService.generateContentStreamWithoutHistory(finalPrompt);
+    return CommandStreamResult.success(command, stream);
   }
 
-  /// Procesa comandos estándar del sistema que solo requieren inyección de contenido
-  /// (Evaluar, Resumir, Código, Corregir, Explicar, Comparar)
-  Future<CommandResult> _processStandardSystemCommand(CommandEntity command, String message) async {
-    try {
-      final content = _extractContentAfterCommand(message, command.trigger);
-      
-      if (content.isEmpty) {
-        return CommandResult.error(command, 'Por favor, añade el contenido después del comando.');
-      }
+  CommandStreamResult _processStandardSystemCommandStream(CommandEntity command, String message) {
+    final content = _extractContentAfterCommand(message, command.trigger);
 
-      // Inyectamos el contenido en el template que viene del Modelo/Firebase
-      final finalPrompt = command.promptTemplate.replaceAll('{{content}}', content);
-
-      debugPrint('   🤖 Enviando Prompt Sistema (${command.title}) a IA...');
-      final response = await _aiService.generateContentWithoutHistory(finalPrompt);
-      return CommandResult.success(command, response);
-    } catch (e) {
-      return CommandResult.error(command, 'Error: $e');
+    if (content.isEmpty) {
+      return CommandStreamResult.error(command, 'Por favor, añade el contenido después del comando.');
     }
+
+    final finalPrompt = command.promptTemplate.replaceAll('{{content}}', content);
+
+    debugPrint('   🌊 Enviando Prompt Sistema (${command.title}) a IA (streaming)...');
+    final stream = _aiService.generateContentStreamWithoutHistory(finalPrompt);
+    return CommandStreamResult.success(command, stream);
   }
 
-  /// Lógica avanzada específica para TRADUCIR
-  /// 
-  /// Detecta el idioma objetivo al inicio del contenido usando [LanguageDetector]
-  /// y traduce el texto restante a ese idioma
-  Future<CommandResult> _processTraducir(CommandEntity command, String message) async {
-    try {
-      final contentRaw = _extractContentAfterCommand(message, command.trigger);
-      
-      if (contentRaw.isEmpty) {
-        return CommandResult.error(command, 'Uso: ${command.trigger} [idioma opcional] [texto]');
-      }
+  CommandStreamResult _processTraducirStream(CommandEntity command, String message) {
+    final contentRaw = _extractContentAfterCommand(message, command.trigger);
 
-      // Usar el detector de idiomas para extraer el idioma objetivo
-      final detection = LanguageDetector.detectLanguage(
-        contentRaw,
-        defaultLanguage: 'inglés',
-      );
-
-      final targetLanguage = detection.languageName;
-      final textToTranslate = detection.remainingText;
-
-      if (textToTranslate.isEmpty) {
-        return CommandResult.error(command, 'Falta el texto a traducir.');
-      }
-
-      // Construir el prompt final con el idioma detectado
-      final finalPrompt = command.promptTemplate
-          .replaceAll('{{targetLanguage}}', targetLanguage)
-          .replaceAll('{{content}}', textToTranslate);
-
-      debugPrint('   🌍 Traduciendo a: $targetLanguage (detectado: ${detection.wasDetected})');
-      final response = await _aiService.generateContentWithoutHistory(finalPrompt);
-      return CommandResult.success(command, response);
-
-    } catch (e) {
-      return CommandResult.error(command, 'Error de traducción: $e');
+    if (contentRaw.isEmpty) {
+      return CommandStreamResult.error(command, 'Uso: ${command.trigger} [idioma opcional] [texto]');
     }
+
+    final detection = LanguageDetector.detectLanguage(
+      contentRaw,
+      defaultLanguage: 'inglés',
+    );
+
+    final targetLanguage = detection.languageName;
+    final textToTranslate = detection.remainingText;
+
+    if (textToTranslate.isEmpty) {
+      return CommandStreamResult.error(command, 'Falta el texto a traducir.');
+    }
+
+    final finalPrompt = command.promptTemplate
+        .replaceAll('{{targetLanguage}}', targetLanguage)
+        .replaceAll('{{content}}', textToTranslate);
+
+    debugPrint('   🌊 Traduciendo a: $targetLanguage (streaming)');
+    final stream = _aiService.generateContentStreamWithoutHistory(finalPrompt);
+    return CommandStreamResult.success(command, stream);
   }
 
-  /// Extrae el contenido después del comando (trigger)
-  /// 
-  /// Maneja correctamente mayúsculas/minúsculas y espacios
   String _extractContentAfterCommand(String message, String trigger) {
-    // Aseguramos case-insensitive matching para el trigger
     final msgLower = message.toLowerCase();
     final trigLower = trigger.toLowerCase();
-    
+
     final index = msgLower.indexOf(trigLower);
-    if (index == -1) return message; // Fallback raro
-    
+    if (index == -1) return message;
+
     final contentStart = index + trigger.length;
     if (contentStart >= message.length) return '';
-    
+
     return message.substring(contentStart).trim();
   }
 }

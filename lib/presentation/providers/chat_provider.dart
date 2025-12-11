@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'dart:async';
 import '../../domain/entities/message_entity.dart';
 import '../../domain/entities/quick_response_entity.dart';
 import '../../data/models/quick_response_model.dart';
@@ -14,84 +15,66 @@ import '../../data/services/ai_service_selector.dart';
 import '../../data/services/preferences_service.dart';
 import '../../data/services/ai_service_adapters.dart';
 import '../../domain/usecases/command_processor.dart';
-import '../../domain/usecases/send_message_usecase.dart';
-import '../../domain/repositories/chat_repository.dart';
-import '../../domain/repositories/conversation_repository.dart';
-import '../../domain/repositories/command_repository.dart'; 
+import '../../domain/repositories/iconversation_repository.dart';
+import '../../domain/repositories/icommand_repository.dart';
 import '../../core/constants/commands_help.dart';
 import 'command_management_provider.dart';
 
 class ChatProvider extends ChangeNotifier {
-  // ============================================================================
-  // ESTADO INTERNO: ENTIDADES (Domain Layer)
-  // ============================================================================
   final List<MessageEntity> _messages = [];
-  List<QuickResponseEntity> _quickResponses =
-      QuickResponseProvider.defaultResponsesAsEntities;
+  List<QuickResponseEntity> _quickResponses = QuickResponseProvider.defaultResponsesAsEntities;
   bool _isProcessing = false;
+  bool _isStreaming = false;
+  StreamSubscription<String>? _streamSubscription;
   bool _isNewConversation = true;
   bool _isRetryingOllama = false;
-  // Controla si el usuario puede seleccionar Ollama remoto desde la UI.
   bool _ollamaSelectable = true;
   bool _needsHistoryLoad = false;
 
-  bool _hasUnsavedChanges = false; // Para saber si hay algo que guardar
-  File? _currentConversationFile; // Para saber qué archivo sobrescribir/borrar
+  bool _hasUnsavedChanges = false;
+  File? _currentConversationFile;
   bool _isSaving = false;
 
-  late SendMessageUseCase _sendMessageUseCase; // No final - se actualiza al cambiar proveedor
   late final AIServiceSelector _aiSelector;
   late final PreferencesService _preferencesService;
 
-  // INTERFACES DE REPOSITORIO
-  final ChatRepository _chatRepository;
-  final ConversationRepository _conversationRepository;
-  final CommandRepository _commandRepository; 
+  final IConversationRepository _conversationRepository;
+  final ICommandRepository _commandRepository;
 
   bool Function()? _getSyncStatus;
-  
-  // Referencia al CommandManagementProvider para obtener carpetas y preferencias
+
   CommandManagementProvider? _commandManagementProvider;
 
-  // Referencias a los servicios
   late final GeminiService _geminiService;
   late final OllamaService _ollamaService;
   late final OpenAIService _openaiService;
   late final OllamaManagedService _localOllamaService;
 
-  // Adaptadores
   late final GeminiServiceAdapter _geminiAdapter;
-  late OllamaServiceAdapter _ollamaAdapter; // No final porque se recrea
+  late OllamaServiceAdapter _ollamaAdapter;
   late final OpenAIServiceAdapter _openaiAdapter;
   late final LocalOllamaServiceAdapter _localOllamaAdapter;
 
-  late CommandProcessor _commandProcessor; // No final - se actualiza al cambiar proveedor
+  late CommandProcessor _commandProcessor;
 
   bool _showModelSelector = false;
   List<OllamaModel> _availableModels = [];
   String _currentModel = 'phi3:latest';
   AIProvider _currentProvider = AIProvider.gemini;
 
-  // ==========================================================================
-  // Clave para preferencia de agrupar comandos del sistema (fallback)
-  // ==========================================================================
   static const String _groupSystemCommandsKey = 'group_system_commands';
 
   ChatProvider({
-    required ChatRepository chatRepository,
-    required ConversationRepository conversationRepository,
-    required CommandRepository commandRepository, 
+    required IConversationRepository conversationRepository,
+    required ICommandRepository commandRepository,
     required AIServiceSelector aiServiceSelector,
-  })  : _chatRepository = chatRepository,
-        _conversationRepository = conversationRepository,
+  })  : _conversationRepository = conversationRepository,
         _commandRepository = commandRepository,
         _aiSelector = aiServiceSelector,
         _geminiService = aiServiceSelector.geminiService,
         _ollamaService = aiServiceSelector.ollamaService,
         _openaiService = aiServiceSelector.openaiService,
         _localOllamaService = aiServiceSelector.localOllamaService {
-    
-    // Crear adaptadores
     _geminiAdapter = GeminiServiceAdapter(_geminiService);
     _ollamaAdapter = OllamaServiceAdapter(_ollamaService, _currentModel);
     _openaiAdapter = OpenAIServiceAdapter(_openaiService);
@@ -99,116 +82,77 @@ class ChatProvider extends ChangeNotifier {
 
     _preferencesService = PreferencesService();
 
-    // Suscribirse a los cambios del selector
     _aiSelector.addListener(_onAiSelectorChanged);
 
-    // Inicializar CommandProcessor con Gemini por defecto
     _commandProcessor = CommandProcessor(_geminiAdapter, _commandRepository);
-
-    _sendMessageUseCase = SendMessageUseCase(
-      commandProcessor: _commandProcessor,
-      chatRepository: _chatRepository,
-    );
 
     _initializeModels();
   }
 
-  /// Vincula el CommandManagementProvider para obtener carpetas y preferencias
   void setCommandManagementProvider(CommandManagementProvider provider) {
-    // Si ya había uno vinculado, nos desuscribimos para evitar fugas de memoria
     if (_commandManagementProvider != null) {
       _commandManagementProvider!.removeListener(_onCommandDataChanged);
     }
 
     _commandManagementProvider = provider;
-    
-    // 1. SOLUCIÓN PROFESIONAL: Suscripción completa.
-    // Escuchamos cualquier cambio (notificación) que emita el proveedor de comandos.
     provider.addListener(_onCommandDataChanged);
-    
-    // 2. Sincronización inicial inmediata
-    // Si el proveedor ya tiene datos cargados, los aplicamos ya mismo.
+
     if (!provider.isLoading) {
       _onCommandDataChanged();
     }
-    
+
     debugPrint('✅ [ChatProvider] Vinculado reactivamente a CommandManagementProvider');
   }
 
-  /// Esta función se ejecuta AUTOMÁTICAMENTE cada vez que CommandManagementProvider hace notifyListeners()
   void _onCommandDataChanged() {
-    // Evitamos actualizaciones innecesarias si el proveedor está cargando (opcional, según preferencia visual)
-    // Pero para la carga inicial, queremos que se ejecute al finalizar la carga.
     if (_commandManagementProvider == null) return;
-
-    // Actualizamos las QuickResponses basándonos en el estado ACTUAL del proveedor de comandos
     _updateQuickResponsesFromProvider();
   }
 
-  /// Método síncrono y rápido para reconstruir las respuestas desde el proveedor vinculado
   void _updateQuickResponsesFromProvider() {
     if (_commandManagementProvider == null) return;
 
     final provider = _commandManagementProvider!;
-    
-    // Usamos el helper estático para regenerar la lista
+
     final organizedResponses = QuickResponseProvider.buildOrganizedResponses(
       commands: provider.commands,
       folders: provider.folders,
-      groupSystemCommands: provider.groupSystemCommands, // AQUÍ LEEMOS EL VALOR REAL ACTUALIZADO
+      groupSystemCommands: provider.groupSystemCommands,
     );
 
     _quickResponses = organizedResponses.map((r) => r.toEntity()).toList();
-    
-    // Notificamos a la UI del Chat para que se repinte
     notifyListeners();
   }
 
-  // Método para manejar las notificaciones del CommandManagementProvider
-  void _onCommandProviderUpdated() {
-    // Solo actualizamos si no está cargando, para evitar parpadeos innecesarios durante la carga
-    // Opcional: puedes quitar el if si quieres ver actualizaciones en tiempo real
-    if (_commandManagementProvider != null && !_commandManagementProvider!.isLoading) {
-       refreshQuickResponses();
-    }
-  }
-
-  /// Vincula el estado de sincronización desde AuthProvider
   void setSyncStatusChecker(bool Function() checker) {
     _getSyncStatus = checker;
   }
 
-  /// Escucha los cambios de AIServiceSelector y notifica a los listeners de ChatProvider
   Future<void> _onAiSelectorChanged() async {
     debugPrint('🔄 [ChatProvider] AIServiceSelector notificó cambios, actualizando UI...');
 
-    // 1. Sincronizar la lista de modelos disponibles
     if (_aiSelector.ollamaAvailable) {
       if (!_ollamaSelectable) {
         _ollamaSelectable = true;
         debugPrint('   🔓 Ollama disponible: desbloqueando selección en la UI');
       }
-      
+
       if (!listEquals(_availableModels, _aiSelector.availableModels)) {
         _availableModels = _aiSelector.availableModels;
-        debugPrint(
-            '   ✅ Lista de modelos Ollama (remoto) actualizada: ${_availableModels.length} modelos');
+        debugPrint('   ✅ Lista de modelos Ollama (remoto) actualizada: ${_availableModels.length} modelos');
 
         if (_availableModels.isNotEmpty) {
-          final currentModelExists =
-              _availableModels.any((m) => m.name == _currentModel);
+          final currentModelExists = _availableModels.any((m) => m.name == _currentModel);
 
           if (!currentModelExists || _currentModel.isEmpty) {
             _currentModel = _availableModels.first.name;
             _ollamaAdapter.updateModel(_currentModel);
-            debugPrint(
-                '   ⚠️ Modelo actual no encontrado. Seleccionando por defecto: $_currentModel');
+            debugPrint('   ⚠️ Modelo actual no encontrado. Seleccionando por defecto: $_currentModel');
           }
         }
       }
 
-      if (_currentProvider == AIProvider.ollama &&
-          _currentModel != _aiSelector.currentOllamaModel) {
+      if (_currentProvider == AIProvider.ollama && _currentModel != _aiSelector.currentOllamaModel) {
         _currentModel = _aiSelector.currentOllamaModel;
         _ollamaAdapter.updateModel(_currentModel);
       }
@@ -228,16 +172,13 @@ class ChatProvider extends ChangeNotifier {
         debugPrint('   🔄 Cambiando automáticamente a Gemini por defecto...');
 
         await selectProvider(AIProvider.gemini);
-
         debugPrint('   ✅ [AIServiceSelector change] Cambio a Gemini completado.');
-        
         _addOllamaConnectionErrorMessage();
       }
     }
     notifyListeners();
   }
 
-  /// Añade un mensaje de error al chat cuando Ollama (remoto) se desconecta
   void _addOllamaConnectionErrorMessage() {
     final errorMessage = MessageEntity(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -255,7 +196,6 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  /// Actualiza el CommandProcessor según el proveedor actual
   void _updateCommandProcessor() {
     AIServiceBase currentAdapter;
 
@@ -267,8 +207,7 @@ class ChatProvider extends ChangeNotifier {
       case AIProvider.ollama:
         _ollamaAdapter.updateModel(_currentModel);
         currentAdapter = _ollamaAdapter;
-        debugPrint(
-            '   🟪 Usando OllamaAdapter (remoto) con modelo: $_currentModel');
+        debugPrint('   🟪 Usando OllamaAdapter (remoto) con modelo: $_currentModel');
         break;
       case AIProvider.openai:
         currentAdapter = _openaiAdapter;
@@ -280,24 +219,14 @@ class ChatProvider extends ChangeNotifier {
         break;
     }
 
-    // Crear nuevo CommandProcessor pasando el Repositorio
     _commandProcessor = CommandProcessor(currentAdapter, _commandRepository);
-
-    _sendMessageUseCase = SendMessageUseCase(
-      commandProcessor: _commandProcessor,
-      chatRepository: _chatRepository,
-    );
-
-    debugPrint(
-        '🔄 [ChatProvider] CommandProcessor actualizado para: $_currentProvider');
+    debugPrint('🔄 [ChatProvider] CommandProcessor actualizado para: $_currentProvider');
   }
 
-  // ============================================================================
-  // GETTERS: EXPONE ENTIDADES A LA UI
-  // ============================================================================
   List<MessageEntity> get messages => List.unmodifiable(_messages);
   List<QuickResponseEntity> get quickResponses => _quickResponses;
   bool get isProcessing => _isProcessing;
+  bool get isStreaming => _isStreaming;
   bool get showModelSelector => _showModelSelector;
   List<OllamaModel> get availableModels => _availableModels;
   String get currentModel => _currentModel;
@@ -305,7 +234,7 @@ class ChatProvider extends ChangeNotifier {
   ConnectionInfo get connectionInfo => _aiSelector.connectionInfo;
   bool get ollamaAvailable => _aiSelector.ollamaAvailable && _ollamaSelectable;
   bool get isRetryingOllama => _isRetryingOllama;
-    bool get hasUnsavedChanges => _hasUnsavedChanges;
+  bool get hasUnsavedChanges => _hasUnsavedChanges;
 
   AIServiceSelector get aiSelector => _aiSelector;
   bool get openaiAvailable => _aiSelector.openaiAvailable;
@@ -317,10 +246,6 @@ class ChatProvider extends ChangeNotifier {
   bool get localOllamaLoading => _aiSelector.localOllamaLoading;
 
   Stream<ConnectionInfo> get connectionStream => _aiSelector.connectionStream;
-
-  // ============================================================================
-  // MÉTODOS PARA GESTIÓN DE HISTORIAL (para HistoryPage)
-  // ============================================================================
 
   Future<List<FileSystemEntity>> listConversations() {
     return _conversationRepository.listConversations();
@@ -339,8 +264,6 @@ class ChatProvider extends ChangeNotifier {
       }
 
       await _restoreUserPreferences();
-      
-      // Cargar quick responses iniciales (incluye comandos del usuario)
       await _updateQuickResponses();
 
       _ollamaSelectable = _aiSelector.ollamaAvailable;
@@ -367,8 +290,7 @@ class ChatProvider extends ChangeNotifier {
           case AIProvider.ollama:
             canRestore = _aiSelector.ollamaAvailable;
             if (!canRestore) {
-              debugPrint(
-                  '   ⚠️ Ollama (remoto) no disponible, usando Gemini por defecto');
+              debugPrint('   ⚠️ Ollama (remoto) no disponible, usando Gemini por defecto');
             }
             break;
           case AIProvider.openai:
@@ -380,8 +302,7 @@ class ChatProvider extends ChangeNotifier {
           case AIProvider.localOllama:
             canRestore = _aiSelector.localOllamaAvailable;
             if (!canRestore) {
-              debugPrint(
-                  '   ⚠️ Ollama Embebido no disponible, usando Gemini por defecto');
+              debugPrint('   ⚠️ Ollama Embebido no disponible, usando Gemini por defecto');
             }
             break;
         }
@@ -398,8 +319,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void toggleModelSelector() {
-    debugPrint(
-        '🔄 [ChatProvider] Toggling model selector: $_showModelSelector -> ${!_showModelSelector}');
+    debugPrint('🔄 [ChatProvider] Toggling model selector: $_showModelSelector -> ${!_showModelSelector}');
     _showModelSelector = !_showModelSelector;
     notifyListeners();
   }
@@ -431,12 +351,12 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> selectProvider(AIProvider provider) async {
     debugPrint('🔄 [ChatProvider] Cambiando proveedor a: $provider');
-    
+
     if (provider == AIProvider.ollama && !_aiSelector.ollamaAvailable) {
       debugPrint('   ❌ Ollama (remoto) no disponible. No se puede seleccionar por ahora.');
       return;
     }
-    
+
     bool isAvailable = false;
     switch (provider) {
       case AIProvider.gemini:
@@ -452,7 +372,7 @@ class ChatProvider extends ChangeNotifier {
         isAvailable = _aiSelector.localOllamaAvailable;
         break;
     }
-    
+
     if (!isAvailable) {
       debugPrint('   ❌ Proveedor $provider no disponible');
       return;
@@ -461,25 +381,25 @@ class ChatProvider extends ChangeNotifier {
     if (_needsHistoryLoad && _currentProvider != provider) {
       debugPrint('   📚 Detectado cambio de proveedor con historial pendiente');
       debugPrint('   🔄 Cargando historial en el nuevo proveedor: $provider');
-      
+
       final oldProvider = _currentProvider;
       _currentProvider = provider;
-      
+
       _loadHistoryIntoAIService(_messages);
       _needsHistoryLoad = false;
-      
+
       debugPrint('   ✅ Historial transferido de $oldProvider a $provider');
     }
-    
+
     _currentProvider = provider;
     await _aiSelector.setProvider(provider);
     _updateCommandProcessor();
-    
+
     await _preferencesService.saveLastProvider(provider);
-    
+
     hideModelSelector();
     notifyListeners();
-    
+
     debugPrint('   ✅ Proveedor cambiado a: $provider');
   }
 
@@ -503,7 +423,7 @@ class ChatProvider extends ChangeNotifier {
 
     try {
       await _ollamaService.reconnect();
-      
+
       const int maxAttempts = 10;
       const Duration interval = Duration(milliseconds: 300);
       int attempts = 0;
@@ -518,7 +438,7 @@ class ChatProvider extends ChangeNotifier {
         _ollamaSelectable = true;
         debugPrint('   🔓 Selección de Ollama desbloqueada (reconectado)');
         debugPrint('   ✅ [ChatProvider] Reconexión exitosa. Seleccionando Ollama.');
-        await selectProvider(AIProvider.ollama); 
+        await selectProvider(AIProvider.ollama);
       } else {
         _ollamaSelectable = false;
         debugPrint('   ❌ [ChatProvider] La reconexión falló.');
@@ -535,14 +455,13 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   Future<void> refreshConnection() async {
     await retryOllamaConnection();
   }
 
   Future<LocalOllamaInitResult?> initializeLocalOllama() async {
-    debugPrint(
-        '🚀 [ChatProvider] Iniciando instalación/configuración de Ollama Embebido...');
+    debugPrint('🚀 [ChatProvider] Iniciando instalación/configuración de Ollama Embebido...');
 
     try {
       final result = await _aiSelector.initializeLocalOllama();
@@ -578,192 +497,274 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Refresca los quick responses, útil cuando se crean/editan comandos de usuario
-  /// o cuando cambia la preferencia de agrupar comandos del sistema
   Future<void> refreshQuickResponses() async {
     await _updateQuickResponses();
     notifyListeners();
   }
 
-  Future<void> sendMessage(String content) async {
-    if (content.trim().isEmpty || _isProcessing) return;
-
-    debugPrint('\n🚀 [ChatProvider] === ENVIANDO MENSAJE ===');
-    debugPrint(
-        '   💬 Contenido: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
-    debugPrint('   🤖 Proveedor actual: $_currentProvider');
+  Future<void> _sendMessageWithStreaming(String content) async {
+    debugPrint('\n🌊 [ChatProvider] === ENVIANDO CON STREAMING ===');
+    debugPrint('   💬 Contenido: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
+    debugPrint('   🤖 Proveedor: $_currentProvider');
 
     if (_needsHistoryLoad) {
-      debugPrint('   📚 Cargando historial en el proveedor actual antes de enviar...');
       _loadHistoryIntoAIService(_messages);
       _needsHistoryLoad = false;
     }
 
-    // Logs simplificados
-    switch (_currentProvider) {
-      case AIProvider.ollama:
-        debugPrint('   📝 Modelo Ollama (remoto): $_currentModel');
-        break;
-      case AIProvider.localOllama:
-        debugPrint('   📝 Modelo Ollama Local: ${_localOllamaService.currentModel}');
-        break;
-      case AIProvider.openai:
-        debugPrint('   📝 Modelo OpenAI: ${_aiSelector.currentOpenAIModel}');
-        break;
-      case AIProvider.gemini:
-        debugPrint('   📝 Modelo: gemini-2.5-flash');
-        break;
-    }
-
-    if (_isNewConversation) {
-      _isNewConversation = false;
-    }
-
+    if (_isNewConversation) _isNewConversation = false;
     hideModelSelector();
 
+    final now = DateTime.now();
+    final userMessageId = '${now.millisecondsSinceEpoch}_user';
+    final botMessageId = '${now.millisecondsSinceEpoch}_bot';
+
     final userMessageEntity = MessageEntity(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: userMessageId,
       content: content,
       type: MessageTypeEntity.user,
-      timestamp: DateTime.now(),
+      timestamp: now,
     );
-
     _messages.add(userMessageEntity);
-    _isProcessing = true;
     notifyListeners();
 
+    _messages.add(MessageEntity(
+      id: botMessageId,
+      content: '',
+      type: MessageTypeEntity.bot,
+      timestamp: now,
+    ));
+
+    _isProcessing = true;
+    _isStreaming = true;
+    notifyListeners();
+
+    final buffer = StringBuffer();
+    final completer = Completer<void>();
+
     try {
-      debugPrint('   🔸 Procesando mensaje a través de SendMessageUseCase...');
-      // SendMessageUseCase usará el CommandProcessor que ya tiene el repositorio inyectado
-      final botResponseEntity = await _sendMessageUseCase.execute(content);
+      final adapter = _aiSelector.getCurrentAdapter();
+      final stream = adapter.generateContentStream(content);
 
-      _messages.add(botResponseEntity);
-      debugPrint('✅ [ChatProvider] Mensaje procesado exitosamente');
-      debugPrint('🟢 [ChatProvider] === ENVÍO EXITOSO ===\n');
+      _streamSubscription = stream.listen(
+        (chunk) {
+          buffer.write(chunk);
+
+          final index = _messages.indexWhere((m) => m.id == botMessageId);
+          if (index != -1) {
+            _messages[index] = MessageEntity(
+              id: botMessageId,
+              content: buffer.toString(),
+              type: MessageTypeEntity.bot,
+              timestamp: now,
+            );
+            notifyListeners();
+          }
+        },
+        onError: (error) {
+          debugPrint('❌ [ChatProvider] Error en streaming: $error');
+
+          final index = _messages.indexWhere((m) => m.id == botMessageId);
+          if (index != -1) {
+            _messages[index] = MessageEntity(
+              id: botMessageId,
+              content: buffer.isNotEmpty ? '${buffer.toString()}\n\n❌ Error: $error' : '❌ Error: $error',
+              type: MessageTypeEntity.bot,
+              timestamp: now,
+            );
+          }
+          completer.complete();
+        },
+        onDone: () {
+          debugPrint('✅ [ChatProvider] Streaming completado: ${buffer.length} caracteres');
+          completer.complete();
+        },
+        cancelOnError: true,
+      );
+
+      await completer.future;
     } catch (e) {
-      debugPrint('❌ [ChatProvider] Error procesando mensaje: $e');
-      debugPrint('🔴 [ChatProvider] === ENVÍO FALLIDO ===\n');
+      debugPrint('❌ [ChatProvider] Error iniciando streaming: $e');
 
-      String errorMessage = '❌ Error: ${e.toString()}';
-
-      if (_currentProvider == AIProvider.ollama) {
-        errorMessage += '\n\n💡 El servidor Ollama remoto no está disponible.\n'
-                       'Cambiando automáticamente a Gemini...';
-        
-        final errorEntity = MessageEntity(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          content: errorMessage,
+      final index = _messages.indexWhere((m) => m.id == botMessageId);
+      if (index != -1) {
+        _messages[index] = MessageEntity(
+          id: botMessageId,
+          content: '❌ Error: $e',
           type: MessageTypeEntity.bot,
-          timestamp: DateTime.now(),
+          timestamp: now,
         );
-        _messages.add(errorEntity);
-
-        _currentProvider = AIProvider.gemini;
-        _ollamaSelectable = false;
-        _updateCommandProcessor();
-        await _preferencesService.saveLastProvider(AIProvider.gemini);
-        debugPrint('   ✅ [sendMessage catch] CAMBIO AUTOMÁTICO a Gemini exitoso');
-        
-      } else if (_currentProvider == AIProvider.localOllama) {
-        errorMessage += '\n\n💡 Ollama Embebido no está disponible.\n'
-            'Puede que esté inicializándose. Espera unos segundos.\n'
-            'O prueba con otro proveedor.';
-        final errorEntity = MessageEntity(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          content: errorMessage,
-          type: MessageTypeEntity.bot,
-          timestamp: DateTime.now(),
-        );
-        _messages.add(errorEntity);
-      } else if (_currentProvider == AIProvider.openai) {
-        errorMessage += '\n\n💡 Verifica tu API Key de OpenAI en .env';
-        final errorEntity = MessageEntity(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          content: errorMessage,
-          type: MessageTypeEntity.bot,
-          timestamp: DateTime.now(),
-        );
-        _messages.add(errorEntity);
-      } else {
-        final errorEntity = MessageEntity(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          content: errorMessage,
-          type: MessageTypeEntity.bot,
-          timestamp: DateTime.now(),
-        );
-        _messages.add(errorEntity);
       }
     } finally {
+      _streamSubscription = null;
       _isProcessing = false;
+      _isStreaming = false;
+      _hasUnsavedChanges = true;
       await _updateQuickResponses();
       notifyListeners();
-
-      _hasUnsavedChanges = true;
-      debugPrint('📝 [ChatProvider] Cambios pendientes marcados. Se guardarán al salir.');
-       notifyListeners();
     }
   }
 
-  // ============================================================================
-  // _updateQuickResponses con soporte para carpetas y CommandManagementProvider
-  // ============================================================================
-  Future<void> _updateQuickResponses() async {
-    try {
-      // Si tenemos CommandManagementProvider, usarlo para obtener datos actualizados
-      if (_commandManagementProvider != null) {
-      _updateQuickResponsesFromProvider();
+  Future<void> _sendCommandWithStreaming(String content) async {
+    debugPrint('\n🌊 [ChatProvider] === ENVIANDO COMANDO CON STREAMING ===');
+    debugPrint('   💬 Comando: ${content.length > 50 ? "${content.substring(0, 50)}..." : content}');
+    debugPrint('   🤖 Proveedor: $_currentProvider');
+
+    hideModelSelector();
+
+    final now = DateTime.now();
+    final userMessageId = '${now.millisecondsSinceEpoch}_user';
+    final botMessageId = '${now.millisecondsSinceEpoch}_bot';
+
+    final userMessageEntity = MessageEntity(
+      id: userMessageId,
+      content: content,
+      type: MessageTypeEntity.user,
+      timestamp: now,
+    );
+    _messages.add(userMessageEntity);
+    notifyListeners();
+
+    final commandResult = await _commandProcessor.processMessageStream(content);
+
+    if (!commandResult.isCommand) {
+      debugPrint('   ⚠️ No es comando, redirigiendo a streaming normal');
+      return _sendMessageWithStreaming(content);
+    }
+
+    if (commandResult.error != null) {
+      _messages.add(MessageEntity(
+        id: botMessageId,
+        content: '⚠️ ${commandResult.error}',
+        type: MessageTypeEntity.bot,
+        timestamp: now,
+      ));
+      notifyListeners();
+      _hasUnsavedChanges = true;
       return;
     }
-      
-      // Fallback: obtener datos directamente del repositorio
+
+    _messages.add(MessageEntity(
+      id: botMessageId,
+      content: '',
+      type: MessageTypeEntity.bot,
+      timestamp: now,
+    ));
+
+    _isProcessing = true;
+    _isStreaming = true;
+    notifyListeners();
+
+    final buffer = StringBuffer();
+    final completer = Completer<void>();
+
+    try {
+      _streamSubscription = commandResult.responseStream!.listen(
+        (chunk) {
+          buffer.write(chunk);
+
+          final index = _messages.indexWhere((m) => m.id == botMessageId);
+          if (index != -1) {
+            _messages[index] = MessageEntity(
+              id: botMessageId,
+              content: buffer.toString(),
+              type: MessageTypeEntity.bot,
+              timestamp: now,
+            );
+            notifyListeners();
+          }
+        },
+        onError: (error) {
+          debugPrint('❌ [ChatProvider] Error en comando streaming: $error');
+
+          final index = _messages.indexWhere((m) => m.id == botMessageId);
+          if (index != -1) {
+            _messages[index] = MessageEntity(
+              id: botMessageId,
+              content: buffer.isNotEmpty ? '${buffer.toString()}\n\n❌ Error: $error' : '❌ Error: $error',
+              type: MessageTypeEntity.bot,
+              timestamp: now,
+            );
+          }
+          completer.complete();
+        },
+        onDone: () {
+          debugPrint('✅ [ChatProvider] Comando streaming completado: ${buffer.length} caracteres');
+          completer.complete();
+        },
+        cancelOnError: true,
+      );
+
+      await completer.future;
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error iniciando comando streaming: $e');
+
+      final index = _messages.indexWhere((m) => m.id == botMessageId);
+      if (index != -1) {
+        _messages[index] = MessageEntity(
+          id: botMessageId,
+          content: '❌ Error: $e',
+          type: MessageTypeEntity.bot,
+          timestamp: now,
+        );
+      }
+    } finally {
+      _streamSubscription = null;
+      _isProcessing = false;
+      _isStreaming = false;
+      _hasUnsavedChanges = true;
+      await _updateQuickResponses();
+      notifyListeners();
+    }
+  }
+
+  Future<void> sendMessage(String content) async {
+    if (content.trim().isEmpty || _isProcessing) return;
+
+    final isCommand = content.trim().startsWith('/');
+
+    if (isCommand) {
+      return _sendCommandWithStreaming(content);
+    } else {
+      return _sendMessageWithStreaming(content);
+    }
+  }
+
+  Future<void> _updateQuickResponses() async {
+    try {
+      if (_commandManagementProvider != null) {
+        _updateQuickResponsesFromProvider();
+        return;
+      }
+
       final allCommands = await _commandRepository.getAllCommands();
       final allFolders = await _commandRepository.getAllFolders();
-      
-      // Obtener preferencia de agrupar comandos del sistema
+
       final prefs = await SharedPreferences.getInstance();
       final groupSystemCommands = prefs.getBool(_groupSystemCommandsKey) ?? false;
-      
-      // Usar el método estático para generar respuestas organizadas
+
       final organizedResponses = QuickResponseProvider.buildOrganizedResponses(
         commands: allCommands,
         folders: allFolders,
         groupSystemCommands: groupSystemCommands,
       );
-      
+
       _quickResponses = organizedResponses.map((r) => r.toEntity()).toList();
-      
+
       debugPrint('📦 [ChatProvider] Quick responses actualizadas (fallback): ${_quickResponses.length} items');
-      
     } catch (e) {
       debugPrint('⚠️ [ChatProvider] Error cargando quick responses: $e');
       _quickResponses = QuickResponseProvider.defaultResponsesAsEntities;
     }
   }
 
-  Future<void> _autoSaveConversation() async {
-    if (_messages.isEmpty) return;
-    try {
-      await _conversationRepository.saveConversation(_messages);
-      final isSyncEnabled = _getSyncStatus?.call() ?? false;
-      if (kDebugMode) {
-        debugPrint(
-            "💾 [ChatProvider] Conversación guardada automáticamente (${_messages.length} mensajes)");
-        if (isSyncEnabled) {
-          debugPrint("☁️ [ChatProvider] Conversación sincronizada con la nube");
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ [ChatProvider] Error al guardar conversación: $e');
-    }
-  }
-
   Future<void> clearMessages() async {
     debugPrint('🗑️ [ChatProvider] Limpiando mensajes...');
-    
+
     _messages.clear();
     _isNewConversation = true;
     _needsHistoryLoad = false;
-    
+
     _currentConversationFile = null;
     _hasUnsavedChanges = false;
 
@@ -774,15 +775,31 @@ class ChatProvider extends ChangeNotifier {
 
   void _clearAIServiceHistory() {
     debugPrint('🧹 [ChatProvider] Limpiando historial de servicios de IA...');
-    try { _geminiService.clearConversation(); } catch (e) { debugPrint('   ⚠️ Error limpiando Gemini: $e'); }
-    try { _openaiService.clearConversation(); } catch (e) { debugPrint('   ⚠️ Error limpiando OpenAI: $e'); }
-    try { _ollamaService.clearConversation(); } catch (e) { debugPrint('   ⚠️ Error limpiando Ollama: $e'); }
-    try { _localOllamaService.clearConversation(); } catch (e) { debugPrint('   ⚠️ Error limpiando Ollama Local: $e'); }
+    try {
+      _geminiService.clearConversation();
+    } catch (e) {
+      debugPrint('   ⚠️ Error limpiando Gemini: $e');
+    }
+    try {
+      _openaiService.clearConversation();
+    } catch (e) {
+      debugPrint('   ⚠️ Error limpiando OpenAI: $e');
+    }
+    try {
+      _ollamaService.clearConversation();
+    } catch (e) {
+      debugPrint('   ⚠️ Error limpiando Ollama: $e');
+    }
+    try {
+      _localOllamaService.clearConversation();
+    } catch (e) {
+      debugPrint('   ⚠️ Error limpiando Ollama Local: $e');
+    }
   }
 
   Future<void> loadConversation(File file) async {
-    if (_currentConversationFile != null && 
-        _currentConversationFile!.path == file.path && 
+    if (_currentConversationFile != null &&
+        _currentConversationFile!.path == file.path &&
         _hasUnsavedChanges) {
       debugPrint('🛑 [ChatProvider] Bloqueada recarga accidental: Ya tienes esta conversación abierta con cambios.');
       return;
@@ -798,7 +815,7 @@ class ChatProvider extends ChangeNotifier {
 
       _isNewConversation = false;
       _needsHistoryLoad = true;
-      
+
       _currentConversationFile = file;
       _hasUnsavedChanges = false;
 
@@ -815,7 +832,7 @@ class ChatProvider extends ChangeNotifier {
   void dispose() {
     debugPrint('🔴 [ChatProvider] Disposing...');
     _commandManagementProvider?.removeListener(_onCommandDataChanged);
-    
+
     _aiSelector.removeListener(_onAiSelectorChanged);
     _aiSelector.dispose();
     super.dispose();
@@ -824,7 +841,7 @@ class ChatProvider extends ChangeNotifier {
   void _loadHistoryIntoAIService(List<MessageEntity> messages) {
     debugPrint('📚 [ChatProvider] Cargando historial en servicio de IA...');
     debugPrint('   🎯 Proveedor actual: $_currentProvider');
-    
+
     switch (_currentProvider) {
       case AIProvider.gemini:
         _loadGeminiHistory(messages);
@@ -912,7 +929,7 @@ class ChatProvider extends ChangeNotifier {
       return DeleteResult(
         success: true,
         syncWasEnabled: isSyncEnabled,
-        message: isSyncEnabled 
+        message: isSyncEnabled
             ? 'Todas las conversaciones eliminadas (local y nube)'
             : 'Conversaciones eliminadas localmente. Si sincronizaste previamente, permanecen en la nube.',
       );
@@ -933,7 +950,7 @@ class ChatProvider extends ChangeNotifier {
       return DeleteResult(
         success: true,
         syncWasEnabled: isSyncEnabled,
-        message: isSyncEnabled 
+        message: isSyncEnabled
             ? '$count conversación(es) eliminada(s) (local y nube)'
             : '$count conversación(es) eliminada(s) localmente. Si sincronizaste previamente, permanecen en la nube.',
       );
@@ -946,9 +963,22 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  void cancelStreaming() {
+    if (_isStreaming && _streamSubscription != null) {
+      debugPrint('⏹️ [ChatProvider] Cancelando streaming...');
+      _streamSubscription?.cancel();
+      _streamSubscription = null;
+      _isProcessing = false;
+      _isStreaming = false;
+      _hasUnsavedChanges = true;
+      notifyListeners();
+      debugPrint('✅ [ChatProvider] Streaming cancelado');
+    }
+  }
+
   Future<void> endSession() async {
-    if (_isSaving) return; 
-    
+    if (_isSaving) return;
+
     if (_messages.isEmpty) return;
     if (_messages.length == 1 && _messages.first.type == MessageTypeEntity.bot) return;
     if (!_hasUnsavedChanges) return;
@@ -957,13 +987,9 @@ class ChatProvider extends ChangeNotifier {
     debugPrint('💾 [ChatProvider] Guardando sesión (Actualización)...');
 
     try {
-      await _conversationRepository.saveConversation(
-        _messages, 
-        existingFile: _currentConversationFile
-      );
-      
-      debugPrint('   ✅ Conversación guardada/actualizada correctamente.');
+      await _conversationRepository.saveConversation(_messages, existingFile: _currentConversationFile);
 
+      debugPrint('   ✅ Conversación guardada/actualizada correctamente.');
     } catch (e) {
       debugPrint('❌ [ChatProvider] Error al guardar sesión: $e');
     } finally {
@@ -973,7 +999,6 @@ class ChatProvider extends ChangeNotifier {
   }
 }
 
-/// Resultado de una operación de eliminación
 class DeleteResult {
   final bool success;
   final bool syncWasEnabled;

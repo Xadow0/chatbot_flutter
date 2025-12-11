@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/gemini_service.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import '../../../../domain/entities/message_entity.dart';
-import '../../../../domain/repositories/conversation_repository.dart';
+import '../../../../domain/repositories/iconversation_repository.dart';
 import 'package:provider/provider.dart';
 
 class Module2Page extends StatefulWidget {
@@ -16,12 +16,12 @@ class Module2Page extends StatefulWidget {
 
 class _Module2PageState extends State<Module2Page> {
   int _currentPage = 0;
-  late final ConversationRepository _conversationRepository;
+  late final IConversationRepository _conversationRepository;
 
   @override
   void initState() {
     super.initState();
-    _conversationRepository = Provider.of<ConversationRepository>(context, listen: false);
+    _conversationRepository = Provider.of<IConversationRepository>(context, listen: false);
   }
 
   void _nextPage() {
@@ -103,7 +103,6 @@ class _Module2PageState extends State<Module2Page> {
   }
 }
 
-// ============= PÁGINA INICIAL =============
 class _IntroPage extends StatelessWidget {
   final VoidCallback onStart;
 
@@ -144,7 +143,6 @@ class _IntroPage extends StatelessWidget {
   }
 }
 
-// ============= PÁGINA DE COMPARACIÓN =============
 class _ComparisonPage extends StatefulWidget {
   final VoidCallback onNext;
 
@@ -155,7 +153,6 @@ class _ComparisonPage extends StatefulWidget {
 }
 
 class _ComparisonPageState extends State<_ComparisonPage> {
-  // Lógica idéntica a la anterior, solo se incluye para que el archivo sea completo y funcional
   String _displayedExplanation = '';
   final String _fullExplanation =
       'Cada vez que hablas con una IA estás enviando un prompt. '
@@ -230,7 +227,10 @@ class _ComparisonPageState extends State<_ComparisonPage> {
   void _startExplanationAnimation() {
     int charIndex = 0;
     final timer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (charIndex < _fullExplanation.length) {
         setState(() {
           _displayedExplanation = _fullExplanation.substring(0, charIndex + 1);
@@ -242,7 +242,9 @@ class _ComparisonPageState extends State<_ComparisonPage> {
         if (mounted) {
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) {
-              setState(() { _showConversations = true; });
+              setState(() {
+                _showConversations = true;
+              });
               _startConversation1();
             }
           });
@@ -253,10 +255,20 @@ class _ComparisonPageState extends State<_ComparisonPage> {
   }
 
   void _startConversation1() {
-    _animateText(_prompt1, (text) { setState(() { _displayedPrompt1 = text; }); }, () {
+    _animateText(_prompt1, (text) {
+      setState(() {
+        _displayedPrompt1 = text;
+      });
+    }, () {
       Future.delayed(const Duration(milliseconds: 500), () {
-        _animateText(_response1, (text) { setState(() { _displayedResponse1 = text; }); }, () {
-          setState(() { _conversation1Complete = true; });
+        _animateText(_response1, (text) {
+          setState(() {
+            _displayedResponse1 = text;
+          });
+        }, () {
+          setState(() {
+            _conversation1Complete = true;
+          });
           _startConversation2();
         });
       });
@@ -264,12 +276,24 @@ class _ComparisonPageState extends State<_ComparisonPage> {
   }
 
   void _startConversation2() {
-    _animateText(_prompt2, (text) { setState(() { _displayedPrompt2 = text; }); }, () {
+    _animateText(_prompt2, (text) {
+      setState(() {
+        _displayedPrompt2 = text;
+      });
+    }, () {
       Future.delayed(const Duration(milliseconds: 500), () {
-        _animateText(_response2, (text) { setState(() { _displayedResponse2 = text; }); }, () {
-          setState(() { _conversation2Complete = true; });
+        _animateText(_response2, (text) {
+          setState(() {
+            _displayedResponse2 = text;
+          });
+        }, () {
+          setState(() {
+            _conversation2Complete = true;
+          });
           Future.delayed(const Duration(milliseconds: 800), () {
-            setState(() { _showFinalText = true; });
+            setState(() {
+              _showFinalText = true;
+            });
             _startFinalTextAnimation();
           });
         });
@@ -280,7 +304,10 @@ class _ComparisonPageState extends State<_ComparisonPage> {
   void _animateText(String text, Function(String) onUpdate, VoidCallback onComplete) {
     int charIndex = 0;
     final timer = Timer.periodic(const Duration(milliseconds: 20), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (charIndex < text.length) {
         onUpdate(text.substring(0, charIndex + 1));
         charIndex++;
@@ -296,14 +323,21 @@ class _ComparisonPageState extends State<_ComparisonPage> {
   void _startFinalTextAnimation() {
     int charIndex = 0;
     final timer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (charIndex < _fullFinalText.length) {
-        setState(() { _displayedFinalText = _fullFinalText.substring(0, charIndex + 1); });
+        setState(() {
+          _displayedFinalText = _fullFinalText.substring(0, charIndex + 1);
+        });
         charIndex++;
       } else {
         timer.cancel();
         _activeTimers.remove(timer);
-        setState(() { _allAnimationsComplete = true; });
+        setState(() {
+          _allAnimationsComplete = true;
+        });
       }
     });
     _activeTimers.add(timer);
@@ -332,25 +366,35 @@ class _ComparisonPageState extends State<_ComparisonPage> {
                 ),
               ),
               if (!_allAnimationsComplete)
-                 Padding(
-                   padding: const EdgeInsets.all(8.0),
-                   child: TextButton.icon(
-                      onPressed: _skipAnimations,
-                      icon: const Icon(Icons.fast_forward, size: 16),
-                      label: const Text('Saltar'),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.5),
-                      ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextButton.icon(
+                    onPressed: _skipAnimations,
+                    icon: const Icon(Icons.fast_forward, size: 16),
+                    label: const Text('Saltar'),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.5),
                     ),
-                 ),
+                  ),
+                ),
             ],
           ),
           if (_showConversations) ...[
             const SizedBox(height: 32),
-            _buildConversationBox(theme: theme, title: 'Conversación 1', userPrompt: _displayedPrompt1, aiResponse: _displayedResponse1, isComplete: _conversation1Complete),
+            _buildConversationBox(
+                theme: theme,
+                title: 'Conversación 1',
+                userPrompt: _displayedPrompt1,
+                aiResponse: _displayedResponse1,
+                isComplete: _conversation1Complete),
             const SizedBox(height: 24),
-            _buildConversationBox(theme: theme, title: 'Conversación 2', userPrompt: _displayedPrompt2, aiResponse: _displayedResponse2, isComplete: _conversation2Complete),
+            _buildConversationBox(
+                theme: theme,
+                title: 'Conversación 2',
+                userPrompt: _displayedPrompt2,
+                aiResponse: _displayedResponse2,
+                isComplete: _conversation2Complete),
           ],
           if (_showFinalText) ...[
             const SizedBox(height: 32),
@@ -388,14 +432,19 @@ class _ComparisonPageState extends State<_ComparisonPage> {
               child: const Text('Siguiente'),
             ),
           ] else if (_showFinalText) ...[
-             const SizedBox(height: 82), 
+            const SizedBox(height: 82),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildConversationBox({required ThemeData theme, required String title, required String userPrompt, required String aiResponse, required bool isComplete}) {
+  Widget _buildConversationBox(
+      {required ThemeData theme,
+      required String title,
+      required String userPrompt,
+      required String aiResponse,
+      required bool isComplete}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -406,15 +455,24 @@ class _ComparisonPageState extends State<_ComparisonPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+          Text(title,
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
           const SizedBox(height: 16),
           if (userPrompt.isNotEmpty) ...[
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(backgroundColor: theme.colorScheme.primaryContainer, radius: 16, child: Icon(Icons.person, size: 18, color: theme.colorScheme.onPrimaryContainer)),
+                CircleAvatar(
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    radius: 16,
+                    child: Icon(Icons.person, size: 18, color: theme.colorScheme.onPrimaryContainer)),
                 const SizedBox(width: 8),
-                Expanded(child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: theme.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(12)), child: Text(userPrompt, style: theme.textTheme.bodyMedium))),
+                Expanded(
+                    child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration:
+                            BoxDecoration(color: theme.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(12)),
+                        child: Text(userPrompt, style: theme.textTheme.bodyMedium))),
               ],
             ),
             const SizedBox(height: 12),
@@ -423,24 +481,42 @@ class _ComparisonPageState extends State<_ComparisonPage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(backgroundColor: theme.colorScheme.secondaryContainer, radius: 16, child: Icon(Icons.smart_toy, size: 18, color: theme.colorScheme.onSecondaryContainer)),
+                CircleAvatar(
+                    backgroundColor: theme.colorScheme.secondaryContainer,
+                    radius: 16,
+                    child: Icon(Icons.smart_toy, size: 18, color: theme.colorScheme.onSecondaryContainer)),
                 const SizedBox(width: 8),
-                Expanded(child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)), child: Text(aiResponse, style: theme.textTheme.bodyMedium))),
+                Expanded(
+                    child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
+                        child: Text(aiResponse, style: theme.textTheme.bodyMedium))),
               ],
             ),
           ],
           if (userPrompt.isNotEmpty && aiResponse.isEmpty)
-            Padding(padding: const EdgeInsets.only(left: 40), child: Row(children: [SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)), const SizedBox(width: 8), Text('Generando respuesta...', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round())))]))
+            Padding(
+                padding: const EdgeInsets.only(left: 40),
+                child: Row(children: [
+                  SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
+                  const SizedBox(width: 8),
+                  Text('Generando respuesta...',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurface.withAlpha((0.6 * 255).round())))
+                ]))
         ],
       ),
     );
   }
 }
 
-// ============= PÁGINA DE CONSTRUCCIÓN DE PROMPT =============
 class _PromptBuilderPage extends StatefulWidget {
   final VoidCallback onComplete;
-  final ConversationRepository conversationRepository;
+  final IConversationRepository conversationRepository;
 
   const _PromptBuilderPage({
     required this.onComplete,
@@ -456,8 +532,7 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
   final ScrollController _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [];
   final GeminiService _geminiService = GeminiService();
-  
-  // Stream controller para enviar señal de parada a las burbujas de texto
+
   final StreamController<void> _skipSignal = StreamController<void>.broadcast();
 
   final Map<String, String> _promptParts = {
@@ -479,15 +554,15 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
 
   final Map<String, String> _partDescriptions = {
     'contexto': 'Escribe el contexto o tema sobre el que estas trabajando. Por ejemplo: '
-        '“Estoy preparando una presentación sobre IA Generativa para un público no técnico.”',
+        '"Estoy preparando una presentación sobre IA Generativa para un público no técnico."',
     'rol': 'Indica que rol debe adoptar la IA (profesor, experto, guía, etc.). Por ejemplo: '
-        '“Actúa como un experto en IA Generativa con experiencia en educación.”',
+        '"Actúa como un experto en IA Generativa con experiencia en educación."',
     'tarea': 'Indica la tarea específica que deseas realizar. Por ejemplo: '
-        '“Crea un esquema para una presentación de 10 minutos sobre los conceptos básicos de IA Generativa.”',
+        '"Crea un esquema para una presentación de 10 minutos sobre los conceptos básicos de IA Generativa."',
     'formato': 'Ahora indica en que forma to quieres que te sea dada la respuesta (lista, párrafo, tabla, etc.). Por ejemplo: '
-        '“Proporciona la información en formato de lista de diapositivas con su correspondiente información y guión”',
+        '"Proporciona la información en formato de lista de diapositivas con su correspondiente información y guión"',
     'tono': 'Indica el tono más adecuado para la tarea que necesitas (formal, informal, motivador, técnico, etc.). Por ejemplo: '
-        '“Utiliza un tono motivador y accesible para una audiencia general.”',
+        '"Utiliza un tono motivador y accesible para una audiencia general."',
   };
 
   int _currentPartIndex = 0;
@@ -496,10 +571,10 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
   bool _responseAnimationComplete = false;
   bool _geminiReturned = false;
   String? _conversationId;
-  
+
   Timer? _introTimer;
-  // Variable para controlar si hay algo animándose (para mostrar el botón Saltar)
-  bool _isTyping = false; 
+  bool _isTyping = false;
+  StreamSubscription<String>? _streamSubscription;
 
   @override
   void initState() {
@@ -514,12 +589,12 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
     _messageController.dispose();
     _scrollController.dispose();
     _introTimer?.cancel();
-    _skipSignal.close(); // Importante cerrar el stream
+    _skipSignal.close();
+    _streamSubscription?.cancel();
     super.dispose();
   }
 
   void _startConversation() {
-    // Primera parte
     _addMessage(
       _ChatMessage(
         text: 'Para crear un prompt completo para una tarea compleja es conveniente que '
@@ -535,18 +610,13 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
     });
   }
 
-  // Función mejorada para saltar cualquier animación actual
   void _skipCurrentAnimation() {
-    // 1. Cancelar lógica de temporizadores del padre (para intro)
     _introTimer?.cancel();
-    
-    // 2. Enviar señal a todos los widgets _AnimatedText hijos para que terminen YA
+
     _skipSignal.add(null);
 
-    // 3. Lógica específica según el estado
     if (_currentPartIndex == 0 && !_waitingForInput) {
-        // Si estábamos en la intro y aún no pedimos la primera parte
-        _askForNextPart();
+      _askForNextPart();
     }
   }
 
@@ -574,7 +644,6 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
   void _addMessage(_ChatMessage message) {
     setState(() {
       _messages.add(message);
-      // Si el mensaje es animado, marcamos que estamos escribiendo
       if (message.isAnimated) {
         _isTyping = true;
       }
@@ -668,11 +737,8 @@ class _PromptBuilderPageState extends State<_PromptBuilderPage> {
 
   Future<void> _getGeminiResponse() async {
     try {
-      // 1. Obtenemos el prompt que construyó el usuario
       final userPrompt = _buildCompletePrompt();
-      
-      // 2. Creamos el "Meta-Prompt" o instrucción para el evaluador
-      // Aquí definimos el rol de "Entrenadora de Prompts" y los criterios de evaluación.
+
       final evaluationPrompt = '''
 Actúa como una experta Mentora en Ingeniería de Prompts (Prompt Engineering). Tu objetivo es evaluar el prompt que ha creado un usuario para ver si es efectivo.
 
@@ -696,31 +762,52 @@ FORMATO DE TU RESPUESTA:
 - Si la puntuación es <= 70: Sé amable pero crítica. Explica qué le falta (ej. "El contexto es muy vago" o "No definiste bien el formato de salida") y dale un ejemplo concreto de cómo arreglar esa parte específica.
 - Termina con una frase motivadora.
 ''';
-      
-      // 3. Enviamos el prompt de evaluación a Gemini en lugar del prompt del usuario
-      final response = await _geminiService.generateContent(evaluationPrompt);
-      
-      if (!mounted) return;
-      
-      _messages.removeLast(); // Quitamos el mensaje de "Generando..."
-      setState(() {
-        _geminiReturned = true;
-      });
 
-      // Añadimos la respuesta (que ahora será la evaluación)
-      _addMessage(
-        _ChatMessage(
-          text: response,
-          isUser: false,
-          isAnimated: true,
-          onComplete: () {
-            if (!mounted) return;
-            setState(() {
-              _responseAnimationComplete = true;
-              _isTyping = false; 
-            });
-          },
-        ),
+      final buffer = StringBuffer();
+
+      _streamSubscription = _geminiService.generateContentStream(evaluationPrompt).listen(
+        (chunk) {
+          buffer.write(chunk);
+        },
+        onDone: () {
+          if (!mounted) return;
+
+          _messages.removeLast();
+          setState(() {
+            _geminiReturned = true;
+          });
+
+          _addMessage(
+            _ChatMessage(
+              text: buffer.toString(),
+              isUser: false,
+              isAnimated: true,
+              onComplete: () {
+                if (!mounted) return;
+                setState(() {
+                  _responseAnimationComplete = true;
+                  _isTyping = false;
+                });
+              },
+            ),
+          );
+        },
+        onError: (e) {
+          if (!mounted) return;
+          setState(() {
+            _responseAnimationComplete = false;
+            _geminiReturned = false;
+            _isTyping = false;
+          });
+          _messages.removeLast();
+          _addMessage(
+            _ChatMessage(
+              text: 'Error al evaluar el prompt: $e\n\nPor favor, intenta de nuevo.',
+              isUser: false,
+              isAnimated: false,
+            ),
+          );
+        },
       );
     } catch (e) {
       if (!mounted) return;
@@ -740,7 +827,7 @@ FORMATO DE TU RESPUESTA:
     }
   }
 
- Future<void> _saveConversation() async {
+  Future<void> _saveConversation() async {
     final messageEntities = _messages.map((chatMsg) {
       return MessageEntity(
         id: '${_conversationId}_${DateTime.now().millisecondsSinceEpoch}',
@@ -749,7 +836,7 @@ FORMATO DE TU RESPUESTA:
         timestamp: DateTime.now(),
       );
     }).toList();
-    
+
     await widget.conversationRepository.saveConversation(messageEntities, suffix: 'modulo2');
   }
 
@@ -789,7 +876,6 @@ FORMATO DE TU RESPUESTA:
                   textAlign: TextAlign.center,
                 ),
               ),
-              // Botón saltar visible siempre que la IA esté escribiendo
               if (_isTyping)
                 TextButton(
                   onPressed: _skipCurrentAnimation,
@@ -803,7 +889,6 @@ FORMATO DE TU RESPUESTA:
           ),
         ),
         const SizedBox(height: 16),
-
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
@@ -815,7 +900,6 @@ FORMATO DE TU RESPUESTA:
             },
           ),
         ),
-
         if (_promptComplete && _responseAnimationComplete)
           Padding(
             padding: const EdgeInsets.all(16),
@@ -845,7 +929,6 @@ FORMATO DE TU RESPUESTA:
               ],
             ),
           ),
-
         if (_waitingForInput && !_promptComplete)
           Container(
             padding: const EdgeInsets.all(16),
@@ -894,8 +977,7 @@ FORMATO DE TU RESPUESTA:
               ],
             ),
           ),
-
-        if (!_waitingForInput && _promptComplete)
+        if (!_waitingForInput && _promptComplete && !_responseAnimationComplete)
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -922,8 +1004,7 @@ FORMATO DE TU RESPUESTA:
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment:
-            message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!message.isUser) ...[
@@ -945,9 +1026,7 @@ FORMATO DE TU RESPUESTA:
               ),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: message.isUser
-                    ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.secondaryContainer,
+                color: message.isUser ? theme.colorScheme.primaryContainer : theme.colorScheme.secondaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: _buildMessageContent(theme, message),
@@ -971,26 +1050,20 @@ FORMATO DE TU RESPUESTA:
   }
 
   Widget _buildMessageContent(ThemeData theme, _ChatMessage message) {
-    // Si es animado, pasamos el stream de salto y el callback de completado
-    // Este callback notificará al padre que la animación ha terminado (para ocultar el botón Saltar)
     if (message.isAnimated) {
       return _AnimatedText(
         text: message.text,
         skipStream: _skipSignal.stream,
         onComplete: () {
-          // Callback propio del mensaje
           message.onComplete?.call();
-          // Notificar al padre que esta burbuja terminó
           _handleMessageComplete();
         },
       );
     }
 
-    // Si no es animado (o ya terminó), mostramos el contenido estático (Markdown o texto)
     return _buildStaticContent(theme, message.text);
   }
 
-  // Método auxiliar para renderizar contenido estático (Markdown o Texto)
   Widget _buildStaticContent(ThemeData theme, String text) {
     bool looksLikeMarkdown(String t) {
       if (t.contains('```')) return true;
@@ -1014,12 +1087,17 @@ FORMATO DE TU RESPUESTA:
         config: MarkdownConfig(
           configs: [
             PConfig(textStyle: TextStyle(color: theme.colorScheme.onSurface, fontSize: 15, height: 1.4)),
-            CodeConfig(style: TextStyle(backgroundColor: theme.colorScheme.surfaceContainer, color: theme.colorScheme.primary, fontFamily: 'monospace', fontSize: 14)),
+            CodeConfig(
+                style: TextStyle(
+                    backgroundColor: theme.colorScheme.surfaceContainer,
+                    color: theme.colorScheme.primary,
+                    fontFamily: 'monospace',
+                    fontSize: 14)),
           ],
         ),
       );
     }
-    
+
     return SelectableText(
       text,
       style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
@@ -1041,14 +1119,13 @@ class _ChatMessage {
   });
 }
 
-// ============= TEXTO ANIMADO CON STREAM DE SALTO =============
 class _AnimatedText extends StatefulWidget {
   final String text;
   final VoidCallback? onComplete;
-  final Stream<void>? skipStream; // Nuevo stream para recibir señal de salto
+  final Stream<void>? skipStream;
 
   const _AnimatedText({
-    required this.text, 
+    required this.text,
     this.onComplete,
     this.skipStream,
   });
@@ -1066,7 +1143,6 @@ class _AnimatedTextState extends State<_AnimatedText> {
   @override
   void initState() {
     super.initState();
-    // Suscribirse a la señal de salto
     if (widget.skipStream != null) {
       _skipSubscription = widget.skipStream!.listen((_) {
         _finishImmediately();
@@ -1089,7 +1165,6 @@ class _AnimatedTextState extends State<_AnimatedText> {
       _displayedText = widget.text;
       _isFinished = true;
     });
-    // Importante: Llamar al onComplete para notificar al padre
     if (widget.onComplete != null) {
       widget.onComplete!();
     }
@@ -1119,8 +1194,6 @@ class _AnimatedTextState extends State<_AnimatedText> {
 
   @override
   Widget build(BuildContext context) {
-    // Si ha terminado y parece markdown, usamos el renderizador de Markdown completo
-    // Si no, seguimos mostrando el texto simple (que pudo haber terminado instantáneamente)
     if (_isFinished) {
       return _buildStaticContent(Theme.of(context), widget.text);
     }
@@ -1130,13 +1203,12 @@ class _AnimatedTextState extends State<_AnimatedText> {
       child: SelectableText(
         _displayedText,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          height: 1.5,
-        ),
+              height: 1.5,
+            ),
       ),
     );
   }
 
-  // Reutilizamos la lógica de detección de markdown para el estado final
   Widget _buildStaticContent(ThemeData theme, String text) {
     bool looksLikeMarkdown(String t) {
       if (t.contains('```')) return true;
@@ -1147,18 +1219,23 @@ class _AnimatedTextState extends State<_AnimatedText> {
 
     if (looksLikeMarkdown(text)) {
       return MarkdownWidget(
-        data: text, // Usar texto completo
+        data: text,
         shrinkWrap: true,
         selectable: true,
-         config: MarkdownConfig(
+        config: MarkdownConfig(
           configs: [
             PConfig(textStyle: TextStyle(color: theme.colorScheme.onSurface, fontSize: 15, height: 1.4)),
-            CodeConfig(style: TextStyle(backgroundColor: theme.colorScheme.surfaceContainer, color: theme.colorScheme.primary, fontFamily: 'monospace', fontSize: 14)),
+            CodeConfig(
+                style: TextStyle(
+                    backgroundColor: theme.colorScheme.surfaceContainer,
+                    color: theme.colorScheme.primary,
+                    fontFamily: 'monospace',
+                    fontSize: 14)),
           ],
         ),
       );
     }
-    
+
     return SelectableText(
       text,
       style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),

@@ -3,7 +3,7 @@ import '../entities/command_folder_entity.dart';
 
 /// Interfaz del repositorio de comandos.
 /// Define las operaciones disponibles para gestionar comandos del sistema y del usuario.
-abstract class CommandRepository {
+abstract class ICommandRepository {
   // ============================================================================
   // COMANDOS
   // ============================================================================

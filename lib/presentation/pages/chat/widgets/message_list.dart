@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import '../../../../data/models/message_model.dart';
 
-class MessageList extends StatelessWidget {
+class MessageList extends StatefulWidget {
   final List<Message> messages;
   final bool isProcessing;
 
@@ -14,8 +14,59 @@ class MessageList extends StatelessWidget {
   });
 
   @override
+  State<MessageList> createState() => _MessageListState();
+}
+
+class _MessageListState extends State<MessageList> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Scroll inicial al fondo si hay mensajes al cargar
+    if (widget.messages.isNotEmpty) {
+      _scrollToBottom();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant MessageList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Detectar si se han añadido mensajes nuevos
+    if (widget.messages.length > oldWidget.messages.length) {
+      _scrollToBottom();
+    }
+    
+    // Opcional: Si quieres que scrollee también mientras el bot escribe (stream)
+    // podrias verificar si el último mensaje cambió de contenido, 
+    // pero a veces es molesto si el usuario quiere leer arriba.
+    // Por ahora lo dejamos solo al "añadir" mensaje nuevo.
+  }
+
+  void _scrollToBottom() {
+    // Usamos addPostFrameCallback para esperar a que la lista se renderice
+    // y calcule su nuevo tamaño antes de hacer scroll.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (messages.isEmpty) {
+    if (widget.messages.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -42,11 +93,22 @@ class MessageList extends StatelessWidget {
     // Envuelve la lista completa para permitir selección continua y auto-scroll
     return SelectionArea(
       child: ListView.builder(
+        controller: _scrollController, // Vinculamos el controlador aquí
         padding: const EdgeInsets.all(8),
-        itemCount: messages.length,
+        itemCount: widget.messages.length,
         itemBuilder: (context, index) {
-          final message = messages[index];
-          return _MessageBubble(message: message);
+          final message = widget.messages[index];
+          // Añadimos un padding extra al último elemento para que no quede pegado
+          // y asegure visibilidad total tras el scroll
+          final isLast = index == widget.messages.length - 1;
+          
+          return Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 10.0 : 0.0),
+            child: _MessageBubble(
+              key: ValueKey(message.id),
+              message: message,
+            ),
+          );
         },
       ),
     );
@@ -56,7 +118,7 @@ class MessageList extends StatelessWidget {
 class _MessageBubble extends StatelessWidget {
   final Message message;
 
-  const _MessageBubble({required this.message});
+  const _MessageBubble({super.key, required this.message});
 
   String _cleanMarkdownText(String text) {
     String cleaned = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
@@ -104,7 +166,6 @@ class _MessageBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Prefijo (Icono/Nombre)
-                // SelectionContainer.disabled evita que al "Seleccionar todo" se copien los iconos/nombres
                 SelectionContainer.disabled(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 2),
@@ -119,7 +180,7 @@ class _MessageBubble extends StatelessWidget {
                 // Contenido del Mensaje
                 Flexible(
                   child: isUser
-                      ? Text( // Usamos Text normal porque SelectionArea maneja la selección ahora
+                      ? Text( 
                           message.content,
                           style: TextStyle(
                             color: colorScheme.onPrimary,
@@ -130,8 +191,6 @@ class _MessageBubble extends StatelessWidget {
                       : MarkdownWidget(
                           data: _cleanMarkdownText(message.content),
                           shrinkWrap: true,
-                          // IMPORTANTE: Desactivamos la selección interna del Markdown
-                          // para que no pelee con el SelectionArea global.
                           selectable: false, 
                           config: MarkdownConfig(
                             configs: [
@@ -213,7 +272,6 @@ class _MessageBubble extends StatelessWidget {
               ],
             ),
             // Botón de Copiar
-            // Usamos SelectionContainer.disabled para que el texto del icono no sea seleccionable accidentalmente
             SelectionContainer.disabled(
               child: InkWell(
                   onTap: () => _copyToClipboard(context, message.content),

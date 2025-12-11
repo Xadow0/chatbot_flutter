@@ -127,7 +127,7 @@ void _handleEditRequested(QuickResponse response) {
       builder: (context, chatProvider, _) {
         return PopScope(
           canPop: _canExit,
-          onPopInvoked: (didPop) async {
+          onPopInvokedWithResult: (didPop, result) async {
             if (didPop) return;
             await _onWillPop();
           },
@@ -181,7 +181,9 @@ void _handleEditRequested(QuickResponse response) {
                   MessageInput(
                     key: _messageInputKey,
                     onSendMessage: chatProvider.sendMessage,
+                    onStopStreaming: chatProvider.cancelStreaming,
                     isBlocked: chatProvider.isProcessing,
+                    isStreaming: chatProvider.isStreaming,
                   ),
                 ],
               ),

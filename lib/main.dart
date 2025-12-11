@@ -12,9 +12,9 @@ import 'presentation/providers/command_management_provider.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-import 'domain/repositories/chat_repository.dart';
-import 'domain/repositories/conversation_repository.dart';
-import 'domain/repositories/command_repository.dart'; 
+import 'domain/repositories/ichat_repository.dart';
+import 'domain/repositories/iconversation_repository.dart';
+import 'domain/repositories/icommand_repository.dart'; 
 
 import 'data/services/ai_chat_service.dart';
 import 'data/repositories/chat_repository.dart';
@@ -151,7 +151,7 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
 
         // CommandRepository con 5 argumentos
-        Provider<CommandRepository>(
+        Provider<ICommandRepository>(
           create: (context) {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             
@@ -165,13 +165,13 @@ class _AppInitializerState extends State<AppInitializer> {
           },
         ),
         
-        Provider<ChatRepository>(
+        Provider<IChatRepository>(
           create: (context) => LocalChatRepository(
             context.read<AIChatService>(),
           ),
         ),
         
-        Provider<ConversationRepository>(
+        Provider<IConversationRepository>(
           create: (context) {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             
@@ -187,7 +187,7 @@ class _AppInitializerState extends State<AppInitializer> {
           create: (context) {
             final authProvider = Provider.of<AuthProvider>(context, listen: false);
             final commandProvider = CommandManagementProvider(
-              context.read<CommandRepository>() as CommandRepositoryImpl,
+              context.read<ICommandRepository>() as CommandRepositoryImpl,
             );
 
             // Vinculación Auth (existente)
@@ -223,9 +223,8 @@ class _AppInitializerState extends State<AppInitializer> {
             final commandProvider = Provider.of<CommandManagementProvider>(context, listen: false);
             
             final chatProvider = ChatProvider(
-              chatRepository: context.read<ChatRepository>(),
-              conversationRepository: context.read<ConversationRepository>(),
-              commandRepository: context.read<CommandRepository>(),
+              conversationRepository: context.read<IConversationRepository>(),
+              commandRepository: context.read<ICommandRepository>(),
               aiServiceSelector: context.read<AIServiceSelector>(),
             );
             

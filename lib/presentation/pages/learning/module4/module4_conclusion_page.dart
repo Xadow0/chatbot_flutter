@@ -58,6 +58,16 @@ class Module4ConclusionPage extends StatelessWidget {
                     color: Colors.green,
                   ),
 
+                  const SizedBox(height: 12),
+
+                  _buildAchievementCard(
+                    icon: Icons.bolt,
+                    title: 'Comandos Personalizados',
+                    description:
+                        'Aprendiste a guardar tus meta-prompts como comandos reutilizables para acceder a ellos con un solo toque.',
+                    color: Colors.orange,
+                  ),
+
                   const SizedBox(height: 24),
 
                   // Siguiente paso
@@ -98,11 +108,11 @@ class Module4ConclusionPage extends StatelessWidget {
                         const SizedBox(height: 16),
                         const Text(
                           'Ahora es momento de aplicar estas técnicas en tu trabajo real:\n\n'
-                          '1. Identifica un proyecto complejo que tengas pendiente\n'
-                          '2. Usa la descomposición para planificarlo\n'
-                          '3. Crea 2-3 plantillas para tus tareas más frecuentes\n'
-                          '4. Construye tu biblioteca personal de prompts\n\n'
-                          'En pocas semanas, estas técnicas se convertirán en tu forma natural de trabajar con IA.',
+                          '1. Ve a "Mis Comandos" y crea tu primer comando personalizado\n'
+                          '2. Usa meta-preguntas para diseñar prompts perfectos\n'
+                          '3. Guarda los mejores como comandos editables\n'
+                          '4. Accede a ellos rápidamente desde el chat\n\n'
+                          'En pocas semanas, estos comandos se convertirán en tu sistema personal de productividad con IA.',
                           style: TextStyle(fontSize: 15, height: 1.6),
                         ),
                       ],
@@ -110,6 +120,61 @@ class Module4ConclusionPage extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 24),
+
+                  // Tip sobre comandos Editables vs Automáticos
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: Colors.indigo.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.tune, color: Colors.indigo[700], size: 28),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Dominando los Modos de Comando',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 12),
+                              _TipBullet(
+                                icon: Icons.edit_note,
+                                title: 'Modo Editable',
+                                text:
+                                    'Ideal para plantillas con huecos ([TEMA]). El prompt se pega en el chat para que lo completes.',
+                              ),
+                              SizedBox(height: 8),
+                              _TipBullet(
+                                icon: Icons.bolt,
+                                title: 'Modo Automático',
+                                text:
+                                    'Usa {{content}} en el prompt. Al escribir "/resumir texto", el "texto" reemplaza automáticamente a {{content}}.',
+                              ),
+                              SizedBox(height: 8),
+                              _TipBullet(
+                                icon: Icons.mouse,
+                                title: 'Edición Rápida',
+                                text:
+                                    '¿Necesitas cambiar un comando automático solo una vez? Haz click derecho (o mantén presionado) sobre el chip y elige "Editar prompt".',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
 
                   // Tips finales
                   Container(
@@ -180,7 +245,7 @@ class Module4ConclusionPage extends StatelessWidget {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Has completado el Módulo 4 de Técnicas Avanzadas',
+                                'Has completado el Módulo 4 de Técnicas Avanzadas y Comandos',
                                 style: TextStyle(fontSize: 14),
                               ),
                             ],
@@ -260,6 +325,45 @@ class Module4ConclusionPage extends StatelessWidget {
           Icon(Icons.check_circle, color: color, size: 24),
         ],
       ),
+    );
+  }
+}
+
+class _TipBullet extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+
+  const _TipBullet({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Colors.indigo[700]),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                  fontSize: 13,
+                  height: 1.4),
+              children: [
+                TextSpan(
+                    text: '$title: ',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                TextSpan(text: text),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

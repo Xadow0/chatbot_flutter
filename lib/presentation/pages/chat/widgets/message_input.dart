@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Necesario para LogicalKeyboardKey y HardwareKeyboard
+import 'package:flutter/services.dart';
 
 class MessageInput extends StatefulWidget {
   final Function(String) onSendMessage;
+  final VoidCallback? onStopStreaming;
   final bool isBlocked;
+  final bool isStreaming;
 
   const MessageInput({
     super.key,
     required this.onSendMessage,
+    this.onStopStreaming,
     this.isBlocked = false,
+    this.isStreaming = false,
   });
 
   @override
@@ -17,25 +21,29 @@ class MessageInput extends StatefulWidget {
 
 class MessageInputState extends State<MessageInput> {
   final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode(); // Nodo para interceptar teclas
+  final FocusNode _focusNode = FocusNode();
+  bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
-    // Configurar la intercepción de teclas directamente en el FocusNode
+    
+    _controller.addListener(() {
+      final hasText = _controller.text.trim().isNotEmpty;
+      if (hasText != _hasText) {
+        setState(() {
+          _hasText = hasText;
+        });
+      }
+    });
+    
     _focusNode.onKeyEvent = (node, event) {
-      // Solo nos interesa cuando la tecla se "baja" (KeyDown)
       if (event is KeyDownEvent) {
-        // Si es la tecla ENTER
         if (event.logicalKey == LogicalKeyboardKey.enter) {
-          // Verificamos si SHIFT está presionado
           if (HardwareKeyboard.instance.isShiftPressed) {
-            // Shift + Enter: Dejar pasar el evento para que haga el salto de línea normal
             return KeyEventResult.ignored;
           } else {
-            // Solo Enter: Enviar mensaje y detener la propagación (para no insertar \n)
-            // Solo enviamos si no está bloqueado
-            if (!widget.isBlocked) {
+            if (!widget.isBlocked && !widget.isStreaming) {
               _handleSend();
             }
             return KeyEventResult.handled;
@@ -53,26 +61,31 @@ class MessageInputState extends State<MessageInput> {
   }
 
   void _handleSend() {
-    if (_controller.text.trim().isEmpty || widget.isBlocked) return;
+    if (_controller.text.trim().isEmpty || widget.isBlocked || widget.isStreaming) return;
     widget.onSendMessage(_controller.text.trim());
     _controller.clear();
-    // Opcional: Mantener el foco en el input después de enviar
-    _focusNode.requestFocus(); 
+    _focusNode.requestFocus();
+  }
+
+  void _handleStop() {
+    widget.onStopStreaming?.call();
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _focusNode.dispose(); // Importante limpiar el nodo
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
       padding: const EdgeInsets.all(8.0),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: colorScheme.surface,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(13),
@@ -82,39 +95,46 @@ class MessageInputState extends State<MessageInput> {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end, // Alinea el botón abajo si el texto crece
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: TextField(
               controller: _controller,
-              focusNode: _focusNode, // Vinculamos el FocusNode aquí
-              enabled: !widget.isBlocked,
-              
-              // --- CONFIGURACIÓN DINÁMICA ---
+              focusNode: _focusNode,
+              enabled: !widget.isBlocked || widget.isStreaming,
               keyboardType: TextInputType.multiline,
               minLines: 1,
-              maxLines: 8, // Crece hasta 8 líneas
-              textInputAction: TextInputAction.newline, // Mantiene el botón de 'Enter' visualmente
-              // ------------------------------
-
+              maxLines: 8,
+              textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
-                hintText: widget.isBlocked
-                    ? 'Procesando respuesta...'
-                    : 'Escribe un mensaje...',
+                hintText: widget.isStreaming
+                    ? 'Generando respuesta...'
+                    : widget.isBlocked
+                        ? 'Procesando...'
+                        : 'Escribe un mensaje...',
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               ),
-              // Ya no usamos onSubmitted porque lo manejamos manualmente en el FocusNode
             ),
           ),
           const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
-            child: IconButton.filled(
-              icon: const Icon(Icons.send),
-              onPressed: widget.isBlocked ? null : _handleSend,
-              tooltip: 'Enviar',
-            ),
+            child: widget.isStreaming
+                ? IconButton.filled(
+                    icon: const Icon(Icons.stop),
+                    onPressed: _handleStop,
+                    tooltip: 'Detener generación',
+                    style: IconButton.styleFrom(
+                      backgroundColor: colorScheme.error,
+                      foregroundColor: colorScheme.onError,
+                    ),
+                  )
+                : IconButton.filled(
+                    icon: const Icon(Icons.send),
+                    onPressed: (widget.isBlocked || !_hasText) ? null : _handleSend,
+                    tooltip: 'Enviar',
+                  ),
           ),
         ],
       ),

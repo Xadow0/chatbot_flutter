@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/command_entity.dart';
 import '../../domain/entities/command_folder_entity.dart';
-import '../../domain/repositories/command_repository.dart';
+import '../../domain/repositories/icommand_repository.dart';
 import '../models/command_model.dart';
 import '../models/command_folder_model.dart';
 import '../services/local_command_service.dart';
@@ -9,7 +9,7 @@ import '../services/local_folder_service.dart';
 import '../services/firebase_command_sync_service.dart';
 import '../services/firebase_folder_sync_service.dart';
 
-class CommandRepositoryImpl implements CommandRepository {
+class CommandRepositoryImpl implements ICommandRepository {
   final LocalCommandService _localCommandService;
   final LocalFolderService _localFolderService;
   final FirebaseCommandSyncService _firebaseCommandSyncService;

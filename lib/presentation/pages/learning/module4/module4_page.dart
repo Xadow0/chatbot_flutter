@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'module4_intro_page.dart';
 import 'module4_context_explanation_page.dart';
 import 'module4_practice_page.dart';
+import 'module4_commands_tutorial_page.dart';
 import 'module4_conclusion_page.dart';
 
 class Module4Page extends StatefulWidget {
@@ -31,7 +32,6 @@ class _Module4PageState extends State<Module4Page> {
     }
   }
 
-  // 1. AÑADIMOS LA FUNCIÓN PARA VOLVER AL HOME
   void _goHome() {
     Navigator.pop(context);
   }
@@ -51,11 +51,10 @@ class _Module4PageState extends State<Module4Page> {
       body: SafeArea(
         child: Column(
           children: [
-            // 2. MODIFICAMOS EL HEADER
+            // Header con navegación
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
-                // Alineación para separar los botones (izquierda y derecha)
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
@@ -63,7 +62,6 @@ class _Module4PageState extends State<Module4Page> {
                     onPressed: _previousPage,
                     tooltip: 'Volver',
                   ),
-                  // Nuevo botón de Casa
                   IconButton(
                     icon: const Icon(Icons.home_rounded, size: 28),
                     onPressed: _goHome,
@@ -94,11 +92,13 @@ class _Module4PageState extends State<Module4Page> {
             TechniqueType.descomposicion,
             TechniqueType.metaPreguntas,
             TechniqueType.plantillas,
-            TechniqueType.practica, 
           ],
           onNext: _nextPage,
         );
       case 3:
+        // Nueva página: Tutorial de Comandos
+        return Module4CommandsTutorialPage(onNext: _nextPage);
+      case 4:
         return Module4ConclusionPage(onFinish: _completeModule);
       default:
         return const SizedBox();
