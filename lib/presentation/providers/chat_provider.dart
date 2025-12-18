@@ -34,6 +34,14 @@ class ChatProvider extends ChangeNotifier {
   bool _hasUnsavedChanges = false;
   File? _currentConversationFile;
   bool _isSaving = false;
+  
+  // ============================================================================
+  // NUEVO: Control de sesión activa
+  // ============================================================================
+  /// Indica si hay una conversación activa en la sesión actual.
+  /// Se pone en true cuando el usuario envía su primer mensaje.
+  /// Se pone en false cuando el usuario crea una nueva conversación explícitamente.
+  bool _hasActiveSession = false;
 
   late final AIServiceSelector _aiSelector;
   late final PreferencesService _preferencesService;
@@ -223,6 +231,9 @@ class ChatProvider extends ChangeNotifier {
     debugPrint('🔄 [ChatProvider] CommandProcessor actualizado para: $_currentProvider');
   }
 
+  // ============================================================================
+  // GETTERS
+  // ============================================================================
   List<MessageEntity> get messages => List.unmodifiable(_messages);
   List<QuickResponseEntity> get quickResponses => _quickResponses;
   bool get isProcessing => _isProcessing;
@@ -235,6 +246,19 @@ class ChatProvider extends ChangeNotifier {
   bool get ollamaAvailable => _aiSelector.ollamaAvailable && _ollamaSelectable;
   bool get isRetryingOllama => _isRetryingOllama;
   bool get hasUnsavedChanges => _hasUnsavedChanges;
+  
+  // NUEVO: Getter para saber si hay una sesión activa
+  bool get hasActiveSession => _hasActiveSession;
+  
+  /// Indica si la conversación actual tiene contenido significativo para guardar
+  /// (más que solo el mensaje de bienvenida del bot)
+  bool get hasSignificantContent {
+    if (_messages.isEmpty) return false;
+    // Si solo hay un mensaje y es del bot (bienvenida), no es significativo
+    if (_messages.length == 1 && _messages.first.type == MessageTypeEntity.bot) return false;
+    // Si hay al menos un mensaje del usuario, es significativo
+    return _messages.any((m) => m.type == MessageTypeEntity.user);
+  }
 
   AIServiceSelector get aiSelector => _aiSelector;
   bool get openaiAvailable => _aiSelector.openaiAvailable;
@@ -267,6 +291,13 @@ class ChatProvider extends ChangeNotifier {
       await _updateQuickResponses();
 
       _ollamaSelectable = _aiSelector.ollamaAvailable;
+
+      // NUEVO: Añadir mensaje de bienvenida al inicializar si no hay mensajes
+      // Esto asegura que siempre haya un mensaje inicial al abrir la app
+      if (_messages.isEmpty) {
+        _addWelcomeMessage();
+        debugPrint('👋 [ChatProvider] Mensaje de bienvenida añadido en inicialización');
+      }
 
       notifyListeners();
     } catch (e) {
@@ -513,6 +544,10 @@ class ChatProvider extends ChangeNotifier {
     }
 
     if (_isNewConversation) _isNewConversation = false;
+    
+    // NUEVO: Marcar que hay una sesión activa
+    _hasActiveSession = true;
+    
     hideModelSelector();
 
     final now = DateTime.now();
@@ -611,6 +646,9 @@ class ChatProvider extends ChangeNotifier {
     debugPrint('   🤖 Proveedor: $_currentProvider');
 
     hideModelSelector();
+    
+    // NUEVO: Marcar que hay una sesión activa
+    _hasActiveSession = true;
 
     final now = DateTime.now();
     final userMessageId = '${now.millisecondsSinceEpoch}_user';
@@ -758,15 +796,52 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  // ============================================================================
+  // NUEVO: Método para iniciar una nueva conversación explícitamente
+  // ============================================================================
+  /// Inicia una nueva conversación.
+  /// 1. Guarda la conversación actual si tiene contenido significativo
+  /// 2. Limpia los mensajes y el historial de IA
+  /// 3. Resetea el estado de la sesión
+  Future<void> startNewConversation() async {
+    debugPrint('🆕 [ChatProvider] Iniciando nueva conversación...');
+    
+    // 1. Guardar la conversación actual si tiene contenido
+    if (hasSignificantContent && _hasUnsavedChanges) {
+      debugPrint('   💾 Guardando conversación actual antes de crear nueva...');
+      await saveCurrentConversation();
+    }
+    
+    // 2. Limpiar todo
+    _messages.clear();
+    _isNewConversation = true;
+    _needsHistoryLoad = false;
+    _currentConversationFile = null;
+    _hasUnsavedChanges = false;
+    _hasActiveSession = false;
+    
+    // 3. Limpiar historial de servicios de IA
+    _clearAIServiceHistory();
+    
+    // 4. Añadir mensaje de bienvenida
+    _addWelcomeMessage();
+    
+    notifyListeners();
+    debugPrint('   ✅ Nueva conversación iniciada');
+  }
+
+  /// MODIFICADO: clearMessages ya NO inicia una nueva conversación automáticamente.
+  /// Solo limpia los mensajes actuales sin guardar.
+  /// Usar startNewConversation() para el flujo completo.
   Future<void> clearMessages() async {
-    debugPrint('🗑️ [ChatProvider] Limpiando mensajes...');
+    debugPrint('🗑️ [ChatProvider] Limpiando mensajes (sin guardar)...');
 
     _messages.clear();
     _isNewConversation = true;
     _needsHistoryLoad = false;
-
     _currentConversationFile = null;
     _hasUnsavedChanges = false;
+    // NO reseteamos _hasActiveSession aquí para mantener la sesión
 
     _clearAIServiceHistory();
     _addWelcomeMessage();
@@ -815,6 +890,7 @@ class ChatProvider extends ChangeNotifier {
 
       _isNewConversation = false;
       _needsHistoryLoad = true;
+      _hasActiveSession = true; // Marcar sesión activa al cargar
 
       _currentConversationFile = file;
       _hasUnsavedChanges = false;
@@ -976,6 +1052,54 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  // ============================================================================
+  // NUEVO: Método público para guardar la conversación actual
+  // ============================================================================
+  /// Guarda la conversación actual de forma explícita.
+  /// Útil para llamar desde el ciclo de vida de la app.
+  Future<void> saveCurrentConversation() async {
+    if (_isSaving) return;
+    if (!hasSignificantContent) {
+      debugPrint('💾 [ChatProvider] No hay contenido significativo para guardar');
+      return;
+    }
+    if (!_hasUnsavedChanges) {
+      debugPrint('💾 [ChatProvider] No hay cambios sin guardar');
+      return;
+    }
+
+    _isSaving = true;
+    debugPrint('💾 [ChatProvider] Guardando conversación actual...');
+
+    try {
+      await _conversationRepository.saveConversation(
+        _messages, 
+        existingFile: _currentConversationFile,
+      );
+      _hasUnsavedChanges = false;
+      debugPrint('   ✅ Conversación guardada correctamente.');
+    } catch (e) {
+      debugPrint('❌ [ChatProvider] Error al guardar conversación: $e');
+    } finally {
+      _isSaving = false;
+    }
+  }
+
+  /// Guarda la conversación automáticamente cuando la app pierde el foco.
+  /// Este método es llamado desde el AppLifecycleObserver.
+  Future<void> onAppPaused() async {
+    debugPrint('⏸️ [ChatProvider] App pausada - verificando guardado automático...');
+    await saveCurrentConversation();
+  }
+  
+  /// Guarda la conversación cuando la app se va a cerrar.
+  /// Este método es llamado desde el AppLifecycleObserver.
+  Future<void> onAppDetached() async {
+    debugPrint('🔌 [ChatProvider] App desconectada - guardando conversación...');
+    await saveCurrentConversation();
+  }
+
+  /// endSession ahora solo guarda, no resetea la sesión
   Future<void> endSession() async {
     if (_isSaving) return;
 

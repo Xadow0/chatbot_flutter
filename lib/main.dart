@@ -240,7 +240,10 @@ class _AppInitializerState extends State<AppInitializer> {
           },
         ),
       ],
-      child: MyApp(initialRoute: result.initialRoute),
+      // MODIFICADO: Envolver MyApp con el AppLifecycleManager
+      child: _AppLifecycleManager(
+        child: MyApp(initialRoute: result.initialRoute),
+      ),
     );
   }
 
@@ -263,6 +266,93 @@ class _AppInitializerState extends State<AppInitializer> {
       initialRoute: initialRoute,
       aiServiceSelector: aiServiceSelector,
     );
+  }
+}
+
+// ============================================================================
+// NUEVO: Widget que gestiona el ciclo de vida de la app a nivel global
+// ============================================================================
+/// Widget que observa el ciclo de vida de la aplicación y garantiza
+/// que las conversaciones se guarden cuando la app se cierra o pasa a segundo plano.
+class _AppLifecycleManager extends StatefulWidget {
+  final Widget child;
+  
+  const _AppLifecycleManager({required this.child});
+
+  @override
+  State<_AppLifecycleManager> createState() => _AppLifecycleManagerState();
+}
+
+class _AppLifecycleManagerState extends State<_AppLifecycleManager> 
+    with WidgetsBindingObserver {
+  
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    debugPrint('🔄 [AppLifecycleManager] Observer registrado');
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    debugPrint('🔄 [AppLifecycleManager] Observer removido');
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Intentamos obtener el ChatProvider de forma segura
+    final chatProvider = _getChatProviderSafely();
+    if (chatProvider == null) {
+      debugPrint('⚠️ [AppLifecycleManager] ChatProvider no disponible');
+      return;
+    }
+    
+    switch (state) {
+      case AppLifecycleState.paused:
+        debugPrint('📱 [AppLifecycleManager] App PAUSED - guardando conversación...');
+        chatProvider.onAppPaused();
+        break;
+        
+      case AppLifecycleState.detached:
+        debugPrint('📱 [AppLifecycleManager] App DETACHED - guardando conversación...');
+        chatProvider.onAppDetached();
+        break;
+        
+      case AppLifecycleState.inactive:
+        debugPrint('📱 [AppLifecycleManager] App INACTIVE');
+        // En algunos dispositivos, inactive precede a paused
+        // Guardamos por seguridad
+        chatProvider.onAppPaused();
+        break;
+        
+      case AppLifecycleState.resumed:
+        debugPrint('📱 [AppLifecycleManager] App RESUMED');
+        break;
+        
+      case AppLifecycleState.hidden:
+        debugPrint('📱 [AppLifecycleManager] App HIDDEN - guardando conversación...');
+        chatProvider.onAppPaused();
+        break;
+    }
+  }
+
+  /// Obtiene el ChatProvider de forma segura, retornando null si no está disponible
+  ChatProvider? _getChatProviderSafely() {
+    try {
+      return Provider.of<ChatProvider>(context, listen: false);
+    } catch (e) {
+      debugPrint('⚠️ [AppLifecycleManager] Error obteniendo ChatProvider: $e');
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }
 
@@ -355,7 +445,7 @@ Future<String> _determineInitialRoute() async {
       debugPrint('✅ [Main] Keys migradas correctamente → Ir al menú principal');
       return AppRoutes.startMenu;
     } else {
-      debugPrint('🔒 [Main] Sin keys → Ir a onboarding');
+      debugPrint('🔑 [Main] Sin keys → Ir a onboarding');
       return AppRoutes.apiKeysOnboarding;
     }
   } else {

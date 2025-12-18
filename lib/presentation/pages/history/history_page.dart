@@ -104,6 +104,8 @@ class _HistoryPageState extends State<HistoryPage> {
     );
 
     if (confirm == true) {
+      if (!mounted) return;
+
       try {
         final provider = context.read<ChatProvider>();
         final filesToDelete = _selectedIndices
@@ -159,6 +161,8 @@ class _HistoryPageState extends State<HistoryPage> {
     );
 
     if (confirm == true) {
+      if (!mounted) return;
+
       try {
         final provider = context.read<ChatProvider>();
         await provider.deleteAllConversations();

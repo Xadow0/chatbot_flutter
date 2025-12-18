@@ -6,7 +6,6 @@ import '../../../domain/entities/command_folder_entity.dart';
 import '../../providers/command_management_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
-import '../../widgets/custom_drawer.dart';
 import 'widgets/folder_editor_dialog.dart';
 import 'widgets/command_folder_widget.dart';
 import 'widgets/draggable_command_card.dart';
@@ -58,7 +57,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
       builder: (dialogContext) => FolderEditorDialog(existingFolder: folder),
     );
 
-    if (result != null && mounted) {
+    if (result != null && context.mounted) {
       await context.read<CommandManagementProvider>().saveFolder(result);
     }
   }
@@ -78,7 +77,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await context.read<CommandManagementProvider>().deleteCommand(command.id);
-              if (!context.mounted) return;
+              if (!mounted) return;
               _refreshQuickResponses();
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
@@ -107,7 +106,7 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await context.read<CommandManagementProvider>().deleteFolder(folder.id);
-              if (!context.mounted) return;
+              if (!mounted) return;
               _refreshQuickResponses();
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
@@ -135,8 +134,11 @@ class _UserCommandsPageState extends State<UserCommandsPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      drawer: const CustomDrawer(),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text('Mis Comandos'),
         centerTitle: true,
         flexibleSpace: Container(

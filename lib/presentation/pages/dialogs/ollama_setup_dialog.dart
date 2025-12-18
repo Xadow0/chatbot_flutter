@@ -329,28 +329,30 @@ class _OllamaSetupDialogState extends State<OllamaSetupDialog> {
                       color: colorScheme.surfaceContainerHighest.withAlpha(50),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Column(
-                      children: LocalOllamaModel.recommendedModels.map((model) {
-                        return RadioListTile<String>(
-                          title: Text(model.displayName),
-                          subtitle: Text(
-                            '${model.description} (Tamaño: ${model.estimatedSize})',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                    child: RadioGroup<String>(
+                      groupValue: _selectedModelName,
+                      onChanged: (value) {
+                        if (_isInitializing || value == null) return;
+                        setState(() {
+                          _selectedModelName = value;
+                        });
+                      },
+                      child: Column(
+                        children: LocalOllamaModel.recommendedModels.map((model) {
+                          return RadioListTile<String>(
+                            title: Text(model.displayName),
+                            subtitle: Text(
+                              '${model.description} (Tamaño: ${model.estimatedSize})',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                          value: model.name,
-                          groupValue: _selectedModelName,
-                          onChanged: _isInitializing ? null : (value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedModelName = value;
-                              });
-                            }
-                          },
-                          activeColor: colorScheme.primary,
-                        );
-                      }).toList(),
+                            value: model.name,
+                            activeColor: colorScheme.primary,
+                            enabled: !_isInitializing,
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

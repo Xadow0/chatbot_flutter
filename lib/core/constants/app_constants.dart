@@ -51,7 +51,7 @@ class AppConstants {
 
 class AppStrings {
   // General
-  static const String appTitle = 'Chatbot Demo';
+  static const String appTitle = 'Training IA';
   
   // Chat
   static const String chatTitle = 'Chat';
