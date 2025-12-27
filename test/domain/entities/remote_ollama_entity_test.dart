@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:chatbot_app/domain/entities/remote_ollama_entity.dart';
+import 'package:chatbot_app/features/chat/domain/entities/remote_ollama_entity.dart';
 
 void main() {
   group('OllamaModelEntity', () {

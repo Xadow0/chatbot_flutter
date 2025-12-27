@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import '../presentation/pages/chat/chat_page.dart';
-import '../presentation/pages/settings/settings_page.dart';
-import '../presentation/pages/menu/start_menu_page.dart';
-import '../presentation/pages/history/history_page.dart';
-import '../presentation/pages/learning/learning_page.dart';
-import '../presentation/pages/learning/module1/module1_page.dart';
-import '../presentation/pages/learning/module2/module2_page.dart';
-import '../presentation/pages/learning/module3/module3_page.dart';
-import '../presentation/pages/learning/module4/module4_page.dart';
-import '../presentation/pages/learning/module5/module5_page.dart';
-import '../presentation/pages/commands/user_commands_page.dart'; 
+import '../features/chat/presentation/pages/chat_page.dart';
+import '../features/settings/presentation/pages/settings_page.dart';
+import '../shared/menu/start_menu_page.dart';
+import '../features/chat/presentation/pages/history_page.dart';
+import '../features/learning/presentation/pages/learning_page.dart';
+import '../features/learning/presentation/pages/module1/module1_page.dart';
+import '../features/learning/presentation/pages/module2/module2_page.dart';
+import '../features/learning/presentation/pages/module3/module3_page.dart';
+import '../features/learning/presentation/pages/module4/module4_page.dart';
+import '../features/learning/presentation/pages/module5/module5_page.dart';
+import '../features/commands/presentation/pages/user_commands_page.dart'; 
 
-import '../presentation/pages/onboarding/api_keys_onboarding_page.dart';
-import '../presentation/pages/settings/api_keys_settings_page.dart';
+import '../features/settings/presentation/onboarding/api_keys_onboarding_page.dart';
+import '../features/settings/presentation/pages/api_keys_settings_page.dart';
 
 class AppRoutes {
   static const String startMenu = '/';

@@ -262,7 +262,8 @@ Soy tu asistente de aprendizaje de IA y Prompting.
 - **Ollama (Remoto)** - Tu propio servidor de IA
 
 **Proveedor privado:**
-- **Ollama Local** - 100% privado en tu PC (sin instalación, embebido)
+- **Ollama Local** - 100% privado en tu PC. El primer uso debe instalar la aplicación Ollama,
+y descargar el modelo elegido localmente, por lo que tardará unos minutos en estar listo.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
