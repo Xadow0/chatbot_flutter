@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../config/routes.dart';
-import '../../features/auth/presentation/logic/auth_provider.dart';
-import '../../features/auth/presentation/pages/auth_page.dart';
-import '../../features/commands/presentation/pages/user_commands_page.dart';
+import '../../../config/routes.dart';
+import '../../auth/presentation/logic/auth_provider.dart';
+import '../../auth/presentation/pages/auth_page.dart';
+import '../../commands/presentation/pages/user_commands_page.dart';
 
 class StartMenuPage extends StatefulWidget {
   const StartMenuPage({super.key});

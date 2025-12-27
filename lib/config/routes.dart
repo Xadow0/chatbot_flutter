@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../features/chat/presentation/pages/chat_page.dart';
 import '../features/settings/presentation/pages/settings_page.dart';
-import '../shared/menu/start_menu_page.dart';
+import '../features/menu/presentation/start_menu_page.dart';
 import '../features/chat/presentation/pages/history_page.dart';
 import '../features/learning/presentation/pages/learning_page.dart';
 import '../features/learning/presentation/pages/module1/module1_page.dart';
