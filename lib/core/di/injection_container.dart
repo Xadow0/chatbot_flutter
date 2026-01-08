@@ -1,4 +1,3 @@
-// lib/core/di/injection_container.dart
 import 'package:get_it/get_it.dart';
 
 // Imports de Core y Services
