@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 
 // Imports de Core y Services
 import '../../core/services/secure_storage_service.dart';
+import '../../core/services/conversation_encryption_service.dart'; // NUEVO
 import '../../features/settings/data/datasources/preferences_service.dart';
 import '../../features/settings/data/datasources/api_keys_manager.dart';
 import '../../config/theme/theme_provider.dart';
@@ -44,13 +45,18 @@ Future<void> init() async {
   sl.registerLazySingleton(() => SecureStorageService());
   sl.registerLazySingleton(() => PreferencesService());
   sl.registerLazySingleton(() => ApiKeysManager());
+  
+  // NUEVO: Servicio de cifrado para conversaciones
+  // Depende de SecureStorageService para almacenar el salt de forma segura
+  sl.registerLazySingleton(() => ConversationEncryptionService(sl<SecureStorageService>()));
 
   // ===========================================================================
   // 2. Data Sources (Singletons)
   // ===========================================================================
   
   // Sync Services
-  sl.registerLazySingleton(() => FirebaseSyncService());
+  // MODIFICADO: FirebaseSyncService ahora recibe el servicio de cifrado
+  sl.registerLazySingleton(() => FirebaseSyncService(sl<ConversationEncryptionService>()));
   sl.registerLazySingleton(() => FirebaseCommandSyncService());
   sl.registerLazySingleton(() => FirebaseFolderSyncService());
 
