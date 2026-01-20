@@ -121,6 +121,11 @@ class ChatProvider extends ChangeNotifier {
     if (_commandManagementProvider == null) return;
 
     final provider = _commandManagementProvider!;
+    
+    debugPrint('🔄 [ChatProvider] Actualizando quick responses desde provider...');
+    debugPrint('   - Commands en provider: ${provider.commands.length}');
+    debugPrint('   - Folders en provider: ${provider.folders.length}');
+    debugPrint('   - Provider isLoading: ${provider.isLoading}');
 
     final organizedResponses = QuickResponseProvider.buildOrganizedResponses(
       commands: provider.commands,
@@ -128,7 +133,16 @@ class ChatProvider extends ChangeNotifier {
       groupSystemCommands: provider.groupSystemCommands,
     );
 
-    _quickResponses = organizedResponses.map((r) => r.toEntity()).toList();
+    // Si no hay respuestas y el provider no está cargando, usar defaults
+    if (organizedResponses.isEmpty && !provider.isLoading) {
+      debugPrint('⚠️ [ChatProvider] Provider sin comandos, usando defaults');
+      _quickResponses = QuickResponseProvider.defaultResponsesAsEntities;
+    } else if (organizedResponses.isNotEmpty) {
+      _quickResponses = organizedResponses.map((r) => r.toEntity()).toList();
+    }
+    // Si está vacío pero cargando, no hacer nada (esperar a que termine)
+    
+    debugPrint('📦 [ChatProvider] Quick responses: ${_quickResponses.length} items');
     notifyListeners();
   }
 
@@ -772,11 +786,16 @@ class ChatProvider extends ChangeNotifier {
     try {
       if (_commandManagementProvider != null) {
         _updateQuickResponsesFromProvider();
+        debugPrint('📦 [ChatProvider] Quick responses desde CommandManagementProvider: ${_quickResponses.length} items');
         return;
       }
 
+      debugPrint('🔍 [ChatProvider] Cargando quick responses desde repositorio...');
       final allCommands = await _commandRepository.getAllCommands();
       final allFolders = await _commandRepository.getAllFolders();
+      
+      debugPrint('   - Commands encontrados: ${allCommands.length}');
+      debugPrint('   - Folders encontrados: ${allFolders.length}');
 
       final prefs = await SharedPreferences.getInstance();
       final groupSystemCommands = prefs.getBool(_groupSystemCommandsKey) ?? false;
@@ -787,12 +806,19 @@ class ChatProvider extends ChangeNotifier {
         groupSystemCommands: groupSystemCommands,
       );
 
-      _quickResponses = organizedResponses.map((r) => r.toEntity()).toList();
+      // Si no hay respuestas organizadas, usar los defaults
+      if (organizedResponses.isEmpty) {
+        debugPrint('⚠️ [ChatProvider] No hay comandos en el repositorio, usando defaults');
+        _quickResponses = QuickResponseProvider.defaultResponsesAsEntities;
+      } else {
+        _quickResponses = organizedResponses.map((r) => r.toEntity()).toList();
+      }
 
-      debugPrint('📦 [ChatProvider] Quick responses actualizadas (fallback): ${_quickResponses.length} items');
+      debugPrint('📦 [ChatProvider] Quick responses actualizadas: ${_quickResponses.length} items');
     } catch (e) {
       debugPrint('⚠️ [ChatProvider] Error cargando quick responses: $e');
       _quickResponses = QuickResponseProvider.defaultResponsesAsEntities;
+      debugPrint('📦 [ChatProvider] Usando defaults: ${_quickResponses.length} items');
     }
   }
 

@@ -2,13 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../logic/chat_provider.dart';
+import '../../../commands/presentation/logic/command_provider.dart';
 import '../../../../shared/widgets/custom_drawer.dart';
 import '../widgets/message_list.dart';
 import '../widgets/message_input.dart';
 import '../widgets/quick_responses.dart';
 import '../widgets/model_selector_bubble.dart';
-import '../../data/models/message_model.dart'; 
-import '../../data/models/quick_response_model.dart'; 
+import '../../data/models/message_model.dart';
+import '../../data/models/quick_response_model.dart';
 
 class ChatPage extends StatelessWidget {
   final File? preloadedConversationFile;
@@ -57,6 +58,9 @@ class _ChatBodyState extends State<_ChatBody> with WidgetsBindingObserver {
     }
     
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // IMPORTANTE: Vincular el CommandManagementProvider para cargar los quick responses
+      _linkCommandManagementProvider();
+      
       // Si hay un archivo precargado (viene del historial), lo cargamos
       if (widget.preloadedConversationFile != null) {
         await _chatProviderRef.loadConversation(widget.preloadedConversationFile!);
@@ -73,6 +77,18 @@ class _ChatBodyState extends State<_ChatBody> with WidgetsBindingObserver {
         // El provider maneja la bienvenida
       }
     });
+  }
+  
+  /// Vincula el CommandManagementProvider al ChatProvider para cargar los quick responses
+  void _linkCommandManagementProvider() {
+    try {
+      final commandProvider = context.read<CommandManagementProvider>();
+      _chatProviderRef.setCommandManagementProvider(commandProvider);
+      debugPrint('✅ [ChatPage] CommandManagementProvider vinculado correctamente');
+    } catch (e) {
+      debugPrint('⚠️ [ChatPage] CommandManagementProvider no disponible en el árbol de widgets: $e');
+      // Si no está disponible, el ChatProvider usará el fallback del repositorio
+    }
   }
 
   @override
