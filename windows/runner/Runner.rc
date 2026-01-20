@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "chatbot_app" "\0"
+            VALUE "CompanyName", "xadow" "\0"
+            VALUE "FileDescription", "flutter chatbot app" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "chatbot_app" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "chatbot_app.exe" "\0"
-            VALUE "ProductName", "chatbot_app" "\0"
+            VALUE "InternalName", "TRAINING_IA" "\0"
+            VALUE "LegalCopyright", "Copyright (c) 2026 Leonardo Sánchez Ferrer. All rights reserved." "\0"
+            VALUE "OriginalFilename", "training_ia.exe" "\0"
+            VALUE "ProductName", "training_ia" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
