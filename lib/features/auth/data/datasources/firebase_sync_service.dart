@@ -16,13 +16,15 @@ import '../../../../core/services/conversation_encryption_service.dart';
 /// - Guardado automático en Firebase cuando sync está activo
 /// - Eliminación sincronizada (local + remoto)
 /// - Detección y resolución de conflictos
-/// - **NUEVO**: Cifrado/descifrado automático de contenido en Firebase
+/// - Cifrado/descifrado automático de contenido en Firebase
+/// - **NUEVO**: Sincronización de salt cifrado para multi-dispositivo
 class FirebaseSyncService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ConversationEncryptionService _encryptionService;
   
   static const String _conversationsCollection = 'conversations';
+  static const String _encryptionMetadataDoc = 'encryption_metadata';
   
   FirebaseSyncService(this._encryptionService);
 
@@ -40,6 +42,17 @@ class FirebaseSyncService {
         .collection(_conversationsCollection);
   }
 
+  /// Obtiene la referencia al documento del usuario actual
+  DocumentReference? _getUserDocRef() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      debugPrint('⚠️ [FirebaseSync] No hay usuario autenticado');
+      return null;
+    }
+    
+    return _firestore.collection('users').doc(user.uid);
+  }
+
   /// Obtiene el directorio local de conversaciones
   Future<Directory> _getConversationsDir() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -51,13 +64,174 @@ class FirebaseSyncService {
   }
 
   // ==========================================================================
+  // GESTIÓN DE SALT CIFRADO EN FIREBASE
+  // ==========================================================================
+
+  /// Obtiene el salt cifrado almacenado en Firebase (si existe)
+  Future<EncryptedSaltData?> getEncryptedSaltFromFirebase() async {
+    try {
+      final userDoc = _getUserDocRef();
+      if (userDoc == null) return null;
+
+      final doc = await userDoc.get();
+      
+      if (!doc.exists) return null;
+      
+      final data = doc.data() as Map<String, dynamic>?;
+      if (data == null) return null;
+      
+      final encryptedSalt = data['encryptedSalt'] as String?;
+      final saltVersion = data['saltVersion'] as String?;
+      
+      if (encryptedSalt == null || encryptedSalt.isEmpty) {
+        return null;
+      }
+      
+      debugPrint('📥 [FirebaseSync] Salt cifrado encontrado en Firebase');
+      return EncryptedSaltData(
+        encryptedSalt: encryptedSalt,
+        saltVersion: saltVersion ?? '',
+      );
+    } catch (e) {
+      debugPrint('❌ [FirebaseSync] Error obteniendo salt de Firebase: $e');
+      return null;
+    }
+  }
+
+  /// Guarda el salt cifrado en Firebase
+  Future<bool> saveEncryptedSaltToFirebase({
+    required String encryptedSalt,
+    required String saltVersion,
+  }) async {
+    try {
+      final userDoc = _getUserDocRef();
+      if (userDoc == null) return false;
+
+      await userDoc.set({
+        'encryptedSalt': encryptedSalt,
+        'saltVersion': saltVersion,
+        'saltUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      
+      debugPrint('📤 [FirebaseSync] Salt cifrado guardado en Firebase');
+      return true;
+    } catch (e) {
+      debugPrint('❌ [FirebaseSync] Error guardando salt en Firebase: $e');
+      return false;
+    }
+  }
+
+  /// Elimina el salt cifrado de Firebase
+  Future<bool> deleteEncryptedSaltFromFirebase() async {
+    try {
+      final userDoc = _getUserDocRef();
+      if (userDoc == null) return false;
+
+      await userDoc.update({
+        'encryptedSalt': FieldValue.delete(),
+        'saltVersion': FieldValue.delete(),
+        'saltUpdatedAt': FieldValue.delete(),
+      });
+      
+      debugPrint('🗑️ [FirebaseSync] Salt cifrado eliminado de Firebase');
+      return true;
+    } catch (e) {
+      debugPrint('❌ [FirebaseSync] Error eliminando salt de Firebase: $e');
+      return false;
+    }
+  }
+
+  /// Inicializa el cifrado para sincronización.
+  /// 
+  /// Este método es llamado AUTOMÁTICAMENTE durante el login (si sync activo)
+  /// o al activar sync. Maneja la lógica de:
+  /// - Descargar y descifrar salt de Firebase (dispositivo nuevo)
+  /// - Generar y subir salt nuevo (usuario nuevo)
+  /// - Verificar que el salt local está sincronizado
+  /// 
+  /// [password]: Contraseña del usuario (la misma del login)
+  /// 
+  /// Retorna [SaltSyncResult] indicando el resultado de la operación.
+  Future<SaltSyncResult> initializeEncryptionForSync(String password) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        return SaltSyncResult(
+          success: false,
+          error: 'Usuario no autenticado',
+        );
+      }
+
+      debugPrint('🔐 [FirebaseSync] Inicializando cifrado para ${user.uid.substring(0, 8)}...');
+
+      // 1. Verificar si hay salt en Firebase
+      final firebaseSaltData = await getEncryptedSaltFromFirebase();
+      
+      // 2. Inicializar el servicio de cifrado con la contraseña
+      final initResult = await _encryptionService.initializeWithPassword(
+        encryptedSaltFromFirebase: firebaseSaltData?.encryptedSalt,
+        saltVersionFromFirebase: firebaseSaltData?.saltVersion,
+        password: password,
+      );
+      
+      if (!initResult.success) {
+        return SaltSyncResult(
+          success: false,
+          error: initResult.error ?? 'Error inicializando cifrado',
+        );
+      }
+      
+      // 3. Si necesita subir salt a Firebase, hacerlo
+      if (initResult.needsUpload && 
+          initResult.encryptedSalt != null &&
+          initResult.saltVersion != null) {
+        final uploadSuccess = await saveEncryptedSaltToFirebase(
+          encryptedSalt: initResult.encryptedSalt!,
+          saltVersion: initResult.saltVersion!,
+        );
+        
+        if (!uploadSuccess) {
+          return SaltSyncResult(
+            success: false,
+            error: 'Error subiendo salt cifrado a Firebase',
+          );
+        }
+        
+        debugPrint('📤 [FirebaseSync] Salt cifrado subido a Firebase');
+      }
+      
+      debugPrint('✅ [FirebaseSync] Cifrado inicializado correctamente');
+      return SaltSyncResult(
+        success: true,
+        wasNewSaltGenerated: initResult.needsUpload,
+      );
+      
+    } on InvalidPasswordException catch (e) {
+      debugPrint('❌ [FirebaseSync] Contraseña incorrecta: $e');
+      return SaltSyncResult(
+        success: false,
+        error: 'Contraseña incorrecta',
+        isPasswordError: true,
+      );
+    } catch (e) {
+      debugPrint('❌ [FirebaseSync] Error inicializando cifrado: $e');
+      return SaltSyncResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  // ==========================================================================
   // SINCRONIZACIÓN BIDIRECCIONAL
   // ==========================================================================
 
   /// Sincroniza conversaciones: sube las locales que faltan en Firebase
   /// y descarga las de Firebase que faltan localmente.
   /// 
-  /// IMPORTANTE: Los datos se cifran al subir y se descifran al bajar.
+  /// IMPORTANTE: 
+  /// - Los datos se cifran al subir y se descifran al bajar.
+  /// - Requiere que el salt esté inicializado previamente.
   Future<SyncResult> syncConversations() async {
     try {
       final conversationsRef = _getUserConversationsRef();
@@ -67,6 +241,17 @@ class FirebaseSyncService {
           uploaded: 0,
           downloaded: 0,
           error: 'Usuario no autenticado',
+        );
+      }
+
+      // Verificar que tenemos salt para cifrar/descifrar
+      final hasLocalSalt = await _encryptionService.hasLocalSalt();
+      if (!hasLocalSalt) {
+        return SyncResult(
+          success: false,
+          uploaded: 0,
+          downloaded: 0,
+          error: 'Salt de cifrado no inicializado. Ejecuta initializeEncryptionForSync primero.',
         );
       }
 
@@ -235,40 +420,37 @@ class FirebaseSyncService {
     }
   }
 
-  // ==========================================================================
-  // CARGA DESDE FIREBASE (DESCIFRADO)
-  // ==========================================================================
-
-  /// Carga una conversación específica de Firebase y la descifra.
-  /// Útil para obtener una conversación individual.
-  Future<List<Map<String, dynamic>>?> loadConversationFromFirebase(
+  /// Actualiza una conversación existente en Firebase
+  Future<bool> updateConversationInFirebase(
+    List<MessageEntity> messages,
     String fileName,
   ) async {
     try {
       final conversationsRef = _getUserConversationsRef();
-      if (conversationsRef == null) return null;
+      if (conversationsRef == null) return false;
 
-      final doc = await conversationsRef.doc(fileName).get();
-      if (!doc.exists) return null;
-
-      final data = doc.data() as Map<String, dynamic>;
-      final messages = (data['messages'] as List<dynamic>).cast<Map<String, dynamic>>();
-      final isEncrypted = data['encrypted'] == true;
-
-      // 🔓 DESCIFRAR si está cifrado
-      if (isEncrypted) {
-        return await _encryptionService.decryptMessages(messages);
-      }
+      final models = messages.map((entity) => Message.fromEntity(entity)).toList();
+      final jsonData = models.map((m) => m.toJson()).toList();
       
-      return messages;
+      // 🔐 CIFRAR mensajes
+      final encryptedMessages = await _encryptionService.encryptMessages(jsonData);
+
+      await conversationsRef.doc(fileName).update({
+        'messages': encryptedMessages,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'encrypted': true,
+      });
+
+      debugPrint('☁️🔒 [FirebaseSync] Conversación actualizada cifrada en Firebase: $fileName');
+      return true;
     } catch (e) {
-      debugPrint('❌ [FirebaseSync] Error cargando de Firebase: $e');
-      return null;
+      debugPrint('❌ [FirebaseSync] Error actualizando en Firebase: $e');
+      return false;
     }
   }
 
   // ==========================================================================
-  // ELIMINACIÓN SINCRONIZADA
+  // ELIMINACIÓN
   // ==========================================================================
 
   /// Elimina una conversación de Firebase
@@ -287,12 +469,50 @@ class FirebaseSyncService {
     }
   }
 
-  /// Elimina múltiples conversaciones de Firebase
+  /// Elimina todas las conversaciones de Firebase (pero mantiene el salt)
+  Future<bool> deleteAllFromFirebase() async {
+    try {
+      final conversationsRef = _getUserConversationsRef();
+      if (conversationsRef == null) return false;
+
+      final snapshot = await conversationsRef.get();
+      
+      if (snapshot.docs.isEmpty) {
+        debugPrint('ℹ️ [FirebaseSync] No hay conversaciones que eliminar');
+        return true;
+      }
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      
+      await batch.commit();
+      debugPrint('🗑️ [FirebaseSync] Todas las conversaciones eliminadas de Firebase');
+      
+      return true;
+    } catch (e) {
+      debugPrint('❌ [FirebaseSync] Error eliminando todas de Firebase: $e');
+      return false;
+    }
+  }
+
+  /// Elimina múltiples conversaciones específicas de Firebase
+  /// 
+  /// [fileNames]: Lista de nombres de archivo a eliminar
+  /// 
+  /// Usa batch write para eficiencia cuando hay múltiples archivos.
   Future<bool> deleteMultipleFromFirebase(List<String> fileNames) async {
     try {
       final conversationsRef = _getUserConversationsRef();
       if (conversationsRef == null) return false;
 
+      if (fileNames.isEmpty) {
+        debugPrint('ℹ️ [FirebaseSync] No hay conversaciones que eliminar');
+        return true;
+      }
+
+      // Usar batch para eliminar múltiples documentos eficientemente
       final batch = _firestore.batch();
       
       for (final fileName in fileNames) {
@@ -305,29 +525,6 @@ class FirebaseSyncService {
       return true;
     } catch (e) {
       debugPrint('❌ [FirebaseSync] Error eliminando múltiples de Firebase: $e');
-      return false;
-    }
-  }
-
-  /// Elimina todas las conversaciones del usuario en Firebase
-  Future<bool> deleteAllFromFirebase() async {
-    try {
-      final conversationsRef = _getUserConversationsRef();
-      if (conversationsRef == null) return false;
-
-      final snapshot = await conversationsRef.get();
-      final batch = _firestore.batch();
-      
-      for (final doc in snapshot.docs) {
-        batch.delete(doc.reference);
-      }
-      
-      await batch.commit();
-      debugPrint('🗑️ [FirebaseSync] Todas las conversaciones eliminadas de Firebase');
-      
-      return true;
-    } catch (e) {
-      debugPrint('❌ [FirebaseSync] Error eliminando todas de Firebase: $e');
       return false;
     }
   }
@@ -382,7 +579,7 @@ class FirebaseSyncService {
   /// Elimina todos los datos del usuario tanto local como remotamente
   /// Se usa cuando se elimina la cuenta del usuario
   /// 
-  /// NUEVO: También elimina el salt de cifrado
+  /// Incluye: conversaciones, salt cifrado, y documento de usuario
   Future<bool> deleteAllUserData() async {
     try {
       final user = _auth.currentUser;
@@ -402,10 +599,10 @@ class FirebaseSyncService {
       // 2. Eliminar conversaciones locales
       await deleteAllLocalConversations();
 
-      // 3. 🔐 Eliminar salt de cifrado
+      // 3. 🔐 Eliminar salt de cifrado (local)
       await _encryptionService.deleteUserSalt();
 
-      // 4. Eliminar documento del usuario
+      // 4. Eliminar documento del usuario (incluye salt cifrado)
       try {
         await _firestore.collection('users').doc(user.uid).delete();
         debugPrint('✅ [FirebaseSync] Documento de usuario eliminado');
@@ -516,6 +713,10 @@ class FirebaseSyncService {
   }
 }
 
+// ==========================================================================
+// CLASES DE RESULTADO
+// ==========================================================================
+
 /// Resultado de una operación de sincronización
 class SyncResult {
   final bool success;
@@ -554,4 +755,30 @@ class MigrationResult {
     if (!success) return 'Error: $error';
     return 'Migradas: $migrated conversaciones';
   }
+}
+
+/// Datos del salt cifrado almacenado en Firebase
+class EncryptedSaltData {
+  final String encryptedSalt;
+  final String saltVersion;
+
+  EncryptedSaltData({
+    required this.encryptedSalt,
+    required this.saltVersion,
+  });
+}
+
+/// Resultado de la sincronización del salt
+class SaltSyncResult {
+  final bool success;
+  final bool wasNewSaltGenerated;
+  final String? error;
+  final bool isPasswordError;
+
+  SaltSyncResult({
+    required this.success,
+    this.wasNewSaltGenerated = false,
+    this.error,
+    this.isPasswordError = false,
+  });
 }

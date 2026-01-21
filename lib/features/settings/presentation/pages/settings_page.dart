@@ -87,9 +87,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   value: authProvider.isCloudSyncEnabled,
                   onChanged: authProvider.isSyncing 
                       ? null 
-                      : (bool value) {
-                          authProvider.toggleCloudSync(value);
-                        },
+                      : (bool value) => _handleSyncToggle(context, authProvider, value)
                 ),
 
                 // MENSAJE DE ESTADO DE SINCRONIZACIÓN
@@ -904,6 +902,163 @@ class _SettingsPageState extends State<SettingsPage> {
           Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
         ],
       ),
+    );
+  }
+  // ============================================================================
+  // MÉTODO PARA MANEJAR EL TOGGLE DE SINCRONIZACIÓN
+  // ============================================================================
+  Future<void> _handleSyncToggle(
+    BuildContext context,
+    AuthProvider authProvider,
+    bool value,
+  ) async {
+    if (!value) {
+      // Desactivando sync - no necesita contraseña
+      await authProvider.toggleCloudSync(false);
+      return;
+    }
+
+    // Activando sync
+    if (authProvider.canActivateSyncWithoutPassword) {
+      // Hay contraseña temporal disponible (login reciente)
+      await authProvider.toggleCloudSync(true);
+    } else {
+      // Necesitamos pedir la contraseña
+      final password = await _showSyncPasswordDialog(context);
+      
+      if (password != null && context.mounted) {
+        await authProvider.toggleCloudSyncWithPassword(true, password);
+      }
+    }
+
+    // Mostrar mensaje de error si hay
+    if (authProvider.errorMessage != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      authProvider.clearError();
+    }
+  }
+
+  // ============================================================================
+  // DIÁLOGO PARA SOLICITAR CONTRASEÑA DE SINCRONIZACIÓN
+  // ============================================================================
+  Future<String?> _showSyncPasswordDialog(BuildContext context) async {
+    final passwordController = TextEditingController();
+    bool obscurePassword = true;
+    
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.cloud_sync_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('Activar sincronización'),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Para proteger tus conversaciones en la nube, necesitamos tu contraseña para cifrar los datos.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tu contraseña no se almacena, solo se usa para generar la clave de cifrado.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Contraseña',
+                      hintText: 'Ingresa tu contraseña',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePassword 
+                              ? Icons.visibility_outlined 
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            obscurePassword = !obscurePassword;
+                          });
+                        },
+                      ),
+                      border: const OutlineInputBorder(),
+                    ),
+                    onSubmitted: (value) {
+                      if (value.isNotEmpty && value.length >= 6) {
+                        Navigator.of(dialogContext).pop(value);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    passwordController.dispose();
+                    Navigator.of(dialogContext).pop(null);
+                  },
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    final password = passwordController.text.trim();
+                    if (password.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Por favor ingresa tu contraseña'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
+                    if (password.length < 6) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('La contraseña debe tener al menos 6 caracteres'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
+                    passwordController.dispose();
+                    Navigator.of(dialogContext).pop(password);
+                  },
+                  icon: const Icon(Icons.check),
+                  label: const Text('Activar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
