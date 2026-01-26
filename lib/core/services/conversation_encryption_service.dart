@@ -536,7 +536,7 @@ class ConversationEncryptionService {
     // (Usuario nuevo que activa sync por primera vez)
     final newSalt = await generateNewSalt();
     final encryptedSalt = encryptSaltWithPassword(newSalt, password);
-    final version = await getLocalSaltVersion()!;
+    final version = await getLocalSaltVersion();
     
     debugPrint('🆕 [Encryption] Nuevo salt generado, subiéndolo a Firebase');
     return SaltInitResult(

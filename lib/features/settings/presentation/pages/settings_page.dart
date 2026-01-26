@@ -634,8 +634,8 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context) {
-    showDialog(
+  Future<void> _showDeleteConfirmation(BuildContext context) async {
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('¿Borrar todos los datos?'),
@@ -645,25 +645,43 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              // TODO: Implementar borrado de datos locales
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Datos locales eliminados'),
-                ),
-              );
-            },
+            onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Borrar todo'),
           ),
         ],
       ),
     );
+
+    if (confirm == true) {
+      if (!mounted) return;
+
+      try {
+        final provider = context.read<ChatProvider>();
+        await provider.deleteAllConversations();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Todos los datos locales han sido eliminados'),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al eliminar datos: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _showDeleteAccountDialog(BuildContext context, AuthProvider authProvider) {
