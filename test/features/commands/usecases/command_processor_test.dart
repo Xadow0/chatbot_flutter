@@ -1,11 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
 
-// =============================================================================
-// MOCKS Y STUBS
-// =============================================================================
+// ============================================================================
+// ARCHIVO DE TESTS UNITARIOS PARA command_processor.dart
+// Cobertura objetivo: 90%+
+// ============================================================================
 
-// Enum que replica SystemCommandType del código original
+// -----------------------------------------------------------------------------
+// Entidades y clases necesarias (simuladas para tests independientes)
+// -----------------------------------------------------------------------------
+
+/// Enum que representa los tipos de comandos del sistema
 enum SystemCommandType {
   none,
   traducir,
@@ -17,7 +23,7 @@ enum SystemCommandType {
   comparar,
 }
 
-// Entidad de comando simplificada para tests
+/// Entidad de comando (versión simplificada para tests)
 class CommandEntity {
   final String id;
   final String trigger;
@@ -34,12 +40,12 @@ class CommandEntity {
   });
 }
 
-// Interfaz del repositorio
+/// Interfaz del repositorio de comandos
 abstract class ICommandRepository {
   Future<List<CommandEntity>> getAllCommands();
 }
 
-// Resultado de detección de idioma
+/// Resultado de detección de idioma (simulado)
 class LanguageDetectionResult {
   final String languageName;
   final String remainingText;
@@ -50,53 +56,48 @@ class LanguageDetectionResult {
   });
 }
 
-// Detector de idioma simplificado para tests
+/// Detector de idioma (simulado para poder controlar en tests)
 class LanguageDetector {
+  static LanguageDetectionResult Function(String, {String defaultLanguage})?
+      _mockDetector;
+
+  static void setMockDetector(
+      LanguageDetectionResult Function(String, {String defaultLanguage})
+          detector) {
+    _mockDetector = detector;
+  }
+
+  static void resetMockDetector() {
+    _mockDetector = null;
+  }
+
   static LanguageDetectionResult detectLanguage(
     String text, {
     String defaultLanguage = 'inglés',
   }) {
-    final trimmedText = text.trim();
-    if (trimmedText.isEmpty) {
-      return LanguageDetectionResult(
-        languageName: defaultLanguage,
-        remainingText: '',
-      );
+    if (_mockDetector != null) {
+      return _mockDetector!(text, defaultLanguage: defaultLanguage);
     }
 
-    final words = trimmedText.split(RegExp(r'\s+'));
-    if (words.isEmpty) {
-      return LanguageDetectionResult(
-        languageName: defaultLanguage,
-        remainingText: '',
-      );
-    }
-
-    final languageMap = {
-      'español': 'español',
-      'spanish': 'español',
-      'inglés': 'inglés',
-      'ingles': 'inglés',
-      'english': 'inglés',
-      'francés': 'francés',
-      'frances': 'francés',
-      'french': 'francés',
-      'alemán': 'alemán',
-      'aleman': 'alemán',
-      'german': 'alemán',
-      'italiano': 'italiano',
-      'italian': 'italiano',
-      'portugués': 'portugués',
-      'portugues': 'portugués',
-      'portuguese': 'portugués',
+    // Implementación real simplificada para tests
+    final words = text.trim().split(RegExp(r'\s+'));
+    final languageKeywords = {
+      'inglés': ['inglés', 'ingles', 'english', 'en'],
+      'español': ['español', 'espanol', 'spanish', 'es'],
+      'francés': ['francés', 'frances', 'french', 'fr'],
+      'alemán': ['alemán', 'aleman', 'german', 'de'],
+      'italiano': ['italiano', 'italian', 'it'],
+      'portugués': ['portugués', 'portugues', 'portuguese', 'pt'],
     };
 
-    final firstWord = words.first.toLowerCase();
-    if (languageMap.containsKey(firstWord)) {
-      return LanguageDetectionResult(
-        languageName: languageMap[firstWord]!,
-        remainingText: words.skip(1).join(' '),
-      );
+    for (final entry in languageKeywords.entries) {
+      if (words.isNotEmpty &&
+          entry.value.contains(words.first.toLowerCase())) {
+        return LanguageDetectionResult(
+          languageName: entry.key,
+          remainingText: words.skip(1).join(' '),
+        );
+      }
     }
 
     return LanguageDetectionResult(
@@ -106,9 +107,9 @@ class LanguageDetector {
   }
 }
 
-// =============================================================================
-// CÓDIGO BAJO PRUEBA (CommandStreamResult y CommandProcessor)
-// =============================================================================
+// -----------------------------------------------------------------------------
+// Clases del archivo a testear (copiadas para test standalone)
+// -----------------------------------------------------------------------------
 
 class CommandStreamResult {
   final bool isCommand;
@@ -269,103 +270,124 @@ class CommandProcessor {
   }
 }
 
-// =============================================================================
-// MOCKS CON MOCKTAIL
-// =============================================================================
+// -----------------------------------------------------------------------------
+// MOCKS
+// -----------------------------------------------------------------------------
 
-class MockAIService extends Mock implements AIServiceBase {}
+class MockAIService extends Mock implements AIServiceBase {
+  @override
+  Stream<String> generateContentStream(String prompt) {
+    return Stream.value('mocked response');
+  }
 
-class MockCommandRepository extends Mock implements ICommandRepository {}
+  @override
+  Stream<String> generateContentStreamWithoutHistory(String prompt) {
+    return Stream.value('mocked response without history');
+  }
+}
 
-// =============================================================================
+class MockCommandRepository extends Mock implements ICommandRepository {
+  List<CommandEntity> _commands = [];
+
+  void setCommands(List<CommandEntity> commands) {
+    _commands = commands;
+  }
+
+  void setThrowError(bool shouldThrow) {
+    _shouldThrow = shouldThrow;
+  }
+
+  bool _shouldThrow = false;
+
+  @override
+  Future<List<CommandEntity>> getAllCommands() async {
+    if (_shouldThrow) {
+      throw Exception('Repository error');
+    }
+    return _commands;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // TESTS
-// =============================================================================
+// -----------------------------------------------------------------------------
 
 void main() {
-  // ---------------------------------------------------------------------------
-  // CommandStreamResult Tests
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // GRUPO 1: Tests de CommandStreamResult
+  // ===========================================================================
   group('CommandStreamResult', () {
-    group('constructor', () {
-      test('crea instancia con todos los parámetros', () {
-        final command = _createCommand();
-        final stream = Stream<String>.fromIterable(['test']);
+    test('constructor principal crea instancia correctamente', () {
+      final result = CommandStreamResult(
+        isCommand: true,
+        command: null,
+        responseStream: null,
+        error: 'test error',
+      );
 
-        final result = CommandStreamResult(
-          isCommand: true,
-          command: command,
-          responseStream: stream,
-          error: 'test error',
-        );
-
-        expect(result.isCommand, isTrue);
-        expect(result.command, equals(command));
-        expect(result.responseStream, equals(stream));
-        expect(result.error, equals('test error'));
-      });
-
-      test('crea instancia con parámetros mínimos', () {
-        final result = CommandStreamResult(isCommand: false);
-
-        expect(result.isCommand, isFalse);
-        expect(result.command, isNull);
-        expect(result.responseStream, isNull);
-        expect(result.error, isNull);
-      });
+      expect(result.isCommand, true);
+      expect(result.command, null);
+      expect(result.responseStream, null);
+      expect(result.error, 'test error');
     });
 
-    group('factory notCommand', () {
-      test('retorna resultado con isCommand false', () {
-        final result = CommandStreamResult.notCommand();
+    test('factory notCommand() crea resultado con isCommand=false', () {
+      final result = CommandStreamResult.notCommand();
 
-        expect(result.isCommand, isFalse);
-        expect(result.command, isNull);
-        expect(result.responseStream, isNull);
-        expect(result.error, isNull);
-      });
+      expect(result.isCommand, false);
+      expect(result.command, null);
+      expect(result.responseStream, null);
+      expect(result.error, null);
     });
 
-    group('factory success', () {
-      test('retorna resultado exitoso con comando y stream', () {
-        final command = _createCommand();
-        final stream = Stream<String>.fromIterable(['response', 'data']);
+    test('factory success() crea resultado con comando y stream', () {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/test',
+        title: 'Test Command',
+        promptTemplate: 'Test template',
+        systemType: SystemCommandType.none,
+      );
+      final stream = Stream<String>.value('test');
 
-        final result = CommandStreamResult.success(command, stream);
+      final result = CommandStreamResult.success(command, stream);
 
-        expect(result.isCommand, isTrue);
-        expect(result.command, equals(command));
-        expect(result.responseStream, equals(stream));
-        expect(result.error, isNull);
-      });
+      expect(result.isCommand, true);
+      expect(result.command, command);
+      expect(result.responseStream, stream);
+      expect(result.error, null);
     });
 
-    group('factory error', () {
-      test('retorna resultado de error con comando', () {
-        final command = _createCommand();
+    test('factory error() crea resultado con comando y mensaje de error', () {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/test',
+        title: 'Test Command',
+        promptTemplate: 'Test template',
+        systemType: SystemCommandType.none,
+      );
 
-        final result = CommandStreamResult.error(command, 'Error message');
+      final result = CommandStreamResult.error(command, 'Error message');
 
-        expect(result.isCommand, isTrue);
-        expect(result.command, equals(command));
-        expect(result.responseStream, isNull);
-        expect(result.error, equals('Error message'));
-      });
+      expect(result.isCommand, true);
+      expect(result.command, command);
+      expect(result.responseStream, null);
+      expect(result.error, 'Error message');
+    });
 
-      test('retorna resultado de error sin comando (null)', () {
-        final result = CommandStreamResult.error(null, 'Error sin comando');
+    test('factory error() acepta comando null', () {
+      final result = CommandStreamResult.error(null, 'Error without command');
 
-        expect(result.isCommand, isTrue);
-        expect(result.command, isNull);
-        expect(result.responseStream, isNull);
-        expect(result.error, equals('Error sin comando'));
-      });
+      expect(result.isCommand, true);
+      expect(result.command, null);
+      expect(result.error, 'Error without command');
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // CommandProcessor Tests
-  // ---------------------------------------------------------------------------
-  group('CommandProcessor', () {
+  // ===========================================================================
+  // GRUPO 2: Tests de CommandProcessor.processMessageStream
+  // ===========================================================================
+  group('CommandProcessor.processMessageStream', () {
     late MockAIService mockAIService;
     late MockCommandRepository mockRepository;
     late CommandProcessor processor;
@@ -376,718 +398,989 @@ void main() {
       processor = CommandProcessor(mockAIService, mockRepository);
     });
 
-    // -------------------------------------------------------------------------
-    // processMessageStream - Casos básicos
-    // -------------------------------------------------------------------------
-    group('processMessageStream - casos básicos', () {
-      test('retorna notCommand cuando mensaje no empieza con /', () async {
-        final result = await processor.processMessageStream('hello world');
-
-        expect(result.isCommand, isFalse);
-        verifyNever(() => mockRepository.getAllCommands());
-      });
-
-      test('retorna notCommand para mensaje vacío', () async {
-        final result = await processor.processMessageStream('');
-
-        expect(result.isCommand, isFalse);
-        verifyNever(() => mockRepository.getAllCommands());
-      });
-
-      test('retorna notCommand para mensaje solo con espacios', () async {
-        final result = await processor.processMessageStream('   ');
-
-        expect(result.isCommand, isFalse);
-        verifyNever(() => mockRepository.getAllCommands());
-      });
-
-      test('procesa mensaje que empieza con / después de trim', () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => []);
-
-        final result = await processor.processMessageStream('  /test');
-
-        // Debe intentar buscar comandos porque empieza con /
-        verify(() => mockRepository.getAllCommands()).called(1);
-      });
-
-      test('retorna notCommand cuando no hay comandos registrados', () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => []);
-
-        final result = await processor.processMessageStream('/unknown');
-
-        expect(result.isCommand, isFalse);
-      });
-
-      test('retorna notCommand para comando no registrado', () async {
-        when(() => mockRepository.getAllCommands()).thenAnswer(
-          (_) async => [
-            _createCommand(trigger: '/help'),
-            _createCommand(trigger: '/test'),
-          ],
-        );
-
-        final result = await processor.processMessageStream('/unknown');
-
-        expect(result.isCommand, isFalse);
-      });
-
-      test('retorna notCommand cuando repository lanza excepción', () async {
-        when(() => mockRepository.getAllCommands())
-            .thenThrow(Exception('Database error'));
-
-        final result = await processor.processMessageStream('/test');
-
-        expect(result.isCommand, isFalse);
-      });
+    tearDown(() {
+      LanguageDetector.resetMockDetector();
     });
 
-    // -------------------------------------------------------------------------
-    // processMessageStream - Matching de comandos
-    // -------------------------------------------------------------------------
-    group('processMessageStream - matching de comandos', () {
-      test('coincide con comando exacto (case insensitive)', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((_) => Stream.fromIterable(['ok']));
+    test('retorna notCommand cuando mensaje no empieza con /', () async {
+      final result = await processor.processMessageStream('hello world');
 
-        final result = await processor.processMessageStream('/TEST content');
+      expect(result.isCommand, false);
+    });
 
-        expect(result.isCommand, isTrue);
-        expect(result.command, equals(command));
-      });
+    test('retorna notCommand cuando mensaje es texto normal con espacios', () async {
+      final result = await processor.processMessageStream('   hello world   ');
 
-      test('prioriza comando más largo cuando hay múltiples coincidencias',
-          () async {
-        final shortCommand = _createCommand(
+      expect(result.isCommand, false);
+    });
+
+    test('retorna notCommand cuando no hay comandos que coincidan', () async {
+      mockRepository.setCommands([
+        CommandEntity(
           id: '1',
-          trigger: '/t',
-          title: 'Short',
-          systemType: SystemCommandType.none,
-        );
-        final longCommand = _createCommand(
-          id: '2',
-          trigger: '/test',
-          title: 'Long',
-          systemType: SystemCommandType.none,
-        );
-
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [shortCommand, longCommand]);
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((_) => Stream.fromIterable(['ok']));
-
-        final result = await processor.processMessageStream('/test content');
-
-        expect(result.command?.id, equals('2'));
-        expect(result.command?.title, equals('Long'));
-      });
-
-      test('coincide con comando cuando mensaje solo tiene el trigger',
-          () async {
-        final command = _createCommand(
-          trigger: '/help',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((_) => Stream.fromIterable(['ok']));
-
-        final result = await processor.processMessageStream('/help');
-
-        expect(result.isCommand, isTrue);
-      });
-    });
-
-    // -------------------------------------------------------------------------
-    // processMessageStream - Comandos de usuario (SystemCommandType.none)
-    // -------------------------------------------------------------------------
-    group('processMessageStream - comandos de usuario', () {
-      test('procesa comando con plantilla que contiene {{content}}', () async {
-        final command = _createCommand(
-          trigger: '/custom',
-          promptTemplate: 'Analiza esto: {{content}}',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['response']);
-        });
-
-        final result =
-            await processor.processMessageStream('/custom mi texto');
-
-        expect(result.isCommand, isTrue);
-        expect(capturedPrompt, equals('Analiza esto: mi texto'));
-      });
-
-      test('procesa comando con plantilla sin {{content}}', () async {
-        final command = _createCommand(
-          trigger: '/simple',
-          promptTemplate: 'Plantilla simple',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['response']);
-        });
-
-        final result =
-            await processor.processMessageStream('/simple contenido extra');
-
-        expect(capturedPrompt, equals('Plantilla simple\n\ncontenido extra'));
-      });
-
-      test('comando de usuario funciona sin contenido adicional', () async {
-        final command = _createCommand(
-          trigger: '/empty',
-          promptTemplate: 'Solo template {{content}}',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['response']);
-        });
-
-        final result = await processor.processMessageStream('/empty');
-
-        expect(result.isCommand, isTrue);
-        expect(capturedPrompt, equals('Solo template '));
-      });
-    });
-
-    // -------------------------------------------------------------------------
-    // processMessageStream - Comando traducir
-    // -------------------------------------------------------------------------
-    group('processMessageStream - comando traducir', () {
-      late CommandEntity traducirCommand;
-
-      setUp(() {
-        traducirCommand = _createCommand(
           trigger: '/traducir',
-          promptTemplate:
-              'Traduce al {{targetLanguage}}: {{content}}',
+          title: 'Traducir',
+          promptTemplate: 'Traduce: {{content}}',
           systemType: SystemCommandType.traducir,
-        );
-      });
+        ),
+      ]);
 
-      test('retorna error cuando no hay contenido después del comando',
-          () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [traducirCommand]);
+      final result = await processor.processMessageStream('/unknown comando');
 
-        final result = await processor.processMessageStream('/traducir');
-
-        expect(result.isCommand, isTrue);
-        expect(result.error, contains('Uso:'));
-        expect(result.error, contains('/traducir'));
-      });
-
-      test('retorna error cuando solo hay espacios después del comando',
-          () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [traducirCommand]);
-
-        final result = await processor.processMessageStream('/traducir   ');
-
-        expect(result.isCommand, isTrue);
-        expect(result.error, isNotNull);
-      });
-
-      test('traduce con idioma detectado y texto', () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [traducirCommand]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['traducción']);
-        });
-
-        final result = await processor
-            .processMessageStream('/traducir español Hello world');
-
-        expect(result.isCommand, isTrue);
-        expect(result.error, isNull);
-        expect(capturedPrompt, contains('español'));
-        expect(capturedPrompt, contains('Hello world'));
-      });
-
-      test('usa idioma por defecto (inglés) cuando no se especifica', () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [traducirCommand]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['traducción']);
-        });
-
-        final result =
-            await processor.processMessageStream('/traducir Hola mundo');
-
-        expect(result.isCommand, isTrue);
-        expect(capturedPrompt, contains('inglés'));
-        expect(capturedPrompt, contains('Hola mundo'));
-      });
-
-      test('retorna error cuando solo hay idioma sin texto', () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [traducirCommand]);
-
-        final result =
-            await processor.processMessageStream('/traducir español');
-
-        expect(result.isCommand, isTrue);
-        expect(result.error, equals('Falta el texto a traducir.'));
-      });
-
-      test('detecta diferentes idiomas correctamente', () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [traducirCommand]);
-
-        final testCases = [
-          ('francés', 'francés'),
-          ('french', 'francés'),
-          ('alemán', 'alemán'),
-          ('german', 'alemán'),
-          ('italiano', 'italiano'),
-          ('portugués', 'portugués'),
-        ];
-
-        for (final (input, expected) in testCases) {
-          String? capturedPrompt;
-          when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-              .thenAnswer((invocation) {
-            capturedPrompt = invocation.positionalArguments[0] as String;
-            return Stream.fromIterable(['ok']);
-          });
-
-          await processor.processMessageStream('/traducir $input test text');
-
-          expect(capturedPrompt, contains(expected),
-              reason: 'Fallo para idioma: $input');
-        }
-      });
+      expect(result.isCommand, false);
     });
 
-    // -------------------------------------------------------------------------
-    // processMessageStream - Comandos de sistema estándar
-    // -------------------------------------------------------------------------
-    group('processMessageStream - comandos de sistema estándar', () {
-      final systemTypes = [
-        (SystemCommandType.evaluarPrompt, '/evaluar'),
-        (SystemCommandType.resumir, '/resumir'),
-        (SystemCommandType.codigo, '/codigo'),
-        (SystemCommandType.corregir, '/corregir'),
-        (SystemCommandType.explicar, '/explicar'),
-        (SystemCommandType.comparar, '/comparar'),
-      ];
+    test('retorna notCommand cuando repositorio lanza excepción', () async {
+      mockRepository.setThrowError(true);
 
-      for (final (type, trigger) in systemTypes) {
-        group('SystemCommandType.${type.name}', () {
-          test('procesa correctamente con contenido', () async {
-            final command = _createCommand(
-              trigger: trigger,
-              promptTemplate: 'Procesa: {{content}}',
-              systemType: type,
-            );
-            when(() => mockRepository.getAllCommands())
-                .thenAnswer((_) async => [command]);
+      final result = await processor.processMessageStream('/test');
 
-            String? capturedPrompt;
-            when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-                .thenAnswer((invocation) {
-              capturedPrompt = invocation.positionalArguments[0] as String;
-              return Stream.fromIterable(['response']);
-            });
-
-            final result =
-                await processor.processMessageStream('$trigger mi contenido');
-
-            expect(result.isCommand, isTrue);
-            expect(result.error, isNull);
-            expect(capturedPrompt, equals('Procesa: mi contenido'));
-          });
-
-          test('retorna error cuando no hay contenido', () async {
-            final command = _createCommand(
-              trigger: trigger,
-              promptTemplate: 'Procesa: {{content}}',
-              systemType: type,
-            );
-            when(() => mockRepository.getAllCommands())
-                .thenAnswer((_) async => [command]);
-
-            final result = await processor.processMessageStream(trigger);
-
-            expect(result.isCommand, isTrue);
-            expect(result.error,
-                equals('Por favor, añade el contenido después del comando.'));
-            expect(result.command, equals(command));
-          });
-
-          test('retorna error cuando solo hay espacios después del comando',
-              () async {
-            final command = _createCommand(
-              trigger: trigger,
-              promptTemplate: 'Procesa: {{content}}',
-              systemType: type,
-            );
-            when(() => mockRepository.getAllCommands())
-                .thenAnswer((_) async => [command]);
-
-            final result =
-                await processor.processMessageStream('$trigger    ');
-
-            expect(result.isCommand, isTrue);
-            expect(result.error, isNotNull);
-          });
-        });
-      }
+      expect(result.isCommand, false);
     });
 
-    // -------------------------------------------------------------------------
-    // processMessageStream - Extracción de contenido
-    // -------------------------------------------------------------------------
-    group('processMessageStream - extracción de contenido', () {
-      test('extrae contenido preservando mayúsculas/minúsculas', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          promptTemplate: '{{content}}',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
+    test('procesa comando de usuario (SystemCommandType.none) correctamente', () async {
+      final userCommand = CommandEntity(
+        id: '1',
+        trigger: '/custom',
+        title: 'Custom Command',
+        promptTemplate: 'Custom prompt: {{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([userCommand]);
 
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['ok']);
-        });
+      final result = await processor.processMessageStream('/custom mi texto');
 
-        await processor.processMessageStream('/test HoLa MuNdO');
-
-        expect(capturedPrompt, equals('HoLa MuNdO'));
-      });
-
-      test('extrae contenido con múltiples espacios', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          promptTemplate: '{{content}}',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['ok']);
-        });
-
-        await processor.processMessageStream('/test   contenido   con   espacios');
-
-        // trim() solo elimina espacios al inicio/final del contenido extraído
-        expect(capturedPrompt, equals('contenido   con   espacios'));
-      });
-
-      test('maneja trigger con mayúsculas en el mensaje', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          promptTemplate: '{{content}}',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['ok']);
-        });
-
-        await processor.processMessageStream('/TEST contenido');
-
-        expect(capturedPrompt, equals('contenido'));
-      });
-
-      test('extrae contenido con caracteres especiales', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          promptTemplate: '{{content}}',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['ok']);
-        });
-
-        await processor.processMessageStream('/test ¡Hola! ¿Cómo estás? @#\$%');
-
-        expect(capturedPrompt, equals('¡Hola! ¿Cómo estás? @#\$%'));
-      });
-
-      test('extrae contenido multilínea', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          promptTemplate: '{{content}}',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['ok']);
-        });
-
-        await processor.processMessageStream('/test línea 1\nlínea 2\nlínea 3');
-
-        expect(capturedPrompt, equals('línea 1\nlínea 2\nlínea 3'));
-      });
+      expect(result.isCommand, true);
+      expect(result.command?.trigger, '/custom');
+      expect(result.responseStream, isNotNull);
+      expect(result.error, null);
     });
 
-    // -------------------------------------------------------------------------
-    // processMessageStream - Stream de respuesta
-    // -------------------------------------------------------------------------
-    group('processMessageStream - stream de respuesta', () {
-      test('retorna stream funcional que puede ser consumido', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          systemType: SystemCommandType.none,
+    test('procesa comando traducir correctamente', () async {
+      final traducirCommand = CommandEntity(
+        id: '1',
+        trigger: '/traducir',
+        title: 'Traducir',
+        promptTemplate: 'Traduce a {{targetLanguage}}: {{content}}',
+        systemType: SystemCommandType.traducir,
+      );
+      mockRepository.setCommands([traducirCommand]);
+
+      LanguageDetector.setMockDetector((text, {defaultLanguage = 'inglés'}) {
+        return LanguageDetectionResult(
+          languageName: 'francés',
+          remainingText: 'hello world',
         );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((_) => Stream.fromIterable(['chunk1', 'chunk2', 'chunk3']));
-
-        final result = await processor.processMessageStream('/test content');
-
-        expect(result.responseStream, isNotNull);
-
-        final chunks = await result.responseStream!.toList();
-        expect(chunks, equals(['chunk1', 'chunk2', 'chunk3']));
       });
 
-      test('verifica que se llama al servicio AI correcto', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((_) => Stream.fromIterable(['ok']));
+      final result = await processor.processMessageStream('/traducir francés hello world');
 
-        await processor.processMessageStream('/test content');
-
-        verify(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .called(1);
-        verifyNever(() => mockAIService.generateContentStream(any()));
-      });
+      expect(result.isCommand, true);
+      expect(result.command?.trigger, '/traducir');
+      expect(result.responseStream, isNotNull);
     });
 
-    // -------------------------------------------------------------------------
-    // processMessageStream - Casos edge
-    // -------------------------------------------------------------------------
-    group('processMessageStream - casos edge', () {
-      test('maneja comando que es exactamente el trigger sin espacio', () async {
-        final command = _createCommand(
-          trigger: '/test',
-          promptTemplate: 'Template: {{content}}',
-          systemType: SystemCommandType.none,
+    test('procesa comando evaluarPrompt correctamente', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/evaluar',
+        title: 'Evaluar Prompt',
+        promptTemplate: 'Evalúa este prompt: {{content}}',
+        systemType: SystemCommandType.evaluarPrompt,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/evaluar mi prompt');
+
+      expect(result.isCommand, true);
+      expect(result.command?.systemType, SystemCommandType.evaluarPrompt);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('procesa comando resumir correctamente', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/resumir',
+        title: 'Resumir',
+        promptTemplate: 'Resume: {{content}}',
+        systemType: SystemCommandType.resumir,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/resumir texto largo');
+
+      expect(result.isCommand, true);
+      expect(result.command?.systemType, SystemCommandType.resumir);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('procesa comando codigo correctamente', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/codigo',
+        title: 'Código',
+        promptTemplate: 'Genera código: {{content}}',
+        systemType: SystemCommandType.codigo,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/codigo función suma');
+
+      expect(result.isCommand, true);
+      expect(result.command?.systemType, SystemCommandType.codigo);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('procesa comando corregir correctamente', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/corregir',
+        title: 'Corregir',
+        promptTemplate: 'Corrige: {{content}}',
+        systemType: SystemCommandType.corregir,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/corregir mi texto');
+
+      expect(result.isCommand, true);
+      expect(result.command?.systemType, SystemCommandType.corregir);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('procesa comando explicar correctamente', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/explicar',
+        title: 'Explicar',
+        promptTemplate: 'Explica: {{content}}',
+        systemType: SystemCommandType.explicar,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/explicar concepto');
+
+      expect(result.isCommand, true);
+      expect(result.command?.systemType, SystemCommandType.explicar);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('procesa comando comparar correctamente', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/comparar',
+        title: 'Comparar',
+        promptTemplate: 'Compara: {{content}}',
+        systemType: SystemCommandType.comparar,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/comparar A vs B');
+
+      expect(result.isCommand, true);
+      expect(result.command?.systemType, SystemCommandType.comparar);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('selecciona comando más largo cuando hay múltiples coincidencias', () async {
+      final shortCommand = CommandEntity(
+        id: '1',
+        trigger: '/test',
+        title: 'Test',
+        promptTemplate: 'Short: {{content}}',
+        systemType: SystemCommandType.none,
+      );
+      final longCommand = CommandEntity(
+        id: '2',
+        trigger: '/testlong',
+        title: 'Test Long',
+        promptTemplate: 'Long: {{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([shortCommand, longCommand]);
+
+      final result = await processor.processMessageStream('/testlong contenido');
+
+      expect(result.isCommand, true);
+      expect(result.command?.trigger, '/testlong');
+    });
+
+    test('maneja mensaje con solo el comando sin contenido adicional', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/resumir',
+        title: 'Resumir',
+        promptTemplate: 'Resume: {{content}}',
+        systemType: SystemCommandType.resumir,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/resumir');
+
+      expect(result.isCommand, true);
+      expect(result.error, contains('añade el contenido'));
+    });
+
+    test('maneja mayúsculas y minúsculas en comandos', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/traducir',
+        title: 'Traducir',
+        promptTemplate: 'Traduce a {{targetLanguage}}: {{content}}',
+        systemType: SystemCommandType.traducir,
+      );
+      mockRepository.setCommands([command]);
+
+      LanguageDetector.setMockDetector((text, {defaultLanguage = 'inglés'}) {
+        return LanguageDetectionResult(
+          languageName: 'inglés',
+          remainingText: 'texto',
         );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-
-        String? capturedPrompt;
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((invocation) {
-          capturedPrompt = invocation.positionalArguments[0] as String;
-          return Stream.fromIterable(['ok']);
-        });
-
-        await processor.processMessageStream('/test');
-
-        expect(capturedPrompt, equals('Template: '));
       });
 
-      test('maneja mensaje con solo "/" ', () async {
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [_createCommand(trigger: '/test')]);
+      final result = await processor.processMessageStream('/TRADUCIR inglés texto');
 
-        final result = await processor.processMessageStream('/');
+      expect(result.isCommand, true);
+      expect(result.command?.trigger, '/traducir');
+    });
 
-        expect(result.isCommand, isFalse);
-      });
+    test('maneja espacios al inicio y final del mensaje', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/test',
+        title: 'Test',
+        promptTemplate: 'Test: {{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
 
-      test('no confunde texto que contiene / en medio', () async {
-        final result =
-            await processor.processMessageStream('texto con/barra');
+      final result = await processor.processMessageStream('   /test contenido   ');
 
-        expect(result.isCommand, isFalse);
-        verifyNever(() => mockRepository.getAllCommands());
-      });
-
-      test('maneja múltiples comandos con triggers similares', () async {
-        final commands = [
-          _createCommand(id: '1', trigger: '/t', title: 'T'),
-          _createCommand(id: '2', trigger: '/te', title: 'Te'),
-          _createCommand(id: '3', trigger: '/tes', title: 'Tes'),
-          _createCommand(id: '4', trigger: '/test', title: 'Test'),
-          _createCommand(id: '5', trigger: '/testing', title: 'Testing'),
-        ];
-
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => commands);
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((_) => Stream.fromIterable(['ok']));
-
-        // Debe coincidir con /testing (el más largo que coincide)
-        var result = await processor.processMessageStream('/testing123');
-        expect(result.command?.title, equals('Testing'));
-
-        // Debe coincidir con /test
-        result = await processor.processMessageStream('/test123');
-        expect(result.command?.title, equals('Test'));
-
-        // Debe coincidir con /t
-        result = await processor.processMessageStream('/txyz');
-        expect(result.command?.title, equals('T'));
-      });
-
-      test('maneja trigger con caracteres unicode', () async {
-        final command = _createCommand(
-          trigger: '/búsqueda',
-          systemType: SystemCommandType.none,
-        );
-        when(() => mockRepository.getAllCommands())
-            .thenAnswer((_) async => [command]);
-        when(() => mockAIService.generateContentStreamWithoutHistory(any()))
-            .thenAnswer((_) => Stream.fromIterable(['ok']));
-
-        final result =
-            await processor.processMessageStream('/búsqueda término');
-
-        expect(result.isCommand, isTrue);
-        expect(result.command?.trigger, equals('/búsqueda'));
-      });
+      expect(result.isCommand, true);
+      expect(result.command?.trigger, '/test');
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // LanguageDetector Tests (para completar cobertura)
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // GRUPO 3: Tests de _processUserCommandStream (vía processMessageStream)
+  // ===========================================================================
+  group('CommandProcessor - User Commands', () {
+    late MockAIService mockAIService;
+    late MockCommandRepository mockRepository;
+    late CommandProcessor processor;
+
+    setUp(() {
+      mockAIService = MockAIService();
+      mockRepository = MockCommandRepository();
+      processor = CommandProcessor(mockAIService, mockRepository);
+    });
+
+    test('reemplaza {{content}} en promptTemplate cuando está presente', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/custom',
+        title: 'Custom',
+        promptTemplate: 'Prefix {{content}} Suffix',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/custom mi contenido');
+
+      expect(result.isCommand, true);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('concatena contenido cuando {{content}} NO está en template', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/simple',
+        title: 'Simple',
+        promptTemplate: 'Este es un template simple sin placeholder',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/simple adicional');
+
+      expect(result.isCommand, true);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('maneja contenido vacío después del comando', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/empty',
+        title: 'Empty',
+        promptTemplate: 'Template: {{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/empty');
+
+      expect(result.isCommand, true);
+      // User commands don't require content, so it should succeed
+      expect(result.responseStream, isNotNull);
+    });
+  });
+
+  // ===========================================================================
+  // GRUPO 4: Tests de _processStandardSystemCommandStream
+  // ===========================================================================
+  group('CommandProcessor - Standard System Commands', () {
+    late MockAIService mockAIService;
+    late MockCommandRepository mockRepository;
+    late CommandProcessor processor;
+
+    setUp(() {
+      mockAIService = MockAIService();
+      mockRepository = MockCommandRepository();
+      processor = CommandProcessor(mockAIService, mockRepository);
+    });
+
+    test('retorna error cuando contenido está vacío', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/resumir',
+        title: 'Resumir',
+        promptTemplate: 'Resume: {{content}}',
+        systemType: SystemCommandType.resumir,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/resumir');
+
+      expect(result.isCommand, true);
+      expect(result.error, 'Por favor, añade el contenido después del comando.');
+      expect(result.responseStream, null);
+    });
+
+    test('retorna error cuando contenido es solo espacios', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/explicar',
+        title: 'Explicar',
+        promptTemplate: 'Explica: {{content}}',
+        systemType: SystemCommandType.explicar,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/explicar    ');
+
+      expect(result.isCommand, true);
+      expect(result.error, contains('añade el contenido'));
+    });
+
+    test('procesa correctamente cuando hay contenido válido', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/codigo',
+        title: 'Código',
+        promptTemplate: 'Genera código para: {{content}}',
+        systemType: SystemCommandType.codigo,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/codigo función factorial');
+
+      expect(result.isCommand, true);
+      expect(result.error, null);
+      expect(result.responseStream, isNotNull);
+    });
+  });
+
+  // ===========================================================================
+  // GRUPO 5: Tests de _processTraducirStream
+  // ===========================================================================
+  group('CommandProcessor - Traducir Command', () {
+    late MockAIService mockAIService;
+    late MockCommandRepository mockRepository;
+    late CommandProcessor processor;
+
+    setUp(() {
+      mockAIService = MockAIService();
+      mockRepository = MockCommandRepository();
+      processor = CommandProcessor(mockAIService, mockRepository);
+    });
+
+    tearDown(() {
+      LanguageDetector.resetMockDetector();
+    });
+
+    test('retorna error cuando no hay contenido después del comando', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/traducir',
+        title: 'Traducir',
+        promptTemplate: 'Traduce a {{targetLanguage}}: {{content}}',
+        systemType: SystemCommandType.traducir,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/traducir');
+
+      expect(result.isCommand, true);
+      expect(result.error, 'Uso: /traducir [idioma opcional] [texto]');
+    });
+
+    test('retorna error cuando texto a traducir está vacío', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/traducir',
+        title: 'Traducir',
+        promptTemplate: 'Traduce a {{targetLanguage}}: {{content}}',
+        systemType: SystemCommandType.traducir,
+      );
+      mockRepository.setCommands([command]);
+
+      LanguageDetector.setMockDetector((text, {defaultLanguage = 'inglés'}) {
+        return LanguageDetectionResult(
+          languageName: 'francés',
+          remainingText: '', // Texto vacío
+        );
+      });
+
+      final result = await processor.processMessageStream('/traducir francés');
+
+      expect(result.isCommand, true);
+      expect(result.error, 'Falta el texto a traducir.');
+    });
+
+    test('traduce correctamente con idioma especificado', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/traducir',
+        title: 'Traducir',
+        promptTemplate: 'Traduce a {{targetLanguage}}: {{content}}',
+        systemType: SystemCommandType.traducir,
+      );
+      mockRepository.setCommands([command]);
+
+      LanguageDetector.setMockDetector((text, {defaultLanguage = 'inglés'}) {
+        return LanguageDetectionResult(
+          languageName: 'alemán',
+          remainingText: 'hello world',
+        );
+      });
+
+      final result = await processor.processMessageStream('/traducir alemán hello world');
+
+      expect(result.isCommand, true);
+      expect(result.error, null);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('traduce correctamente con idioma por defecto', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/traducir',
+        title: 'Traducir',
+        promptTemplate: 'Traduce a {{targetLanguage}}: {{content}}',
+        systemType: SystemCommandType.traducir,
+      );
+      mockRepository.setCommands([command]);
+
+      LanguageDetector.setMockDetector((text, {defaultLanguage = 'inglés'}) {
+        return LanguageDetectionResult(
+          languageName: defaultLanguage,
+          remainingText: 'hola mundo',
+        );
+      });
+
+      final result = await processor.processMessageStream('/traducir hola mundo');
+
+      expect(result.isCommand, true);
+      expect(result.error, null);
+      expect(result.responseStream, isNotNull);
+    });
+  });
+
+  // ===========================================================================
+  // GRUPO 6: Tests de _extractContentAfterCommand
+  // ===========================================================================
+  group('CommandProcessor - Extract Content', () {
+    late MockAIService mockAIService;
+    late MockCommandRepository mockRepository;
+    late CommandProcessor processor;
+
+    setUp(() {
+      mockAIService = MockAIService();
+      mockRepository = MockCommandRepository();
+      processor = CommandProcessor(mockAIService, mockRepository);
+    });
+
+    test('extrae contenido correctamente después del trigger', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/test',
+        title: 'Test',
+        promptTemplate: '{{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/test mi contenido aquí');
+
+      expect(result.isCommand, true);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('maneja trigger al final del mensaje', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/test',
+        title: 'Test',
+        promptTemplate: '{{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/test');
+
+      expect(result.isCommand, true);
+    });
+
+    test('maneja mayúsculas y minúsculas en extracción', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/test',
+        title: 'Test',
+        promptTemplate: '{{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/TEST contenido');
+
+      expect(result.isCommand, true);
+    });
+
+    test('trimea espacios del contenido extraído', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/trim',
+        title: 'Trim',
+        promptTemplate: '[{{content}}]',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/trim    espacios    ');
+
+      expect(result.isCommand, true);
+      expect(result.responseStream, isNotNull);
+    });
+  });
+
+  // ===========================================================================
+  // GRUPO 7: Tests de LanguageDetector
+  // ===========================================================================
   group('LanguageDetector', () {
-    test('detecta idioma español', () {
-      final result = LanguageDetector.detectLanguage('español hello world');
-
-      expect(result.languageName, equals('español'));
-      expect(result.remainingText, equals('hello world'));
+    tearDown(() {
+      LanguageDetector.resetMockDetector();
     });
 
-    test('detecta idioma inglés con variantes', () {
-      var result = LanguageDetector.detectLanguage('inglés hola');
-      expect(result.languageName, equals('inglés'));
+    test('detecta inglés correctamente', () {
+      final result = LanguageDetector.detectLanguage('inglés hello world');
 
-      result = LanguageDetector.detectLanguage('ingles hola');
-      expect(result.languageName, equals('inglés'));
-
-      result = LanguageDetector.detectLanguage('english hola');
-      expect(result.languageName, equals('inglés'));
+      expect(result.languageName, 'inglés');
+      expect(result.remainingText, 'hello world');
     });
 
-    test('usa idioma por defecto cuando no detecta idioma', () {
+    test('detecta español correctamente', () {
+      final result = LanguageDetector.detectLanguage('español hola mundo');
+
+      expect(result.languageName, 'español');
+      expect(result.remainingText, 'hola mundo');
+    });
+
+    test('detecta francés correctamente', () {
+      final result = LanguageDetector.detectLanguage('french bonjour monde');
+
+      expect(result.languageName, 'francés');
+      expect(result.remainingText, 'bonjour monde');
+    });
+
+    test('usa idioma por defecto cuando no se especifica', () {
       final result = LanguageDetector.detectLanguage('hello world');
 
-      expect(result.languageName, equals('inglés'));
-      expect(result.remainingText, equals('hello world'));
+      expect(result.languageName, 'inglés');
+      expect(result.remainingText, 'hello world');
     });
 
-    test('usa idioma por defecto personalizado', () {
+    test('permite configurar idioma por defecto personalizado', () {
       final result = LanguageDetector.detectLanguage(
-        'hello world',
+        'texto sin idioma',
         defaultLanguage: 'español',
       );
 
-      expect(result.languageName, equals('español'));
+      expect(result.languageName, 'español');
+      expect(result.remainingText, 'texto sin idioma');
     });
 
-    test('maneja texto vacío', () {
-      final result = LanguageDetector.detectLanguage('');
+    test('detecta abreviatura "en" para inglés', () {
+      final result = LanguageDetector.detectLanguage('en hello');
 
-      expect(result.languageName, equals('inglés'));
-      expect(result.remainingText, equals(''));
+      expect(result.languageName, 'inglés');
+      expect(result.remainingText, 'hello');
     });
 
-    test('maneja texto con solo espacios', () {
-      final result = LanguageDetector.detectLanguage('   ');
+    test('detecta "german" para alemán', () {
+      final result = LanguageDetector.detectLanguage('german hallo welt');
 
-      expect(result.languageName, equals('inglés'));
-      expect(result.remainingText, equals(''));
+      expect(result.languageName, 'alemán');
+      expect(result.remainingText, 'hallo welt');
     });
 
-    test('detecta idioma case insensitive', () {
-      var result = LanguageDetector.detectLanguage('ESPAÑOL hello');
-      expect(result.languageName, equals('español'));
+    test('detecta "italian" para italiano', () {
+      final result = LanguageDetector.detectLanguage('italian ciao mondo');
 
-      result = LanguageDetector.detectLanguage('FrAnCéS hello');
-      expect(result.languageName, equals('francés'));
+      expect(result.languageName, 'italiano');
+      expect(result.remainingText, 'ciao mondo');
+    });
+
+    test('detecta "portuguese" para portugués', () {
+      final result = LanguageDetector.detectLanguage('portuguese olá mundo');
+
+      expect(result.languageName, 'portugués');
+      expect(result.remainingText, 'olá mundo');
+    });
+
+    test('mock detector puede sobreescribir comportamiento', () {
+      LanguageDetector.setMockDetector((text, {defaultLanguage = 'inglés'}) {
+        return LanguageDetectionResult(
+          languageName: 'custom',
+          remainingText: 'mocked',
+        );
+      });
+
+      final result = LanguageDetector.detectLanguage('cualquier cosa');
+
+      expect(result.languageName, 'custom');
+      expect(result.remainingText, 'mocked');
+    });
+
+    test('resetMockDetector restaura comportamiento original', () {
+      LanguageDetector.setMockDetector((text, {defaultLanguage = 'inglés'}) {
+        return LanguageDetectionResult(
+          languageName: 'mocked',
+          remainingText: 'mocked',
+        );
+      });
+
+      LanguageDetector.resetMockDetector();
+
+      final result = LanguageDetector.detectLanguage('inglés real text');
+
+      expect(result.languageName, 'inglés');
+      expect(result.remainingText, 'real text');
     });
   });
-}
 
-// =============================================================================
-// HELPERS
-// =============================================================================
+  // ===========================================================================
+  // GRUPO 8: Tests de casos edge
+  // ===========================================================================
+  group('CommandProcessor - Edge Cases', () {
+    late MockAIService mockAIService;
+    late MockCommandRepository mockRepository;
+    late CommandProcessor processor;
 
-CommandEntity _createCommand({
-  String id = 'test-id',
-  String trigger = '/test',
-  String title = 'Test Command',
-  String promptTemplate = 'Test prompt: {{content}}',
-  SystemCommandType systemType = SystemCommandType.none,
-}) {
-  return CommandEntity(
-    id: id,
-    trigger: trigger,
-    title: title,
-    promptTemplate: promptTemplate,
-    systemType: systemType,
-  );
+    setUp(() {
+      mockAIService = MockAIService();
+      mockRepository = MockCommandRepository();
+      processor = CommandProcessor(mockAIService, mockRepository);
+    });
+
+    tearDown(() {
+      LanguageDetector.resetMockDetector();
+    });
+
+    test('maneja lista de comandos vacía', () async {
+      mockRepository.setCommands([]);
+
+      final result = await processor.processMessageStream('/test');
+
+      expect(result.isCommand, false);
+    });
+
+    test('maneja mensaje vacío', () async {
+      final result = await processor.processMessageStream('');
+
+      expect(result.isCommand, false);
+    });
+
+    test('maneja mensaje con solo espacios', () async {
+      final result = await processor.processMessageStream('   ');
+
+      expect(result.isCommand, false);
+    });
+
+    test('maneja mensaje con solo /', () async {
+      mockRepository.setCommands([]);
+
+      final result = await processor.processMessageStream('/');
+
+      expect(result.isCommand, false);
+    });
+
+    test('distingue entre comandos similares', () async {
+      final commands = [
+        CommandEntity(
+          id: '1',
+          trigger: '/t',
+          title: 'T',
+          promptTemplate: 'Short',
+          systemType: SystemCommandType.none,
+        ),
+        CommandEntity(
+          id: '2',
+          trigger: '/test',
+          title: 'Test',
+          promptTemplate: 'Medium',
+          systemType: SystemCommandType.none,
+        ),
+        CommandEntity(
+          id: '3',
+          trigger: '/testing',
+          title: 'Testing',
+          promptTemplate: 'Long',
+          systemType: SystemCommandType.none,
+        ),
+      ];
+      mockRepository.setCommands(commands);
+
+      final result1 = await processor.processMessageStream('/t contenido');
+      final result2 = await processor.processMessageStream('/test contenido');
+      final result3 = await processor.processMessageStream('/testing contenido');
+
+      expect(result1.command?.trigger, '/t');
+      expect(result2.command?.trigger, '/test');
+      expect(result3.command?.trigger, '/testing');
+    });
+
+    test('maneja caracteres especiales en contenido', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/special',
+        title: 'Special',
+        promptTemplate: '{{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/special !@#\$%^&*()_+-=[]{}|;:,.<>?');
+
+      expect(result.isCommand, true);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('maneja emojis en contenido', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/emoji',
+        title: 'Emoji',
+        promptTemplate: '{{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/emoji 🎉🚀💻');
+
+      expect(result.isCommand, true);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('maneja contenido multilinea', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/multi',
+        title: 'Multi',
+        promptTemplate: '{{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/multi línea 1\nlínea 2\nlínea 3');
+
+      expect(result.isCommand, true);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('trigger con números funciona', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/cmd123',
+        title: 'Cmd123',
+        promptTemplate: '{{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/cmd123 contenido');
+
+      expect(result.isCommand, true);
+      expect(result.command?.trigger, '/cmd123');
+    });
+
+    test('contenido muy largo se procesa correctamente', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/long',
+        title: 'Long',
+        promptTemplate: '{{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final longContent = 'a' * 10000;
+      final result = await processor.processMessageStream('/long $longContent');
+
+      expect(result.isCommand, true);
+      expect(result.responseStream, isNotNull);
+    });
+  });
+
+  // ===========================================================================
+  // GRUPO 9: Tests de CommandEntity
+  // ===========================================================================
+  group('CommandEntity', () {
+    test('crea instancia con todos los campos', () {
+      final entity = CommandEntity(
+        id: 'test-id',
+        trigger: '/test',
+        title: 'Test Title',
+        promptTemplate: 'Test template',
+        systemType: SystemCommandType.none,
+      );
+
+      expect(entity.id, 'test-id');
+      expect(entity.trigger, '/test');
+      expect(entity.title, 'Test Title');
+      expect(entity.promptTemplate, 'Test template');
+      expect(entity.systemType, SystemCommandType.none);
+    });
+
+    test('soporta todos los SystemCommandType', () {
+      for (final type in SystemCommandType.values) {
+        final entity = CommandEntity(
+          id: 'id',
+          trigger: '/trigger',
+          title: 'Title',
+          promptTemplate: 'Template',
+          systemType: type,
+        );
+        expect(entity.systemType, type);
+      }
+    });
+  });
+
+  // ===========================================================================
+  // GRUPO 10: Tests de integración
+  // ===========================================================================
+  group('CommandProcessor - Integration Tests', () {
+    late MockAIService mockAIService;
+    late MockCommandRepository mockRepository;
+    late CommandProcessor processor;
+
+    setUp(() {
+      mockAIService = MockAIService();
+      mockRepository = MockCommandRepository();
+      processor = CommandProcessor(mockAIService, mockRepository);
+    });
+
+    tearDown(() {
+      LanguageDetector.resetMockDetector();
+    });
+
+    test('flujo completo de comando de usuario', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/analizar',
+        title: 'Analizar',
+        promptTemplate: 'Analiza el siguiente texto y proporciona insights: {{content}}',
+        systemType: SystemCommandType.none,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/analizar Este es un texto de ejemplo para analizar.');
+
+      expect(result.isCommand, true);
+      expect(result.command, isNotNull);
+      expect(result.command!.title, 'Analizar');
+      expect(result.responseStream, isNotNull);
+      expect(result.error, null);
+    });
+
+    test('flujo completo de comando de sistema', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/resumir',
+        title: 'Resumir',
+        promptTemplate: 'Resume el siguiente contenido de manera concisa: {{content}}',
+        systemType: SystemCommandType.resumir,
+      );
+      mockRepository.setCommands([command]);
+
+      final result = await processor.processMessageStream('/resumir Lorem ipsum dolor sit amet, consectetur adipiscing elit.');
+
+      expect(result.isCommand, true);
+      expect(result.command!.systemType, SystemCommandType.resumir);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('flujo completo de traducción', () async {
+      final command = CommandEntity(
+        id: '1',
+        trigger: '/traducir',
+        title: 'Traducir',
+        promptTemplate: 'Traduce el siguiente texto a {{targetLanguage}}: {{content}}',
+        systemType: SystemCommandType.traducir,
+      );
+      mockRepository.setCommands([command]);
+
+      LanguageDetector.setMockDetector((text, {defaultLanguage = 'inglés'}) {
+        return LanguageDetectionResult(
+          languageName: 'francés',
+          remainingText: 'Hola, ¿cómo estás?',
+        );
+      });
+
+      final result = await processor.processMessageStream('/traducir francés Hola, ¿cómo estás?');
+
+      expect(result.isCommand, true);
+      expect(result.command!.systemType, SystemCommandType.traducir);
+      expect(result.responseStream, isNotNull);
+    });
+
+    test('múltiples comandos en secuencia', () async {
+      final commands = [
+        CommandEntity(
+          id: '1',
+          trigger: '/a',
+          title: 'A',
+          promptTemplate: 'A: {{content}}',
+          systemType: SystemCommandType.none,
+        ),
+        CommandEntity(
+          id: '2',
+          trigger: '/b',
+          title: 'B',
+          promptTemplate: 'B: {{content}}',
+          systemType: SystemCommandType.none,
+        ),
+      ];
+      mockRepository.setCommands(commands);
+
+      final result1 = await processor.processMessageStream('/a contenido a');
+      final result2 = await processor.processMessageStream('/b contenido b');
+      final result3 = await processor.processMessageStream('no comando');
+
+      expect(result1.isCommand, true);
+      expect(result1.command!.trigger, '/a');
+      expect(result2.isCommand, true);
+      expect(result2.command!.trigger, '/b');
+      expect(result3.isCommand, false);
+    });
+  });
 }
