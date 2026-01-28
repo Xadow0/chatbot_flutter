@@ -31,6 +31,7 @@ class _FakeHttpClient implements HttpClient {
     return _FakeHttpRequest(statusCode);
   }
 
+  @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -44,6 +45,7 @@ class _FakeHttpRequest implements HttpClientRequest {
     return _FakeHttpResponse(statusCode);
   }
 
+  @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -67,6 +69,7 @@ class _FakeHttpResponse implements HttpClientResponse {
         onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }
 
+  @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

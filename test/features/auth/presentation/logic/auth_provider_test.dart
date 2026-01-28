@@ -10,7 +10,6 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 // =============================================================================
 import 'package:chatbot_app/features/auth/presentation/logic/auth_provider.dart';
 import 'package:chatbot_app/features/auth/domain/repositories/auth_repository.dart';
-import 'package:chatbot_app/features/auth/data/datasources/firebase_sync_service.dart';
 import 'package:chatbot_app/features/commands/presentation/logic/command_provider.dart';
 import 'package:chatbot_app/features/commands/data/datasources/firebase_command_sync.dart';
 
