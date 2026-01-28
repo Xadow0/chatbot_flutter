@@ -24,8 +24,8 @@ class OllamaService {
   final _connectionController = StreamController<ConnectionInfo>.broadcast();
 
   OllamaService({String? apiKey}) : _apiKey = apiKey {
-    _tailscaleUrl = dotenv.env['TAILSCALE_URL'] ?? 'http://100.125.201.64:3001';
-    _fallbackUrl = dotenv.env['FALLBACK_URL'] ?? 'http://192.168.1.100:3001';
+    _tailscaleUrl = dotenv.env['TAILSCALE_URL'] ?? '';
+    _fallbackUrl = dotenv.env['FALLBACK_URL'] ?? '';
 
     _baseUrl = _tailscaleUrl;
 
@@ -46,6 +46,17 @@ class OllamaService {
   }
 
   Future<void> _detectBestConnection() async {
+    // Si las URLs están vacías (no config en .env), reportamos error
+    if (_tailscaleUrl.isEmpty && _fallbackUrl.isEmpty) {
+      debugPrint('❌ [OllamaService] URLs no configuradas en .env');
+      _updateConnectionStatus(
+        ConnectionStatus.error,
+        '',
+        errorMessage: 'URLs no configuradas en .env',
+      );
+      return;
+    }
+
     debugPrint('🔍 [OllamaService] Detectando mejor conexión...');
     _updateConnectionStatus(ConnectionStatus.connecting, _tailscaleUrl);
 
@@ -62,32 +73,36 @@ class OllamaService {
 
     debugPrint('📶 [OllamaService] Conectividad: $connectivityResult');
 
-    debugPrint('🔗 [OllamaService] Probando conexión Tailscale: $_tailscaleUrl');
-    if (await _testConnection(_tailscaleUrl)) {
-      _baseUrl = _tailscaleUrl;
-      debugPrint('✅ [OllamaService] Conexión Tailscale establecida');
-      final health = await _getHealthData(_tailscaleUrl);
-      _updateConnectionStatus(
-        ConnectionStatus.connected,
-        _tailscaleUrl,
-        isHealthy: true,
-        healthData: health,
-      );
-      return;
+    if (_tailscaleUrl.isNotEmpty) {
+      debugPrint('🔗 [OllamaService] Probando conexión Tailscale: $_tailscaleUrl');
+      if (await _testConnection(_tailscaleUrl)) {
+        _baseUrl = _tailscaleUrl;
+        debugPrint('✅ [OllamaService] Conexión Tailscale establecida');
+        final health = await _getHealthData(_tailscaleUrl);
+        _updateConnectionStatus(
+          ConnectionStatus.connected,
+          _tailscaleUrl,
+          isHealthy: true,
+          healthData: health,
+        );
+        return;
+      }
     }
 
-    debugPrint('🔗 [OllamaService] Probando conexión local: $_fallbackUrl');
-    if (await _testConnection(_fallbackUrl)) {
-      _baseUrl = _fallbackUrl;
-      debugPrint('✅ [OllamaService] Conexión local establecida');
-      final health = await _getHealthData(_fallbackUrl);
-      _updateConnectionStatus(
-        ConnectionStatus.connected,
-        _fallbackUrl,
-        isHealthy: true,
-        healthData: health,
-      );
-      return;
+    if (_fallbackUrl.isNotEmpty) {
+      debugPrint('🔗 [OllamaService] Probando conexión local: $_fallbackUrl');
+      if (await _testConnection(_fallbackUrl)) {
+        _baseUrl = _fallbackUrl;
+        debugPrint('✅ [OllamaService] Conexión local establecida');
+        final health = await _getHealthData(_fallbackUrl);
+        _updateConnectionStatus(
+          ConnectionStatus.connected,
+          _fallbackUrl,
+          isHealthy: true,
+          healthData: health,
+        );
+        return;
+      }
     }
 
     debugPrint('❌ [OllamaService] No se puede conectar al servidor');
@@ -99,6 +114,7 @@ class OllamaService {
   }
 
   Future<bool> _testConnection(String url) async {
+    if (url.isEmpty) return false;
     try {
       debugPrint('   🔌 Probando: $url/api/health');
       final response = await http
